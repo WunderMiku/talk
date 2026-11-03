@@ -848,7 +848,54 @@ window.TALK_DATA = (() => {
       title: "安静地好奇",
       words: "curious · wander · ephemeral",
       target: "curious"
+    },
+    {
+      tone: "lime",
+      kicker: "04 · 恢复",
+      title: "温柔地恢复",
+      words: "resilient · solace · luminous",
+      target: "resilient"
+    },
+    {
+      tone: "lavender",
+      kicker: "05 · 远行",
+      title: "走到很远",
+      words: "wander · ephemeral · curious",
+      target: "wander"
+    },
+    {
+      tone: "coral",
+      kicker: "06 · 留白",
+      title: "慢一点说",
+      words: "solace · nuance · ephemeral",
+      target: "solace"
+    },
+    {
+      tone: "lime",
+      kicker: "07 · 清醒",
+      title: "锋利而温柔",
+      words: "nuance · resilient · serendipity",
+      target: "nuance"
+    },
+    {
+      tone: "lavender",
+      kicker: "08 · 微光",
+      title: "把光留住",
+      words: "luminous · serendipitous · solace",
+      target: "luminous"
     }
+  ];
+
+  const dailyWords = [
+    "serendipity",
+    "ephemeral",
+    "resilient",
+    "curious",
+    "luminous",
+    "wander",
+    "nuance",
+    "solace",
+    "serendipitous"
   ];
 
   const lexicon = {
@@ -1007,5 +1054,5 @@ window.TALK_DATA = (() => {
     { type: "sentence", query: "We are all ephemeral guests on a planet that will outlast us." }
   ];
 
-  return { words, sentences, moods, lexicon, recent };
+  return { words, sentences, moods, dailyWords, lexicon, recent };
 })();

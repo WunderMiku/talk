@@ -72,7 +72,7 @@ Pages artifact at deploy time.
    such as `.github/workflows/pages.yml`.
 3. Open **Settings → Pages**.
 4. Set **Build and deployment → Source** to **GitHub Actions**.
-5. Run the workflow from the **Actions** tab (or push to `main`).
+5. Run the workflow from the **Actions** tab (or push to `main` / `master`).
 6. After the deployment finishes, open:
 
    ```text
@@ -105,6 +105,21 @@ remove or ignore the Pages workflow if you do not want it to run.
 
 The GitHub web upload form has a 25 MB limit, so the branch route requires Git
 for the 92 MB model.
+
+## Generation depth and cache
+
+- **快速**: fewer senses/relations/examples; `max_tokens` 1400.
+- **标准**: default; `max_tokens` 2600.
+- **深入**: more senses/relations/examples; `max_tokens` 3800.
+
+The setting lives in model settings and is stored locally. Word entries are
+cached for up to 300 words / 90 days; cached entries are tagged with the depth
+that produced them, so switching depth does not reuse the wrong shape of data.
+
+The default model is `deepseek-chat`. This is a normal chat model, not a
+reasoning model; there is no hidden chain-of-thought budget to tune.
+`deepseek-reasoner` is a separate, slower option and is not recommended for
+dictionary lookups.
 
 ## Model API
 

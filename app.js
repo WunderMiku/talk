@@ -19,12 +19,12 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "detailLevel"];
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   const WORD_CACHE_KEY = "talk.wordcache.v1";
-  const WORD_CACHE_TTL = 1000 * 60 * 60 * 24 * 30;
-  const WORD_CACHE_MAX = 120;
+  const WORD_CACHE_TTL = 1000 * 60 * 60 * 24 * 90;
+  const WORD_CACHE_MAX = 300;
 
   const DEFAULT_SETTINGS = {
     provider: "deepseek",
@@ -34,6 +34,7 @@
     remember: false,
     prefetch: false,
     cacheDisplay: "borders",
+    detailLevel: "standard",
     ttsEngine: "kokoro",
     kokoroVoice: "af_heart"
   };
@@ -48,6 +49,45 @@
     ["bf_emma", "Emma · 英式女声"],
     ["bm_george", "George · 英式男声"]
   ];
+
+  const DETAIL_LEVELS = {
+    fast: {
+      label: "快速",
+      maxTokens: 1400,
+      senses: 1,
+      family: 2,
+      synonyms: 2,
+      antonyms: 1,
+      examples: 1,
+      collocations: 2,
+      stages: 2,
+      keyWords: 3
+    },
+    standard: {
+      label: "标准",
+      maxTokens: 2600,
+      senses: 2,
+      family: 3,
+      synonyms: 3,
+      antonyms: 2,
+      examples: 2,
+      collocations: 4,
+      stages: 3,
+      keyWords: 4
+    },
+    deep: {
+      label: "深入",
+      maxTokens: 3800,
+      senses: 3,
+      family: 4,
+      synonyms: 4,
+      antonyms: 3,
+      examples: 3,
+      collocations: 5,
+      stages: 4,
+      keyWords: 5
+    }
+  };
 
   const PROVIDERS = {
     deepseek: { baseUrl: "https://api.deepseek.com", model: "deepseek-chat" },
@@ -76,7 +116,8 @@
     toastTimer: null,
     sheetCloseTimer: null,
     lastAttempt: null,
-    openKey: 0
+    openKey: 0,
+    moodOffset: 0
   };
 
   /* ============================================================
@@ -301,6 +342,7 @@
       apiKey: String(parsed.apiKey || ""),
       remember: Boolean(parsed.remember),
       ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "kokoro",
+      detailLevel: preferences.detailLevel || parsed.detailLevel || "standard",
       kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart"
     };
   }
@@ -378,11 +420,12 @@
     }
   }
 
-  function cacheGetWord(word) {
+  function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
     const key = normalizeWord(word);
     const all = loadWordCache();
     const hit = all[key];
     if (!hit || !hit.data) return null;
+    if (hit.detail && hit.detail !== detail) return null;
     if (Date.now() - Number(hit.at || 0) > WORD_CACHE_TTL) {
       delete all[key];
       try { localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(all)); } catch (_) { /* no-op */ }
@@ -391,12 +434,12 @@
     return { ...hit.data, cached: true };
   }
 
-  function cachePutWord(word, data) {
+  function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard") {
     const key = normalizeWord(word);
     if (!key || !data) return;
     const all = loadWordCache();
     const { context, ...clean } = data;
-    all[key] = { at: Date.now(), data: clean };
+    all[key] = { at: Date.now(), detail, data: clean };
     const entries = Object.entries(all)
       .sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0))
       .slice(0, WORD_CACHE_MAX);
@@ -785,8 +828,54 @@
      Home
      ============================================================ */
 
+  function dayNumber(date = new Date()) {
+    const start = new Date(date.getFullYear(), 0, 0);
+    return Math.floor((date - start) / 86400000);
+  }
+
+  function dailyEntry() {
+    const keys = Array.isArray(DATA.dailyWords) && DATA.dailyWords.length
+      ? DATA.dailyWords
+      : Object.keys(DATA.words);
+    const key = keys[dayNumber() % keys.length];
+    return DATA.words[key] || DATA.words[keys[0]] || null;
+  }
+
+  function visibleMoods() {
+    const pool = Array.isArray(DATA.moods) ? DATA.moods : [];
+    if (!pool.length) return [];
+    const count = Math.min(3, pool.length);
+    const start = (dayNumber() + state.moodOffset) % pool.length;
+    return Array.from({ length: count }, (_, index) => pool[(start + index) % pool.length]);
+  }
+
+  function moodCardsMarkup(moods) {
+    return moods.map((mood) => `
+      <button class="mood-card ${mood.tone}" type="button" data-action="word" data-word="${attr(mood.target)}" aria-label="探索${attr(mood.title)}">
+        <span class="mood-kicker"><span>${esc(mood.kicker)}</span><span>↗</span></span>
+        <strong class="mood-title">${esc(mood.title)}</strong>
+        <span class="mood-words">${esc(mood.words)}</span>
+      </button>`).join("");
+  }
+
+  function renderMoods() {
+    const container = $("#mood-scroll");
+    if (!container) return;
+    const moods = visibleMoods();
+    container.innerHTML = moodCardsMarkup(moods);
+    const count = $("#mood-count");
+    if (count) count.textContent = `${String(moods.length).padStart(2, "0")} 组词单`;
+    container.classList.remove("is-swapping");
+    void container.offsetWidth;
+    container.classList.add("is-swapping");
+  }
+
   function homePage() {
     const recent = state.history.length ? state.history.slice(0, 3) : sanitizeHistory(DATA.recent);
+    const daily = dailyEntry();
+    const moods = visibleMoods();
+    const registerLabels = { common: "日常", formal: "正式", literary: "文学", informal: "口语", technical: "技术" };
+    const dailyKicker = daily ? `${String(dayNumber()).padStart(3, "0")} · ${registerLabels[daily.register] || "每日"}` : "每日";
     return `
       ${homeTopbar()}
       <section class="home-hero">
@@ -830,22 +919,22 @@
             <span class="section-kicker">每天一个小仪式</span>
             <h2>今日一词</h2>
           </div>
-          <span class="side-note">N° 001</span>
+          <span class="side-note">N° ${String(dayNumber()).padStart(3, "0")}</span>
         </div>
-        <button class="daily" type="button" data-action="word" data-word="serendipity" aria-label="打开 serendipity">
+        ${daily ? `<button class="daily" type="button" data-action="word" data-word="${attr(daily.word)}" aria-label="打开 ${attr(daily.word)}">
           <div class="daily-top">
-            <span class="mono">美丽的意外</span>
+            <span class="mono">${esc(dailyKicker)}</span>
             <span class="daily-badge"><i></i>今日词条</span>
           </div>
           <div class="daily-main">
-            <p class="daily-word">serendipity</p>
-            <div class="daily-phonetic">/ˌser.ənˈdɪp.ə.ti/ · noun</div>
+            <p class="daily-word">${esc(daily.word)}</p>
+            <div class="daily-phonetic">${esc(daily.phonetic || "")} · ${esc(daily.pos || "word")}</div>
           </div>
           <div class="daily-bottom">
-            <p class="daily-meaning">意外发现美好事物的运气；机缘巧合。中文先行，英文补充。</p>
+            <p class="daily-meaning">${esc(daily.translation || daily.short || "")}</p>
             <span class="daily-arrow">${icon("arrowUpRight")}</span>
           </div>
-        </button>
+        </button>` : ""}
       </section>
 
       <section class="section reveal" style="--d:2.5">
@@ -854,15 +943,13 @@
             <span class="section-kicker">跟着感觉走</span>
             <h2>按心情漫游</h2>
           </div>
-          <span class="side-note">03 组词单</span>
+          <div class="section-actions">
+            <span class="side-note" id="mood-count">${String(moods.length).padStart(2, "0")} 组词单</span>
+            <button class="mood-refresh" type="button" data-action="shuffle-moods">换一组</button>
+          </div>
         </div>
-        <div class="mood-scroll">
-          ${DATA.moods.map((mood) => `
-            <button class="mood-card ${mood.tone}" type="button" data-action="word" data-word="${attr(mood.target)}" aria-label="探索${attr(mood.title)}">
-              <span class="mood-kicker"><span>${esc(mood.kicker)}</span><span>↗</span></span>
-              <strong class="mood-title">${esc(mood.title)}</strong>
-              <span class="mood-words">${esc(mood.words)}</span>
-            </button>`).join("")}
+        <div class="mood-scroll" id="mood-scroll">
+          ${moodCardsMarkup(moods)}
         </div>
       </section>
 
@@ -1991,6 +2078,14 @@
           <input id="model-name" type="text" data-setting="model" value="${attr(draft.model)}" placeholder="deepseek-chat" spellcheck="false" autocomplete="off" />
         </div>
         <div class="field">
+          <label>生成深度</label>
+          <div class="detail-switch" role="group" aria-label="生成深度">
+            ${Object.entries(DETAIL_LEVELS).map(([id, item]) => `
+              <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
+          </div>
+          <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。词典建议使用 deepseek-chat，deepseek-reasoner 会更慢。</p>
+        </div>
+        <div class="field">
           <label for="api-key">API 密钥</label>
           <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
           <p class="field-hint">密钥只会发送到你的接口。当前 HTML 原型保存在浏览器中；Android 版会改用系统 Keystore。</p>
@@ -2027,7 +2122,7 @@
           <button class="btn btn-primary" type="button" data-action="save-settings">${icon("check")} 保存</button>
           <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试</button>
         </div>
-        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>子词条缓存：</b>模型生成的词条会保存在本机，最多 120 个、30 天后过期。<button class="link-btn" type="button" data-action="clear-word-cache">清除缓存</button></p>
+        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>子词条缓存：</b>模型生成的词条会保存在本机，最多 300 个、90 天后过期。<button class="link-btn" type="button" data-action="clear-word-cache">清除缓存</button></p>
       </div>`;
   }
 
@@ -2267,7 +2362,8 @@
     ].join(" ");
   }
 
-  function wordPrompt(query) {
+  function wordPrompt(query, detail = "standard") {
+    const level = DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard;
     return `请为一位中文母语学习者查这个词或短语：「${query}」。
 
 只返回下面结构的 JSON：
@@ -2304,10 +2400,11 @@
   }
 }
 
-规则：在生成词条前先判断输入是否像拼写错误。只有当你高置信度地知道用户想查哪个正确英文词时，才把 spelling.changed 设为 true，并把 spelling.corrected 设为该词；随后整条词条必须针对 corrected 生成。拼写正确时 changed 为 false，corrected 重复原词。不要为了“纠正”而改动真实存在的生僻词、人名、品牌名或外来词。有多个真实义项时给 2 个，否则 1 个；同根词 2-4 个；近义词 3-4 个；反义词 2-3 个；例句 2 个；搭配 4 个。近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作为词汇本身的补充。词源必须尽量准确；不确定的词源可以给空对象，不要编故事。`;
+规则：在生成词条前先判断输入是否像拼写错误。只有当你高置信度地知道用户想查哪个正确英文词时，才把 spelling.changed 设为 true，并把 spelling.corrected 设为该词；随后整条词条必须针对 corrected 生成。拼写正确时 changed 为 false，corrected 重复原词。不要为了“纠正”而改动真实存在的生僻词、人名、品牌名或外来词。本次深度为「${level.label}」：义项 ${level.senses} 个；同根词 ${level.family} 个；近义词 ${level.synonyms} 个；反义词 ${level.antonyms} 个；例句 ${level.examples} 个；搭配 ${level.collocations} 个；词源演变 ${level.stages} 个阶段。近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作为词汇本身的补充。词源必须尽量准确；不确定的词源可以给空对象，不要编故事。`;
   }
 
-  function sentencePrompt(query) {
+  function sentencePrompt(query, detail = "standard") {
+    const level = DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard;
     return `请为一位中文母语学习者拆解这句英文：
 "${query}"
 
@@ -2335,16 +2432,17 @@
   ]
 }
 
-挑选 3-5 个真正重要的词：支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。每个重点词至少给 1 个同根词、2 个近义词、1 个反义词和 1 个例句。中文负责解释，英文负责呈现词汇本身。`;
+挑选 ${level.keyWords} 个真正重要的词：支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。每个重点词至少给 1 个同根词、${level.synonyms} 个近义词、${level.antonyms} 个反义词和 1 个例句。中文负责解释，英文负责呈现词汇本身。`;
   }
 
   async function modelLookup(query, type, cfg) {
+    const detail = cfg.detailLevel || "standard";
     if (type === "word") {
-      const cached = cacheGetWord(query);
+      const cached = cacheGetWord(query, detail);
       if (cached) return { type: "word", data: cached };
     }
     const endpoint = endpointFor(cfg.baseUrl);
-    const prompt = type === "sentence" ? sentencePrompt(query) : wordPrompt(query);
+    const prompt = type === "sentence" ? sentencePrompt(query, detail) : wordPrompt(query, detail);
     const messages = [
       { role: "system", content: systemPrompt() },
       { role: "user", content: prompt }
@@ -2353,7 +2451,7 @@
     const timer = window.setTimeout(() => controller.abort(), 60_000);
     let response;
     try {
-      response = await postChat(endpoint, cfg, messages, controller.signal, true);
+      response = await postChat(endpoint, cfg, messages, controller.signal, true, (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens);
     } finally {
       window.clearTimeout(timer);
     }
@@ -2373,8 +2471,8 @@
       const data = normalizeModelWord(parsed, query);
       data.source = "model";
       data.model = cfg.model;
-      cachePutWord(normalizeWord(data.word), data);
-      if (normalizeWord(query) !== normalizeWord(data.word)) cachePutWord(query, data);
+      cachePutWord(normalizeWord(data.word), data, detail);
+      if (normalizeWord(query) !== normalizeWord(data.word)) cachePutWord(query, data, detail);
       return { type: "word", data };
     }
     const data = normalizeModelSentence(parsed, query);
@@ -2384,12 +2482,12 @@
     return { type: "sentence", data };
   }
 
-  async function postChat(endpoint, cfg, messages, signal, allowJsonMode) {
+  async function postChat(endpoint, cfg, messages, signal, allowJsonMode, maxTokens = 2600) {
     const body = {
       model: cfg.model,
       messages,
       temperature: 0.4,
-      max_tokens: 3000,
+      max_tokens: maxTokens,
       stream: false
     };
     if (allowJsonMode) body.response_format = { type: "json_object" };
@@ -2743,6 +2841,22 @@
           state.draft.baseUrl = PROVIDERS[state.draft.provider].baseUrl || state.draft.baseUrl;
           state.draft.model = PROVIDERS[state.draft.provider].model || state.draft.model;
         }
+        renderSettingsContent();
+        break;
+
+      case "shuffle-moods":
+        event.preventDefault();
+        state.moodOffset += 3;
+        renderMoods();
+        tapFeedback();
+        break;
+
+      case "detail-level":
+        event.preventDefault();
+        if (!state.draft) break;
+        state.draft.detailLevel = target.dataset.level || "standard";
+        state.settings = { ...state.settings, detailLevel: state.draft.detailLevel };
+        persistSettings(state.settings);
         renderSettingsContent();
         break;
 
