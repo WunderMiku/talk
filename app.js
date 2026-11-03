@@ -23,8 +23,13 @@
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   const WORD_CACHE_KEY = "talk.wordcache.v1";
+  const WORD_DB_NAME = "talk.words.v1";
+  const WORD_DB_STORE = "entries";
   const WORD_CACHE_TTL = 1000 * 60 * 60 * 24 * 90;
   const WORD_CACHE_MAX = 300;
+  let wordDb = null;
+  let wordStoreFallback = false;
+  const wordCache = new Map();
 
   const DEFAULT_SETTINGS = {
     provider: "deepseek",
@@ -411,7 +416,7 @@
     try { localStorage.setItem(SAVED_KEY, JSON.stringify(state.saved)); } catch (_) { /* no-op */ }
   }
 
-  function loadWordCache() {
+  function legacyWordCache() {
     try {
       const parsed = JSON.parse(localStorage.getItem(WORD_CACHE_KEY) || "{}");
       return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
@@ -420,15 +425,90 @@
     }
   }
 
+  function persistFallbackWordCache() {
+    const entries = [...wordCache.values()]
+      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
+      .slice(0, WORD_CACHE_MAX);
+    try {
+      localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(Object.fromEntries(entries.map((item) => [item.key, item]))));
+    } catch (_) {
+      try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
+    }
+  }
+
+  async function initWordStore() {
+    if (!window.idb?.openDB || !("indexedDB" in window)) {
+      wordStoreFallback = true;
+      const legacy = legacyWordCache();
+      for (const [key, hit] of Object.entries(legacy)) {
+        if (hit?.data) wordCache.set(normalizeWord(key), { ...hit, key: normalizeWord(key) });
+      }
+      return;
+    }
+    try {
+      wordDb = await window.idb.openDB(WORD_DB_NAME, 1, {
+        upgrade(db) {
+          if (!db.objectStoreNames.contains(WORD_DB_STORE)) {
+            db.createObjectStore(WORD_DB_STORE, { keyPath: "key" });
+          }
+        }
+      });
+      const entries = await wordDb.getAll(WORD_DB_STORE);
+      for (const entry of entries) {
+        if (entry?.key && entry?.data) wordCache.set(entry.key, entry);
+      }
+      const legacy = legacyWordCache();
+      let migrated = 0;
+      for (const [key, hit] of Object.entries(legacy)) {
+        const normalized = normalizeWord(key);
+        if (!hit?.data || wordCache.has(normalized)) continue;
+        const record = {
+          key: normalized,
+          at: Number(hit.at) || Date.now(),
+          detail: hit.detail || "standard",
+          data: hit.data
+        };
+        wordCache.set(normalized, record);
+        await wordDb.put(WORD_DB_STORE, record);
+        migrated += 1;
+      }
+      if (migrated) {
+        try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
+      }
+      await pruneWordCache();
+    } catch (error) {
+      console.warn("IndexedDB word store unavailable; using localStorage fallback.", error);
+      wordStoreFallback = true;
+      const legacy = legacyWordCache();
+      for (const [key, hit] of Object.entries(legacy)) {
+        if (hit?.data) wordCache.set(normalizeWord(key), { ...hit, key: normalizeWord(key) });
+      }
+    }
+  }
+
+  async function removeWordRecord(key) {
+    wordCache.delete(key);
+    if (wordDb) {
+      try { await wordDb.delete(WORD_DB_STORE, key); } catch (_) { /* no-op */ }
+    } else if (wordStoreFallback) {
+      persistFallbackWordCache();
+    }
+  }
+
+  async function pruneWordCache() {
+    const entries = [...wordCache.entries()].sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
+    for (const [key] of entries.slice(WORD_CACHE_MAX)) {
+      await removeWordRecord(key);
+    }
+  }
+
   function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
     const key = normalizeWord(word);
-    const all = loadWordCache();
-    const hit = all[key];
+    const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
     if (hit.detail && hit.detail !== detail) return null;
     if (Date.now() - Number(hit.at || 0) > WORD_CACHE_TTL) {
-      delete all[key];
-      try { localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(all)); } catch (_) { /* no-op */ }
+      void removeWordRecord(key);
       return null;
     }
     return { ...hit.data, cached: true };
@@ -437,16 +517,93 @@
   function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard") {
     const key = normalizeWord(word);
     if (!key || !data) return;
-    const all = loadWordCache();
     const { context, ...clean } = data;
-    all[key] = { at: Date.now(), detail, data: clean };
-    const entries = Object.entries(all)
-      .sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0))
-      .slice(0, WORD_CACHE_MAX);
-    try { localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(Object.fromEntries(entries))); } catch (_) {
-      // A full storage quota should never break the lookup.
-      try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
+    const record = { key, at: Date.now(), detail, data: clean };
+    wordCache.set(key, record);
+    if (wordDb) {
+      wordDb.put(WORD_DB_STORE, record).catch((error) => {
+        console.warn("Could not write word cache to IndexedDB.", error);
+      });
+    } else if (wordStoreFallback) {
+      persistFallbackWordCache();
     }
+    void pruneWordCache();
+  }
+
+  async function clearWordStore() {
+    wordCache.clear();
+    if (wordDb) {
+      try { await wordDb.clear(WORD_DB_STORE); } catch (_) { /* no-op */ }
+    }
+    try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
+  }
+
+  function exportWordCache() {
+    const entries = [...wordCache.values()]
+      .filter((entry) => entry?.key && entry?.data)
+      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+    if (!entries.length) {
+      toast("还没有可导出的词条缓存");
+      return;
+    }
+    const payload = {
+      app: "talk.",
+      format: "talk.word-cache",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      entries
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `talk-word-cache-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`已导出 ${entries.length} 个词条`);
+  }
+
+  async function importWordCache(file) {
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) throw new Error("缓存文件超过 8MB");
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    const entries = Array.isArray(parsed) ? parsed : parsed?.entries;
+    if (!Array.isArray(entries)) throw new Error("不是有效的 Talk 缓存文件");
+    let count = 0;
+    for (const entry of entries) {
+      if (!entry || typeof entry !== "object") continue;
+      const data = entry.data && typeof entry.data === "object" ? entry.data : null;
+      if (!data) continue;
+      const key = normalizeWord(entry.key || data.word || "");
+      if (!key || !data.word) continue;
+      const record = {
+        key,
+        at: Number(entry.at) || Date.now(),
+        detail: entry.detail || "standard",
+        data
+      };
+      wordCache.set(key, record);
+      if (wordDb) await wordDb.put(WORD_DB_STORE, record);
+      count += 1;
+    }
+    if (!count) throw new Error("文件里没有可导入的词条");
+    await pruneWordCache();
+    if (wordStoreFallback) persistFallbackWordCache();
+    refreshCacheBorders();
+    return count;
+  }
+
+  function wordCacheStats() {
+    return {
+      count: wordCache.size,
+      max: WORD_CACHE_MAX,
+      ttlDays: Math.round(WORD_CACHE_TTL / 86400000),
+      backend: wordDb ? "IndexedDB" : "localStorage",
+      fallback: wordStoreFallback
+    };
   }
 
   function lookupWordDeduped(word) {
@@ -997,6 +1154,7 @@
       origin: normalizeOrigin(raw.origin || raw.etymology),
       spelling: normalizeSpelling(raw.spelling, raw.word),
       source: raw.source || "demo",
+      cached: Boolean(raw.cached),
       model: raw.model || ""
     };
   }
@@ -1033,6 +1191,7 @@
             <span class="kicker-pill accent">单词</span>
             <span class="kicker-pill">${esc(word.level)}</span>
             <span class="kicker-pill">${esc(registerLabel(word.register))}</span>
+            <span class="cache-state-pill ${word.source === "demo" ? "is-builtin" : word.cached ? "is-cached" : "is-generated"}">${word.source === "demo" ? "内置词条" : word.cached ? "本机缓存" : "本次生成"}</span>
           </div>
           <h1 class="word-title" aria-label="${attr(word.word)}">${letterTitle(word.word)}</h1>
           <div class="word-subrow reveal" style="--d:1">
@@ -2122,7 +2281,13 @@
           <button class="btn btn-primary" type="button" data-action="save-settings">${icon("check")} 保存</button>
           <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试</button>
         </div>
-        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>子词条缓存：</b>模型生成的词条会保存在本机，最多 300 个、90 天后过期。<button class="link-btn" type="button" data-action="clear-word-cache">清除缓存</button></p>
+        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>词条缓存：</b>优先读取本机 IndexedDB，未命中才请求模型；最多 300 个、90 天后过期。<span id="word-cache-stats">${wordCacheStats().count}/${wordCacheStats().max} 条 · ${wordCacheStats().backend}</span></p>
+        <div class="cache-actions">
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
+          <button class="link-btn" type="button" data-action="clear-word-cache">清除</button>
+          <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
+        </div>
       </div>`;
   }
 
@@ -2705,7 +2870,7 @@
      Interactions
      ============================================================ */
 
-  function handleClick(event) {
+  async function handleClick(event) {
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
@@ -2940,11 +3105,24 @@
 
       case "clear-word-cache":
         event.preventDefault();
-        try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
+        await clearWordStore();
         refreshCacheBorders();
-        const active = activeWordData();
-        if (active) schedulePrefetch(active);
-        toast("子词条缓存已清除");
+        {
+          const active = activeWordData();
+          if (active) schedulePrefetch(active);
+        }
+        renderSettingsContent();
+        toast("词条缓存已清除");
+        break;
+
+      case "export-word-cache":
+        event.preventDefault();
+        exportWordCache();
+        break;
+
+      case "import-word-cache":
+        event.preventDefault();
+        $("#word-cache-file")?.click();
         break;
 
       default:
@@ -2954,6 +3132,19 @@
 
   function handleInput(event) {
     const target = event.target;
+    if (target.id === "word-cache-file") {
+      const file = target.files?.[0];
+      target.value = "";
+      if (!file) return;
+      void importWordCache(file).then((count) => {
+        renderSettingsContent();
+        refreshCacheBorders();
+        toast(`已导入 ${count} 个词条`);
+      }).catch((error) => {
+        toast(`导入失败：${String(error?.message || error)}`);
+      });
+      return;
+    }
     if (target.id === "search-input") {
       autoGrow(target);
       updateSearchMeta();
@@ -3610,8 +3801,9 @@
      Init
      ============================================================ */
 
-  function init() {
+  async function init() {
     applyCacheDisplay();
+    await initWordStore();
     app.addEventListener("click", handleClick);
     app.addEventListener("input", handleInput);
     app.addEventListener("change", handleInput);
@@ -3640,9 +3832,14 @@
         if (sentence) navigate({ name: "sentence", id, result: sentence });
       },
       search: (query, mode = "auto") => runSearch(query, mode),
+      wordCacheStats,
+      exportWordCache,
       state
     };
   }
 
-  init();
+  init().catch((error) => {
+    console.error("Talk failed to initialise.", error);
+    renderRoute({ name: "home" }, "forward", { instant: true });
+  });
 })();

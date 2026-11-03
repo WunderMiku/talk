@@ -35,6 +35,7 @@ for voice in af_heart af_bella af_nicole am_michael bf_emma bm_george; do
 done
 
 echo "Downloading Kokoro JS and ONNX runtime..."
+fetch "https://cdn.jsdelivr.net/npm/idb@8.0.0/build/umd.js" "${VENDOR_DIR}/idb.js"
 fetch "https://cdn.jsdelivr.net/npm/kokoro-js@1.2.1/dist/kokoro.web.js" "${VENDOR_DIR}/kokoro.web.js"
 fetch "https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}/dist/ort-wasm-simd-threaded.jsep.wasm" "${ORT_DIR}/ort-wasm-simd-threaded.jsep.wasm"
 fetch "https://cdn.jsdelivr.net/npm/@huggingface/transformers@${TRANSFORMERS_VERSION}/dist/ort-wasm-simd-threaded.jsep.mjs" "${ORT_DIR}/ort-wasm-simd-threaded.jsep.mjs"

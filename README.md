@@ -23,12 +23,18 @@ vendor/
   ort/ort-wasm-simd-threaded.jsep.{mjs,wasm}
 ```
 
+The word cache is stored in IndexedDB (`talk.words.v1`) through the vendored
+`idb` library. It is checked before any model request. Cache entries can be
+exported/imported as JSON, and the word page shows whether it came from the
+local cache, was generated this time, or is a built-in demo entry.
+
 Total size is about **115 MB**:
 
 - Kokoro q8 model: ~92 MB
 - ONNX Runtime WASM: ~21 MB
 - Kokoro JS + six voices: ~5 MB
 - app/data/styles/icons: < 1 MB
+- `idb` browser bundle: ~4 KB
 
 The model, runtime, voices, CSS and JS are all served from the same static
 origin. There are no `fetch` calls to Hugging Face or jsDelivr at runtime.
@@ -79,8 +85,8 @@ Pages artifact at deploy time.
    https://<user>.github.io/<repo>/
    ```
 
-The first workflow run downloads ~115 MB of Kokoro assets and publishes them
-with the static site. Visitors then download them from Pages, not from
+The workflow also downloads the `idb` browser bundle. The first run downloads
+~115 MB of Kokoro assets and publishes them with the static site. Visitors then download them from Pages, not from
 Hugging Face or jsDelivr.
 
 Limits: GitHub Pages allows a 1 GB site and 100 MB per file. The q8 model is
@@ -144,6 +150,8 @@ The choice is stored as a non-secret browser preference.
 ## Kokoro TTS
 
 - 100% browser-side inference.
+- Word lookup is local-first: IndexedDB cache → model API.
+- Cache entries are exported/imported from the model settings as JSON.
 - WebGPU is probed first and used when functional; it automatically falls back
   to WASM. The settings panel reports the active backend and load/generation
   timings.
