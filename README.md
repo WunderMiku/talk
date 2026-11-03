@@ -153,9 +153,15 @@ The app now exposes a **发音** selector in settings:
 - **系统原生** — immediate device `speechSynthesis`; no model download, voice
   depends on the device.
 
-Kokoro audio cache keys are versioned (`v2`), so old generated WAVs are not
+Kokoro audio cache keys are versioned (`v3`), so old generated WAVs are not
 replayed after a voice/model fix. Use the refresh button beside a speaker to
 force a new WAV, or clear audio cache from cache management.
+
+The default Kokoro backend is now **WASM 兼容**, because some WebGPU runtimes
+produce bad audio with the q8 quantized session. Use `自动` only if WebGPU is
+known to work on the device. If a voice sounds wrong, press the refresh button
+beside the speaker or clear audio cache; the settings panel reports the active
+backend.
 
 The choice is stored as a non-secret browser preference.
 

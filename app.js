@@ -19,7 +19,7 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "kokoroBackendMode", "detailLevel", "cacheMax", "cacheTtlDays"];
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   const WORD_CACHE_KEY = "talk.wordcache.v1";
@@ -41,7 +41,8 @@
     cacheDisplay: "borders",
     detailLevel: "standard",
     ttsEngine: "kokoro",
-    kokoroVoice: "af_heart"
+    kokoroVoice: "af_heart",
+    kokoroBackendMode: "wasm"
   };
 
   const KOKORO_CDN = "./vendor/kokoro.web.js";
@@ -347,6 +348,7 @@
       apiKey: String(parsed.apiKey || ""),
       remember: Boolean(parsed.remember),
       ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "kokoro",
+      kokoroBackendMode: preferences.kokoroBackendMode || parsed.kokoroBackendMode || "wasm",
       detailLevel: preferences.detailLevel || parsed.detailLevel || "standard",
       cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
       cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
@@ -2268,10 +2270,15 @@
           <select id="kokoro-voice" data-setting="kokoroVoice" aria-label="Kokoro 语音">
             ${KOKORO_VOICES.map(([id, label]) => `<option value="${id}" ${(draft.kokoroVoice || "af_heart") === id ? "selected" : ""}>${label}</option>`).join("")}
           </select>
+          <select id="kokoro-backend" data-setting="kokoroBackendMode" aria-label="Kokoro 后端">
+            <option value="auto" ${draft.kokoroBackendMode === "auto" ? "selected" : ""}>自动</option>
+            <option value="wasm" ${(draft.kokoroBackendMode || "wasm") === "wasm" ? "selected" : ""}>WASM 兼容</option>
+          </select>
           <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
         </div>
         <span class="tts-status" id="tts-test-status">首次点发音会加载模型</span>
         <p class="tts-line" id="tts-backend-status">当前后端：未加载</p>
+        <p class="tts-line">音色异常时先点刷新按钮；仍异常可在上方切到 WASM 兼容。</p>
         ${!window.isSecureContext ? `<p class="tts-line tts-https-warning">HTTP 环境不会启用 WebGPU，语音加载会慢一些</p>` : ""}
         <p class="tts-error" id="tts-error" hidden></p>`}`;
   }
@@ -3335,6 +3342,14 @@
     if (target.matches("[data-setting]") && state.draft) {
       const key = target.dataset.setting;
       state.draft[key] = target.type === "checkbox" ? target.checked : target.value;
+      if (key === "kokoroBackendMode") {
+        state.settings = { ...state.settings, kokoroBackendMode: state.draft.kokoroBackendMode || "wasm" };
+        kokoroTTSPromise = null;
+        kokoroBackend = "";
+        kokoroBackendDetail = "";
+        persistSettings(state.settings);
+        updateTtsBackendStatus();
+      }
       if (key === "prefetch") {
         state.settings = { ...state.settings, prefetch: Boolean(target.checked) };
         persistSettings(state.settings);
@@ -3495,7 +3510,7 @@
       const found = voices.find((voice) => pattern.test(voice.name) || pattern.test(voice.lang));
       if (found) return found;
     }
-    return voices[0] || null;
+    return null;
   }
 
   function speakSystem(text, button) {
@@ -3724,7 +3739,8 @@
         }
       }
       const { KokoroTTS } = module;
-      if (await detectWebGPU()) {
+      const forceWasm = (state.settings.kokoroBackendMode || "wasm") !== "auto";
+      if (!forceWasm && await detectWebGPU()) {
         try {
           const webgpu = KokoroTTS.from_pretrained(KOKORO_MODEL, {
             dtype: "q8",
@@ -3745,7 +3761,7 @@
           console.warn("Kokoro WebGPU unavailable, falling back to WASM.", error);
           if (!window.isSecureContext) showTtsHttpsNotice();
         }
-      } else if (!window.isSecureContext) {
+      } else if (!window.isSecureContext && !forceWasm) {
         showTtsHttpsNotice();
       }
       const wasm = KokoroTTS.from_pretrained(KOKORO_MODEL, {
@@ -3800,7 +3816,7 @@
     }
   }
 
-  const KOKORO_AUDIO_CACHE_VERSION = "v2";
+  const KOKORO_AUDIO_CACHE_VERSION = "v3";
 
   async function getKokoroAudioStats() {
     try {
@@ -3856,7 +3872,8 @@
     const voice = KOKORO_VOICES.some(([id]) => id === cfg.kokoroVoice)
       ? cfg.kokoroVoice
       : "af_heart";
-    const cacheKey = `${voice}|${text}|0.98|${KOKORO_AUDIO_CACHE_VERSION}`;
+    const backendMode = cfg.kokoroBackendMode || "wasm";
+    const cacheKey = `${voice}|${text}|0.98|${KOKORO_AUDIO_CACHE_VERSION}|${backendMode}`;
     if (!bypassCache) {
       const cached = await getKokoroAudio(cacheKey);
       if (cached) {

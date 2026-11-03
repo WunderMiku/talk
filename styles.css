@@ -4505,3 +4505,8 @@ textarea:focus-visible,
   font-family: var(--mono);
   font-size: 7.5px;
 }
+
+#kokoro-backend {
+  flex: 0 0 72px;
+  font-size: 8px;
+}
