@@ -19,14 +19,14 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "detailLevel"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   const WORD_CACHE_KEY = "talk.wordcache.v1";
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
-  const WORD_CACHE_TTL = 1000 * 60 * 60 * 24 * 90;
-  const WORD_CACHE_MAX = 300;
+  const DEFAULT_CACHE_MAX = 300;
+  const DEFAULT_CACHE_TTL_DAYS = 90;
   let wordDb = null;
   let wordStoreFallback = false;
   const wordCache = new Map();
@@ -348,6 +348,8 @@
       remember: Boolean(parsed.remember),
       ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "kokoro",
       detailLevel: preferences.detailLevel || parsed.detailLevel || "standard",
+      cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
+      cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
       kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart"
     };
   }
@@ -416,6 +418,35 @@
     try { localStorage.setItem(SAVED_KEY, JSON.stringify(state.saved)); } catch (_) { /* no-op */ }
   }
 
+  function cacheMax() {
+    const value = Number(state.settings?.cacheMax) || DEFAULT_CACHE_MAX;
+    return Math.max(10, Math.min(2000, Math.round(value)));
+  }
+
+  function cacheTtlDays() {
+    const value = Number(state.settings?.cacheTtlDays) || DEFAULT_CACHE_TTL_DAYS;
+    return Math.max(1, Math.min(3650, Math.round(value)));
+  }
+
+  function cacheTtlMs() {
+    return cacheTtlDays() * 86400000;
+  }
+
+  function formatBytes(bytes) {
+    const value = Math.max(0, Number(bytes) || 0);
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+    return `${(value / 1024 / 1024).toFixed(1)} MB`;
+  }
+
+  function cacheRecordBytes(record) {
+    try {
+      return new Blob([JSON.stringify(record)]).size;
+    } catch (_) {
+      return 0;
+    }
+  }
+
   function legacyWordCache() {
     try {
       const parsed = JSON.parse(localStorage.getItem(WORD_CACHE_KEY) || "{}");
@@ -428,7 +459,7 @@
   function persistFallbackWordCache() {
     const entries = [...wordCache.values()]
       .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
-      .slice(0, WORD_CACHE_MAX);
+      .slice(0, cacheMax());
     try {
       localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(Object.fromEntries(entries.map((item) => [item.key, item]))));
     } catch (_) {
@@ -496,9 +527,13 @@
   }
 
   async function pruneWordCache() {
+    const now = Date.now();
     const entries = [...wordCache.entries()].sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
-    for (const [key] of entries.slice(WORD_CACHE_MAX)) {
-      await removeWordRecord(key);
+    for (const [key, entry] of entries) {
+      if (now - Number(entry.at || 0) > cacheTtlMs()) await removeWordRecord(key);
+    }
+    for (const [key] of entries.slice(cacheMax())) {
+      if (wordCache.has(key)) await removeWordRecord(key);
     }
   }
 
@@ -507,7 +542,7 @@
     const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
     if (hit.detail && hit.detail !== detail) return null;
-    if (Date.now() - Number(hit.at || 0) > WORD_CACHE_TTL) {
+    if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
       void removeWordRecord(key);
       return null;
     }
@@ -539,8 +574,9 @@
   }
 
   function exportWordCache() {
+    const now = Date.now();
     const entries = [...wordCache.values()]
-      .filter((entry) => entry?.key && entry?.data)
+      .filter((entry) => entry?.key && entry?.data && now - Number(entry.at || 0) <= cacheTtlMs())
       .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
     if (!entries.length) {
       toast("还没有可导出的词条缓存");
@@ -597,13 +633,32 @@
   }
 
   function wordCacheStats() {
+    const now = Date.now();
+    const entries = [...wordCache.values()]
+      .filter((entry) => entry?.key && entry?.data && now - Number(entry.at || 0) <= cacheTtlMs())
+      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
     return {
-      count: wordCache.size,
-      max: WORD_CACHE_MAX,
-      ttlDays: Math.round(WORD_CACHE_TTL / 86400000),
+      count: entries.length,
+      max: cacheMax(),
+      ttlDays: cacheTtlDays(),
+      bytes: entries.reduce((sum, entry) => sum + cacheRecordBytes(entry), 0),
       backend: wordDb ? "IndexedDB" : "localStorage",
-      fallback: wordStoreFallback
+      fallback: wordStoreFallback,
+      entries: entries.map((entry) => ({
+        key: entry.key,
+        word: entry.data.word || entry.key,
+        detail: entry.detail || "standard",
+        at: Number(entry.at) || 0,
+        bytes: cacheRecordBytes(entry)
+      }))
     };
+  }
+
+  function wordCacheEstimate() {
+    const stats = wordCacheStats();
+    const average = stats.count ? stats.bytes / stats.count : 2600;
+    const bytes = Math.round(average * stats.max);
+    return { average, bytes, label: formatBytes(bytes) };
   }
 
   function lookupWordDeduped(word) {
@@ -786,6 +841,7 @@
     wand: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 19 9-9"/><path d="m13 5 1.2 3.3L17.5 9.5l-3.3 1.2L13 14l-1.2-3.3L8.5 9.5l3.3-1.2L13 5Z"/><path d="M18 14.5v4M16 16.5h4"/></svg>`,
     external: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>`,
     shield: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg>`,
+    archive: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M3 4h18v3H3z"/><path d="M9 11h6"/></svg>`,
     volume: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></svg>`
   };
 
@@ -1199,6 +1255,7 @@
             <span class="dot-sep"></span>
             <span class="pos-pill">${esc(posLabel(word.pos))}</span>
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
+            <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
           </div>
           <p class="word-gloss reveal" style="--d:1.1">${esc(word.translation || word.short)}</p>
           ${word.translation && word.short ? `<p class="word-short reveal" style="--d:1.2">${esc(word.short)}</p>` : ""}
@@ -1336,6 +1393,7 @@
         <div class="page-actions reveal" style="--d:3.2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
+          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
         </div>
       </main>`;
   }
@@ -1377,6 +1435,7 @@
             <span>${esc(sentence.source || "Talk corpus")}</span>
             <span class="wave"></span>
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(sentence.text)}">${icon("volume")} 朗读</button>
+            <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(sentence.text)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
           </div>
         </section>
 
@@ -2281,11 +2340,88 @@
           <button class="btn btn-primary" type="button" data-action="save-settings">${icon("check")} 保存</button>
           <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试</button>
         </div>
-        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>词条缓存：</b>优先读取本机 IndexedDB，未命中才请求模型；最多 300 个、90 天后过期。<span id="word-cache-stats">${wordCacheStats().count}/${wordCacheStats().max} 条 · ${wordCacheStats().backend}</span></p>
+        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>词条缓存：</b>优先读取本机 IndexedDB，未命中才请求模型。<span id="word-cache-stats">${wordCacheStats().count}/${wordCacheStats().max} 条 · ${formatBytes(wordCacheStats().bytes)}</span></p>
+        <div class="cache-actions">
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
+          <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
+        </div>
+      </div>`;
+  }
+
+  function refreshCacheUi() {
+    if ($("#cache-dashboard")) {
+      void renderCacheContent();
+    } else if (state.sheetOpen && $("#sheet-scroll .settings-intro")) {
+      renderSettingsContent();
+    }
+  }
+
+  function openCacheSheet() {
+    openSheetShell({ kicker: "本机数据", title: "缓存与空间" });
+    void renderCacheContent();
+  }
+
+  async function renderCacheContent() {
+    const holder = $("#sheet-scroll");
+    if (!holder) return;
+    holder.innerHTML = `<div class="sheet-content" id="cache-dashboard"><p class="settings-intro">正在读取本机缓存…</p></div>`;
+    const words = wordCacheStats();
+    const audio = await getKokoroAudioStats();
+    if (!holder.isConnected) return;
+    const estimate = wordCacheEstimate();
+    const percent = Math.min(100, words.max ? (words.count / words.max) * 100 : 0);
+    const totalBytes = words.bytes + audio.bytes;
+    const recent = words.entries.slice(0, 24);
+    holder.innerHTML = `
+      <div class="sheet-content" id="cache-dashboard">
+        <p class="settings-intro">所有数据只存在当前浏览器。词条在 IndexedDB，语音也在 IndexedDB；导出 JSON 只包含词条，不包含音频。</p>
+        <div class="cache-summary-grid">
+          <div class="cache-summary-card">
+            <span class="cache-summary-label">词条</span>
+            <strong>${words.count}<small> / ${words.max}</small></strong>
+            <span>${formatBytes(words.bytes)} · ${words.ttlDays} 天</span>
+          </div>
+          <div class="cache-summary-card">
+            <span class="cache-summary-label">语音</span>
+            <strong>${audio.count}</strong>
+            <span>${formatBytes(audio.bytes)}</span>
+          </div>
+          <div class="cache-summary-card accent">
+            <span class="cache-summary-label">合计</span>
+            <strong>${formatBytes(totalBytes)}</strong>
+            <span>${words.backend}</span>
+          </div>
+        </div>
+        <div class="cache-meter" aria-label="词条缓存占用 ${percent.toFixed(0)}%">
+          <span style="width:${percent}%"></span>
+        </div>
+        <div class="cache-limit-grid">
+          <label>词条上限
+            <input type="number" min="10" max="2000" step="10" value="${words.max}" data-cache-setting="cacheMax" inputmode="numeric" />
+          </label>
+          <label>保留天数
+            <input type="number" min="1" max="3650" step="1" value="${words.ttlDays}" data-cache-setting="cacheTtlDays" inputmode="numeric" />
+          </label>
+        </div>
+        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>；语音缓存另计。Kokoro 模型文件约 115MB，不计入这里。</p>
+        <div class="cache-list-head">
+          <span class="settings-subhead">已缓存词条</span>
+          <span class="mono">${words.count} 条</span>
+        </div>
+        ${recent.length ? `<div class="cache-word-list">
+          ${recent.map((entry) => `<button class="cache-word-item" type="button" data-action="word" data-word="${attr(entry.key)}">
+            <span><strong>${esc(entry.word)}</strong><small>${esc(entry.detail)} · ${formatBytes(entry.bytes)}</small></span>
+            <span class="cache-word-date">${entry.at ? new Date(entry.at).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }) : "—"}</span>
+          </button>`).join("")}
+        </div>` : `<p class="field-hint">还没有缓存词条。查一个模型词条后，它会出现在这里。</p>`}
+        ${words.count > recent.length ? `<p class="field-hint">只显示最近 ${recent.length} 条，共 ${words.count} 条。</p>` : ""}
         <div class="cache-actions">
           <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
           <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
-          <button class="link-btn" type="button" data-action="clear-word-cache">清除</button>
+          <button class="link-btn" type="button" data-action="clear-word-cache">清空词条</button>
+          <button class="link-btn" type="button" data-action="clear-audio-cache">清空语音</button>
           <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
         </div>
       </div>`;
@@ -2993,6 +3129,22 @@
         speakText(target.dataset.text || "", target);
         break;
 
+      case "regenerate-audio":
+        event.preventDefault();
+        speakText(target.dataset.text || "", target, state.settings, { bypassCache: true });
+        break;
+
+      case "regenerate-word": {
+        event.preventDefault();
+        const active = activeWordData();
+        if (!active) break;
+        const key = normalizeWord(active.word);
+        if (!key || !hasModelConfig()) break;
+        await removeWordRecord(key);
+        await runSearch(key, "word");
+        break;
+      }
+
       case "copy":
         event.preventDefault();
         copyCurrentPage();
@@ -3111,7 +3263,7 @@
           const active = activeWordData();
           if (active) schedulePrefetch(active);
         }
-        renderSettingsContent();
+        refreshCacheUi();
         toast("词条缓存已清除");
         break;
 
@@ -3125,6 +3277,19 @@
         $("#word-cache-file")?.click();
         break;
 
+      case "open-cache":
+        event.preventDefault();
+        openCacheSheet();
+        break;
+
+      case "clear-audio-cache":
+        event.preventDefault();
+        if (!window.confirm("清空所有已生成的语音缓存？")) break;
+        await clearKokoroAudio();
+        refreshCacheUi();
+        toast("语音缓存已清空");
+        break;
+
       default:
         break;
     }
@@ -3132,12 +3297,29 @@
 
   function handleInput(event) {
     const target = event.target;
+    if (target.matches("[data-cache-setting]")) {
+      const key = target.dataset.cacheSetting;
+      let value = Number(target.value);
+      if (!Number.isFinite(value)) return;
+      if (key === "cacheMax") value = Math.max(10, Math.min(2000, Math.round(value)));
+      if (key === "cacheTtlDays") value = Math.max(1, Math.min(3650, Math.round(value)));
+      state.settings = { ...state.settings, [key]: value };
+      if (state.draft) state.draft[key] = value;
+      persistSettings(state.settings);
+      if (event.type === "change") {
+        void pruneWordCache().then(() => refreshCacheUi());
+      } else {
+        const estimate = $("#cache-estimate");
+        if (estimate) estimate.textContent = `按当前平均 ${formatBytes(wordCacheEstimate().average)}/词条估算，上限占用约 ${wordCacheEstimate().label}；语音缓存另计。`;
+      }
+      return;
+    }
     if (target.id === "word-cache-file") {
       const file = target.files?.[0];
       target.value = "";
       if (!file) return;
       void importWordCache(file).then((count) => {
-        renderSettingsContent();
+        refreshCacheUi();
         refreshCacheBorders();
         toast(`已导入 ${count} 个词条`);
       }).catch((error) => {
@@ -3618,6 +3800,44 @@
     }
   }
 
+  const KOKORO_AUDIO_CACHE_VERSION = "v2";
+
+  async function getKokoroAudioStats() {
+    try {
+      const db = await openKokoroAudioDb();
+      const records = await new Promise((resolve) => {
+        const req = db.transaction("audio", "readonly").objectStore("audio").getAll();
+        req.onsuccess = () => resolve(req.result || []);
+        req.onerror = () => resolve([]);
+      });
+      return {
+        count: records.length,
+        bytes: records.reduce((sum, record) => sum + (record?.blob?.size || 0), 0),
+        latest: records
+          .filter((record) => record?.at)
+          .sort((a, b) => Number(b.at) - Number(a.at))
+          .slice(0, 8)
+          .map((record) => ({ at: Number(record.at), bytes: record?.blob?.size || 0 }))
+      };
+    } catch (_) {
+      return { count: 0, bytes: 0, latest: [] };
+    }
+  }
+
+  async function clearKokoroAudio() {
+    try {
+      const db = await openKokoroAudioDb();
+      await new Promise((resolve) => {
+        const tx = db.transaction("audio", "readwrite");
+        tx.objectStore("audio").clear();
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      });
+    } catch (_) {
+      // Ignore unavailable storage.
+    }
+  }
+
   async function putKokoroAudio(key, blob) {
     try {
       const db = await openKokoroAudioDb();
@@ -3636,7 +3856,7 @@
     const voice = KOKORO_VOICES.some(([id]) => id === cfg.kokoroVoice)
       ? cfg.kokoroVoice
       : "af_heart";
-    const cacheKey = `${voice}|${text}|0.98`;
+    const cacheKey = `${voice}|${text}|0.98|${KOKORO_AUDIO_CACHE_VERSION}`;
     if (!bypassCache) {
       const cached = await getKokoroAudio(cacheKey);
       if (cached) {

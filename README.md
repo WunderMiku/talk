@@ -28,6 +28,14 @@ The word cache is stored in IndexedDB (`talk.words.v1`) through the vendored
 exported/imported as JSON, and the word page shows whether it came from the
 local cache, was generated this time, or is a built-in demo entry.
 
+Cache management is available from **settings → cache management**. It shows
+word/audio counts, actual bytes, a usage meter, and allows changing the word
+limit (10–2000) and retention (1–3650 days). The estimated word footprint is
+shown above the recent-word list. Audio entries have a separate clear action.
+The **regenerate** controls bypass the relevant cache: the word button forces a
+new model lookup, and the small refresh button beside a speaker regenerates the
+WAV instead of replaying the old cached audio.
+
 Total size is about **115 MB**:
 
 - Kokoro q8 model: ~92 MB
@@ -144,6 +152,10 @@ The app now exposes a **发音** selector in settings:
 - **Kokoro** — local neural TTS; slower first load, better/consistent voice.
 - **系统原生** — immediate device `speechSynthesis`; no model download, voice
   depends on the device.
+
+Kokoro audio cache keys are versioned (`v2`), so old generated WAVs are not
+replayed after a voice/model fix. Use the refresh button beside a speaker to
+force a new WAV, or clear audio cache from cache management.
 
 The choice is stored as a non-secret browser preference.
 
