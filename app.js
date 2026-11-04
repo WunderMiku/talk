@@ -105,6 +105,7 @@
   let prefetchToken = 0;
   let currentAudio = null;
   let ttsAudio = null;
+  let suppressNextPopstate = false;
   const SILENT_AUDIO = "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
   const state = {
@@ -4085,6 +4086,22 @@
     document.addEventListener("keydown", handleKeydown);
 
     window.addEventListener("popstate", (event) => {
+      if (suppressNextPopstate) {
+        suppressNextPopstate = false;
+        return;
+      }
+      // Browser back should peel one overlay at a time. The URL has already
+      // moved to the previous history entry, so immediately move forward
+      // again while closing the overlay; otherwise the app would jump to the
+      // previous page and close every layer at once.
+      if (state.sheetOpen || state.wordLayers.length) {
+        if (state.sheetOpen) closeSheet();
+        else popWordLayer();
+        suppressNextPopstate = true;
+        history.forward();
+        window.setTimeout(() => { suppressNextPopstate = false; }, 700);
+        return;
+      }
       state.searchSeq += 1;
       clearLoadingTimer();
       const route = event.state?.route;
