@@ -128,6 +128,18 @@ debounce; the sticky footer reports `正在保存…` / `已自动保存` and pr
 single `完成` action. Clicking the backdrop during the opening animation is
 ignored, so a double tap cannot immediately close the sheet.
 
+## Multi-style translator
+
+The top module bar switches between **词典** and **翻译**. The translator accepts
+Chinese or English and produces five English versions in one model call:
+极简口语, 地道习语, 书面正式, 网络流行, 优雅文句.
+
+The translator system prompt is static (styles, schema, and rules), with only
+the source text in the final user message, so it benefits from prefix caching.
+Results are cached locally by exact input for 30 days (up to 40 entries); use
+**重新生成** to bypass the cache. It shares the active model profile and API
+settings with the dictionary.
+
 ## Model profiles
 
 Settings includes independent model profiles for DeepSeek, OpenAI, Qwen,

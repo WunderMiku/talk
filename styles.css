@@ -250,6 +250,8 @@ textarea:focus-visible,
 .app {
   position: absolute;
   inset: 40px 6px 6px;
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   background: var(--paper);
   border-radius: 0 0 48px 48px;
@@ -268,7 +270,9 @@ textarea:focus-visible,
 
 .screen {
   position: relative;
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0 22px 48px;
@@ -4822,4 +4826,447 @@ textarea:focus-visible,
 .install-settings-btn {
   width: 100%;
   margin-top: 10px;
+}
+
+/* ============================================================
+   Module bar / multi-style translator
+   ============================================================ */
+
+.module-bar {
+  position: relative;
+  z-index: 60;
+  display: flex;
+  flex: 0 0 42px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.module-bar-label {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+}
+
+.module-switch {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(23, 24, 19, 0.055);
+}
+
+.module-btn {
+  min-width: 52px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.module-btn.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.translator-page {
+  padding-top: 12px;
+}
+
+.translator-hero {
+  padding-top: 12px;
+}
+
+.translator-title {
+  margin: 13px 0 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: clamp(37px, 10vw, 49px);
+  font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+
+.translator-title em {
+  color: var(--lime-deep);
+  font-style: normal;
+}
+
+.translator-lede {
+  max-width: 315px;
+  margin: 13px 0 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  line-height: 1.65;
+}
+
+.translator-form {
+  margin-top: 20px;
+}
+
+.translator-input-shell {
+  padding: 12px 12px 9px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+
+.translator-input-head,
+.translator-input-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.translator-input-head {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.translator-input-head .mono {
+  color: var(--ink);
+}
+
+#translator-input {
+  display: block;
+  width: 100%;
+  min-height: 70px;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: vertical;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+#translator-input::placeholder {
+  color: var(--muted-2);
+}
+
+.translator-input-foot {
+  margin-top: 6px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.translator-input-foot .search-submit {
+  width: 34px;
+  height: 34px;
+}
+
+.translator-styles {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  margin: 12px -22px 0;
+  padding: 0 22px 4px;
+  scrollbar-width: none;
+}
+
+.translator-styles::-webkit-scrollbar {
+  display: none;
+}
+
+.translator-style-chip {
+  display: flex;
+  flex: 0 0 112px;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: rgba(251, 249, 243, 0.72);
+}
+
+.translator-style-chip > span {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.translator-style-chip strong {
+  color: var(--ink);
+  font-size: 9.5px;
+  font-weight: 650;
+}
+
+.translator-style-chip small {
+  color: var(--muted);
+  font-size: 7.5px;
+  line-height: 1.4;
+}
+
+.translator-results {
+  margin-top: 14px;
+}
+
+.translator-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 17px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 17px;
+  background: rgba(251, 249, 243, 0.52);
+}
+
+.translator-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 11px;
+  background: var(--lime-wash);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.translator-empty p {
+  max-width: 300px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.65;
+}
+
+.translator-empty.error {
+  border-color: rgba(192, 92, 54, 0.22);
+  background: var(--coral-wash);
+}
+
+.translator-empty.error p {
+  color: #8e321d;
+}
+
+.translator-examples {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.translator-example {
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 8px;
+  text-align: left;
+}
+
+.translator-example span {
+  color: var(--muted-2);
+  margin-left: 3px;
+}
+
+.translation-loading {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: var(--card);
+}
+
+.translation-loading-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 9.5px;
+}
+
+.translation-loading-card {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 11px;
+  border-radius: 11px;
+  background: rgba(23, 24, 19, 0.035);
+}
+
+.translation-loading-card > span {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+}
+
+.translation-loading-card i {
+  display: block;
+  width: 85%;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(23, 24, 19, 0.08);
+  animation: live-pulse 1.2s ease-in-out infinite;
+}
+
+.translation-loading-card i:last-child {
+  width: 58%;
+}
+
+.translation-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 9px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7.5px;
+}
+
+.translation-result-head > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.translation-cache-label {
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: rgba(199, 224, 120, 0.25);
+  color: #52651f;
+  font-size: 6.5px;
+}
+
+.translation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.translation-card {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--card);
+  animation: translation-card-in 0.4s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 45ms);
+}
+
+.translation-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.translation-number {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+  line-height: 1.7;
+}
+
+.translation-card-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.translation-card-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.translation-card-head p {
+  margin: 2px 0 0;
+  color: var(--muted-2);
+  font-size: 8px;
+  line-height: 1.4;
+}
+
+.translation-copy {
+  width: 26px;
+  height: 26px;
+  flex: 0 0 auto;
+}
+
+.translation-copy svg {
+  width: 13px;
+  height: 13px;
+}
+
+.translation-text {
+  margin: 10px 0 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.45;
+  letter-spacing: -0.015em;
+}
+
+.translation-nuance {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.55;
+}
+
+@keyframes translation-card-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 360px) {
+  .module-bar {
+    padding-inline: 11px;
+  }
+
+  .module-bar-label:last-child {
+    display: none;
+  }
+}
+
+/* Keep the five style labels visible in one compact row. */
+.translator-styles {
+  flex-wrap: nowrap;
+  overflow: visible;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 0;
+}
+
+.translator-style-chip {
+  flex: 1 1 0;
+  min-width: 0;
+  align-items: center;
+  padding: 6px 4px;
+  text-align: center;
+}
+
+.translator-style-chip > span,
+.translator-style-chip small {
+  display: none;
+}
+
+.translator-style-chip strong {
+  overflow: hidden;
+  width: 100%;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
