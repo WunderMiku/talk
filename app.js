@@ -298,6 +298,7 @@
     settingsSaveTimer: null,
     module: "dictionary",
     translatorSeq: 0,
+    translatorMode: "auto",
     lastTranslationInput: "",
     lastTranslationResult: null,
     lastAttempt: null,
@@ -1124,6 +1125,7 @@
       screen.classList.add("is-entering");
       window.setTimeout(() => screen.classList.remove("is-entering"), 1300);
       document.title = pageTitle(route);
+      if (route.name === "translator") updateTranslatorLanguage();
     };
 
     if (!instant && !reduceMotion && document.startViewTransition) {
@@ -1305,7 +1307,7 @@
     container.classList.add("is-swapping");
   }
 
-  const TRANSLATION_CACHE_KEY = "talk.translations.v1";
+  const TRANSLATION_CACHE_KEY = "talk.translations.v3";
   const TRANSLATION_CACHE_MAX = 40;
   const TRANSLATION_CACHE_TTL = 30 * 86400000;
 
@@ -1343,7 +1345,7 @@
   function translatorEmptyHtml() {
     return `<div class="translator-empty">
       <span class="translator-empty-mark">Aa</span>
-      <p>输入一句中文，或一段英文。Talk 会保留原意，写成五种不同语气的英文。</p>
+      <p>输入中文或英文。保留原意，换成不同语气的英文。</p>
       <div class="translator-examples">
         <button class="translator-example" type="button" data-action="translator-sample" data-text="今天有点累，但我还是想出去走走。">中文示例 <span>↗</span></button>
         <button class="translator-example" type="button" data-action="translator-sample" data-text="I’m not upset. I’m just tired of explaining myself.">English 示例 <span>↗</span></button>
@@ -1351,12 +1353,15 @@
     </div>`;
   }
 
+  function styleEmoji(style, className = "") {
+    return `<img class="${className}" src="${esc(style.emoji)}" alt="" loading="lazy" />`;
+  }
+
   function translatorStylesHtml() {
-    return TRANSLATOR_STYLES.map((style, index) => `
-      <div class="translator-style-chip" style="--i:${index}">
-        <span>${String(index + 1).padStart(2, "0")}</span>
+    return TRANSLATOR_STYLES.map((style) => `
+      <div class="translator-style-chip tone-${style.tone}">
+        ${styleEmoji(style, "translator-style-emoji")}
         <strong>${esc(style.name)}</strong>
-        <small>${esc(style.hint)}</small>
       </div>`).join("");
   }
 
@@ -1367,7 +1372,7 @@
         <section class="translator-hero reveal" style="--d:0">
           <div class="result-kicker">
             <span class="kicker-pill accent">多风格翻译</span>
-            <span class="kicker-pill">中 / 英 → 5 种英文</span>
+            <span class="kicker-pill">中文 / English</span>
           </div>
           <h1 class="translator-title">一句话，<em>五种说法。</em></h1>
           <p class="translator-lede">中文翻译成英文，或把英文换一种说法。原意不变，只换语气、场合和锋芒。</p>
@@ -1376,11 +1381,13 @@
           <div class="translator-input-shell">
             <div class="translator-input-head">
               <span class="mono">原文</span>
-              <span id="translator-language">自动识别</span>
+              <div class="translator-mode-switch" role="group" aria-label="翻译方向">
+                ${["auto", "zh", "en"].map((mode) => `<button class="translator-mode-btn ${state.translatorMode === mode ? "active" : ""}" type="button" data-action="translator-mode" data-mode="${mode}" aria-pressed="${state.translatorMode === mode}">${mode === "auto" ? "自动" : mode === "zh" ? "中 → 英" : "英 → 英"}</button>`).join("")}
+              </div>
             </div>
-            <textarea id="translator-input" rows="3" maxlength="600" placeholder="输入一句中文，或一段英文…" spellcheck="false" aria-label="待翻译文本"></textarea>
+            <textarea id="translator-input" rows="3" maxlength="600" placeholder="输入中文或英文…" spellcheck="false" aria-label="待翻译文本"></textarea>
             <div class="translator-input-foot">
-              <span>5 种风格 · 一次请求</span>
+              <span id="translator-language">自动识别</span>
               <button class="search-submit" type="submit" aria-label="生成五种说法">${icon("arrowUpRight")}</button>
             </div>
           </div>
@@ -1390,16 +1397,30 @@
       </main>`;
   }
 
+  function translatorSourceLanguage() {
+    if (state.translatorMode === "zh" || state.translatorMode === "en") return state.translatorMode;
+    const input = $("#translator-input");
+    return detectSourceLanguage(input?.value || "");
+  }
+
   function updateTranslatorLanguage() {
     const input = $("#translator-input");
     const label = $("#translator-language");
     if (!input || !label) return;
     const value = input.value.trim();
+    if (state.translatorMode === "zh") {
+      label.textContent = "中 → 英";
+      return;
+    }
+    if (state.translatorMode === "en") {
+      label.textContent = "英 → 英";
+      return;
+    }
     if (!value) {
       label.textContent = "自动识别";
       return;
     }
-    label.textContent = detectSourceLanguage(value) === "zh" ? "中文 → English" : "English → English";
+    label.textContent = detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英";
   }
 
   function renderTranslatorLoading() {
@@ -1434,7 +1455,7 @@
   function renderTranslatorResult(result) {
     const host = $("#translator-results");
     if (!host || !result?.variants?.length) return;
-    const source = result.sourceLanguage === "zh" ? "中文 → English" : "English → English";
+    const source = result.sourceLanguage === "zh" ? "中 → 英" : "英 → 英";
     const styleMap = new Map(TRANSLATOR_STYLES.map((style) => [style.id, style]));
     host.innerHTML = `<div class="translation-result">
       <div class="translation-result-head">
@@ -1444,38 +1465,84 @@
       <div class="translation-list">
         ${result.variants.map((variant, index) => {
           const style = styleMap.get(variant.style) || TRANSLATOR_STYLES[index] || TRANSLATOR_STYLES[0];
-          return `<article class="translation-card" style="--i:${index}">
+          return `<article class="translation-card tone-${style.tone}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
             <div class="translation-card-head">
-              <span class="translation-number">${String(index + 1).padStart(2, "0")}</span>
+              <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
               <div><h2>${esc(style.name)}</h2><p>${esc(style.hint)}</p></div>
               <button class="icon-btn translation-copy" type="button" data-action="copy-translation" data-text="${attr(variant.text)}" aria-label="复制这个版本">${icon("copy")}</button>
             </div>
             <p class="translation-text">${esc(variant.text)}</p>
             ${variant.nuance ? `<p class="translation-nuance">${esc(variant.nuance)}</p>` : ""}
+            <span class="translation-open">搭配与知识点 <span aria-hidden="true">↗</span></span>
           </article>`;
         }).join("")}
       </div>
     </div>`;
   }
 
-  function normalizeTranslation(raw, sourceText, cfg) {
+  function translationDetailHtml(variant, style) {
+    const phrases = variant?.phrases || [];
+    const points = variant?.points || [];
+    return `<div class="sheet-content translation-detail">
+      <div class="translation-detail-head tone-${style.tone}">
+        <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
+        <div><span class="mono">${esc(style.name)}</span><h2>搭配与知识点</h2></div>
+      </div>
+      <p class="translation-detail-text">${esc(variant.text)}</p>
+      ${variant.nuance ? `<p class="translation-detail-nuance">${esc(variant.nuance)}</p>` : ""}
+      <div class="translation-detail-section">
+        <h3>常见搭配</h3>
+        ${phrases.length ? phrases.map((item) => `<div class="translation-phrase">
+          <strong>${esc(item.phrase)}</strong>
+          <span>${esc(item.zh || "")}${item.note ? ` · ${esc(item.note)}` : ""}</span>
+        </div>`).join("") : `<p class="translation-detail-empty">这个版本没有返回搭配。重新生成一次试试。</p>`}
+      </div>
+      <div class="translation-detail-section">
+        <h3>知识点</h3>
+        ${points.length ? `<ul class="translation-points">${points.map((point) => `<li>${esc(point)}</li>`).join("")}</ul>` : `<p class="translation-detail-empty">这个版本没有返回知识点。重新生成一次试试。</p>`}
+      </div>
+      <button class="btn btn-secondary translation-detail-copy" type="button" data-action="copy-translation" data-text="${attr(variant.text)}">${icon("copy")} 复制这个版本</button>
+    </div>`;
+  }
+
+  function openTranslationDetail(index) {
+    const result = state.lastTranslationResult;
+    const variant = result?.variants?.[Number(index)];
+    if (!variant) return;
+    const style = TRANSLATOR_STYLES.find((item) => item.id === variant.style) || TRANSLATOR_STYLES[0];
+    openSheetShell({ kicker: "风格拆解", title: style.name });
+    const holder = $("#sheet-scroll");
+    if (holder) holder.innerHTML = translationDetailHtml(variant, style);
+  }
+
+  function normalizeTranslation(raw, sourceText, cfg, sourceLanguage) {
     const base = raw && typeof raw === "object" ? raw : {};
-    const sourceLanguage = base.sourceLanguage === "en" ? "en" : detectSourceLanguage(sourceText);
     const sourceVariants = Array.isArray(base.variants) ? base.variants : [];
     const variants = TRANSLATOR_STYLES.map((style, index) => {
       const found = sourceVariants.find((item) => String(item?.style || "").toLowerCase() === style.id)
         || sourceVariants[index]
         || {};
+      const phrases = Array.isArray(found.phrases)
+        ? found.phrases.map((item) => ({
+            phrase: String(item?.phrase || item?.text || "").trim(),
+            zh: String(item?.zh || item?.meaning || "").trim(),
+            note: String(item?.note || "").trim()
+          })).filter((item) => item.phrase)
+        : [];
       return {
         style: style.id,
         text: String(found.text || found.translation || "").trim(),
-        nuance: String(found.nuance || found.note || "").trim()
+        nuance: String(found.nuance || found.note || "").trim(),
+        phrases,
+        points: Array.isArray(found.points)
+          ? found.points.map((item) => String(item || "").trim()).filter(Boolean)
+          : []
       };
     }).filter((variant) => variant.text);
     if (!variants.length) throw new Error("模型没有返回可用的英文版本。");
     return {
       sourceText,
-      sourceLanguage,
+      sourceLanguage: sourceLanguage || (base.sourceLanguage === "en" ? "en" : "zh"),
       variants,
       model: cfg.model,
       cached: false,
@@ -1483,21 +1550,21 @@
     };
   }
 
-  async function requestTranslation(text, cfg) {
+  async function requestTranslation(text, cfg, sourceLanguage) {
     const endpoint = endpointFor(cfg.baseUrl);
     const messages = [
       { role: "system", content: TRANSLATOR_SYSTEM_PROMPT },
-      { role: "user", content: JSON.stringify({ text }) }
+      { role: "user", content: JSON.stringify({ sourceLanguage, text }) }
     ];
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
     try {
       let content = "";
       try {
-        content = await postChatStream(endpoint, cfg, messages, controller.signal, false, 1200);
+        content = await postChatStream(endpoint, cfg, messages, controller.signal, false, 1600);
       } catch (error) {
         if (error?.name === "AbortError") throw error;
-        const response = await postChat(endpoint, cfg, messages, controller.signal, false, 1200);
+        const response = await postChat(endpoint, cfg, messages, controller.signal, false, 1600);
         if (!response.ok) {
           const raw = await response.text().catch(() => "");
           throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 220)}` : ""}`);
@@ -1506,7 +1573,7 @@
         content = json?.choices?.[0]?.message?.content || "";
       }
       if (!content) throw new Error("模型返回了空内容。");
-      return normalizeTranslation(parseJsonObject(content), text, cfg);
+      return normalizeTranslation(parseJsonObject(content), text, cfg, sourceLanguage);
     } finally {
       window.clearTimeout(timer);
     }
@@ -1523,9 +1590,11 @@
       return;
     }
     const token = ++state.translatorSeq;
+    const sourceLanguage = translatorSourceLanguage();
     state.lastTranslationInput = text;
     updateTranslatorLanguage();
-    const cached = bypassCache ? null : translationCacheGet(text);
+    const cacheKey = `${sourceLanguage}|${text}`;
+    const cached = bypassCache ? null : translationCacheGet(cacheKey);
     if (cached) {
       state.lastTranslationResult = cached;
       renderTranslatorResult(cached);
@@ -1537,10 +1606,10 @@
     }
     renderTranslatorLoading();
     try {
-      const result = await requestTranslation(text, state.settings);
+      const result = await requestTranslation(text, state.settings, sourceLanguage);
       if (token !== state.translatorSeq) return;
       state.lastTranslationResult = result;
-      translationCachePut(text, result);
+      translationCachePut(cacheKey, result);
       renderTranslatorResult(result);
     } catch (error) {
       if (token !== state.translatorSeq) return;
@@ -3326,24 +3395,28 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"noun","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}`;
 
   const TRANSLATOR_STYLES = [
-    { id: "minimal", name: "极简口语", hint: "短、直接，像日常对话" },
-    { id: "idiom", name: "地道习语", hint: "像母语者会脱口而出的说法" },
-    { id: "formal", name: "书面正式", hint: "邮件、报告、正式场合" },
-    { id: "slang", name: "网络流行", hint: "社交媒体、轻松俚语" },
-    { id: "elegant", name: "优雅文句", hint: "有节奏和文学感" }
+    { id: "minimal", name: "极简口语", emoji: "icons/style/minimal.svg", tone: "lime", hint: "短、直接，像日常对话" },
+    { id: "idiom", name: "地道习语", emoji: "icons/style/idiom.svg", tone: "sage", hint: "像母语者会脱口而出的说法" },
+    { id: "formal", name: "书面正式", emoji: "icons/style/formal.svg", tone: "sky", hint: "邮件、报告、正式场合" },
+    { id: "slang", name: "网络流行", emoji: "icons/style/slang.svg", tone: "coral", hint: "社交媒体、轻松俚语" },
+    { id: "elegant", name: "优雅文句", emoji: "icons/style/elegant.svg", tone: "lavender", hint: "有节奏和文学感" }
   ];
 
   const TRANSLATOR_SYSTEM_PROMPT = `你是 Talk 的多风格英文翻译与改写器。输入可能是中文或英文；无论哪种，都输出 5 个英文版本：中文输入是英译，英文输入是英文改写。必须保留原意、信息量和语气强度，不添加原文没有的事实。
+
+用户消息会提供 text 和 sourceLanguage（zh 或 en）。sourceLanguage=en 时，这是英文改写，不是翻译成中文；sourceLanguage=zh 时，才是中译英。
 
 只返回一个合法 JSON 对象，不要 Markdown、代码块或额外说明：
 {
   "sourceLanguage": "zh | en",
   "variants": [
-    {"style": "minimal", "text": "英文版本", "nuance": "一句中文语气说明"},
-    {"style": "idiom", "text": "英文版本", "nuance": "一句中文语气说明"},
-    {"style": "formal", "text": "英文版本", "nuance": "一句中文语气说明"},
-    {"style": "slang", "text": "英文版本", "nuance": "一句中文语气说明"},
-    {"style": "elegant", "text": "英文版本", "nuance": "一句中文语气说明"}
+    {
+      "style": "minimal",
+      "text": "英文版本",
+      "nuance": "一句中文语气说明",
+      "phrases": [{"phrase": "搭配或短语", "zh": "中文意思", "note": "怎么用"}],
+      "points": ["一句中文知识点"]
+    }
   ]
 }
 
@@ -3358,8 +3431,9 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 1. 每个 text 必须是可直接使用的英文；不要中文、拼音或英文解释。
 2. nuance 必须是简体中文，一句话说明语气、场合或细微差别。
 3. 中文输入不要逐字直译，要像英文母语者自然地表达同一件事。
-4. 英文输入保留原意和语气，不要擅自加强或减弱。
-5. 每条尽量控制在 35 个英文单词以内；不要输出 JSON 之外的任何内容。`;
+4. 英文输入保留原意和语气，不要擅自加强或减弱；不要把英文改写成中文。
+5. phrases 给 2 个该版本里可用的搭配或短语；phrase 用英文，zh 和 note 用中文。points 给 1-2 条中文知识点（语法、语感、使用场合）。这些内容要短，服务于理解，不要重复 text。
+6. 每条 text 尽量控制在 35 个英文单词以内；不要输出 JSON 之外的任何内容。`;
 
   function systemPrompt(type) {
     return type === "sentence" ? SENTENCE_SYSTEM_PROMPT : WORD_SYSTEM_PROMPT;
@@ -4021,6 +4095,23 @@ Few-shot（只示意字段和语气，不要照抄内容）：
       case "copy":
         event.preventDefault();
         copyCurrentPage();
+        break;
+
+      case "translator-mode": {
+        event.preventDefault();
+        state.translatorMode = target.dataset.mode === "zh" || target.dataset.mode === "en" ? target.dataset.mode : "auto";
+        $$(".translator-mode-btn").forEach((button) => {
+          const active = button.dataset.mode === state.translatorMode;
+          button.classList.toggle("active", active);
+          button.setAttribute("aria-pressed", String(active));
+        });
+        updateTranslatorLanguage();
+        break;
+      }
+
+      case "translation-detail":
+        event.preventDefault();
+        openTranslationDetail(Number(target.dataset.index));
         break;
 
       case "copy-translation": {

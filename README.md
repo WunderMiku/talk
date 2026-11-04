@@ -134,11 +134,19 @@ The top module bar switches between **词典** and **翻译**. The translator ac
 Chinese or English and produces five English versions in one model call:
 极简口语, 地道习语, 书面正式, 网络流行, 优雅文句.
 
-The translator system prompt is static (styles, schema, and rules), with only
-the source text in the final user message, so it benefits from prefix caching.
-Results are cached locally by exact input for 30 days (up to 40 entries); use
-**重新生成** to bypass the cache. It shares the active model profile and API
-settings with the dictionary.
+The translator has an explicit `自动 / 中 → 英 / 英 → 英` mode switch. The
+translator system prompt is static (styles, schema, and rules), with only the
+source text and source language in the final user message, so it benefits from
+prefix caching. Results are cached locally by source language + exact input for
+30 days (up to 40 entries); use **重新生成** to bypass the cache. It shares the
+active model profile and API settings with the dictionary.
+
+Each style result is clickable and opens a sheet with useful phrases and Chinese
+language notes. Style cards use distinct pastel tones, local emoji SVGs, 22px
+corners, and full-width layout. The style emoji SVGs are from Twemoji
+(CC-BY 4.0); attribution is in `icons/style/LICENSE.txt`. Results are cached by
+source language + text, so English → English and Chinese → English do not share
+the wrong entry.
 
 ## Model profiles
 

@@ -1,0 +1,2 @@
+Style emoji SVGs are from Twemoji (https://github.com/twitter/twemoji),
+licensed under CC-BY 4.0.

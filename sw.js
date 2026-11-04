@@ -1,5 +1,5 @@
 /* talk. service worker — app shell only; model/audio caches stay in IndexedDB. */
-const SHELL_CACHE = "talk-shell-v63";
+const SHELL_CACHE = "talk-shell-v66";
 const SHELL = [
   "./",
   "./index.html",
@@ -10,7 +10,12 @@ const SHELL = [
   "./manifest.webmanifest",
   "./favicon.svg",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/style/minimal.svg",
+  "./icons/style/idiom.svg",
+  "./icons/style/formal.svg",
+  "./icons/style/slang.svg",
+  "./icons/style/elegant.svg"
 ];
 
 self.addEventListener("install", (event) => {

@@ -5270,3 +5270,324 @@ textarea:focus-visible,
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* Style tones and richer translation cards */
+.translator-mode-switch {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: rgba(23, 24, 19, 0.055);
+}
+
+.translator-mode-btn {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 7.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.translator-mode-btn.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.tone-lime {
+  --tone: #7e9b20;
+  --tone-ink: #52651f;
+  --tone-wash: #f0ffcb;
+  --tone-border: rgba(126, 155, 32, 0.24);
+}
+
+.tone-sage {
+  --tone: #5f7a50;
+  --tone-ink: #465d3a;
+  --tone-wash: #e7f0df;
+  --tone-border: rgba(95, 122, 80, 0.24);
+}
+
+.tone-sky {
+  --tone: #4d7894;
+  --tone-ink: #345b73;
+  --tone-wash: #e7f3ff;
+  --tone-border: rgba(77, 120, 148, 0.24);
+}
+
+.tone-coral {
+  --tone: #c06a4d;
+  --tone-ink: #8e321d;
+  --tone-wash: #ffe6de;
+  --tone-border: rgba(192, 106, 77, 0.24);
+}
+
+.tone-lavender {
+  --tone: #7567a8;
+  --tone-ink: #5b4b8d;
+  --tone-wash: #e9e5ff;
+  --tone-border: rgba(117, 103, 168, 0.24);
+}
+
+.translator-style-chip.tone-lime,
+.translator-style-chip.tone-sage,
+.translator-style-chip.tone-sky,
+.translator-style-chip.tone-coral,
+.translator-style-chip.tone-lavender {
+  border-color: var(--tone-border);
+  background: var(--tone-wash);
+}
+
+.translator-style-chip > .translator-style-emoji {
+  display: block;
+  color: var(--tone-ink);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.translator-style-chip strong {
+  color: var(--tone-ink);
+}
+
+.translation-card {
+  width: 100%;
+  padding: 15px;
+  border-radius: 22px;
+  border-color: var(--tone-border);
+  background:
+    linear-gradient(135deg, var(--tone-wash) 0%, var(--card) 64%);
+  cursor: pointer;
+  transition: transform 0.3s var(--ease-spring), box-shadow 0.3s ease;
+}
+
+.translation-card:hover,
+.translation-card:focus-visible {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+  outline: none;
+}
+
+.translation-card:active {
+  transform: scale(0.985);
+}
+
+.translation-card .translation-card-head {
+  align-items: flex-start;
+}
+
+.translation-emoji {
+  display: grid;
+  flex: 0 0 27px;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 9px;
+  background: var(--tone-wash);
+  color: var(--tone-ink);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.translation-card .translation-card-head h2 {
+  margin-top: 2px;
+  color: var(--tone-ink);
+  font-size: 11.5px;
+}
+
+.translation-card .translation-card-head p {
+  color: var(--tone-ink);
+  opacity: 0.65;
+}
+
+.translation-card .translation-text {
+  margin-top: 11px;
+  font-size: 18px;
+  line-height: 1.45;
+}
+
+.translation-card .translation-nuance {
+  margin-top: 6px;
+  color: var(--tone-ink);
+  opacity: 0.76;
+}
+
+.translation-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  color: var(--tone-ink);
+  font-family: var(--mono);
+  font-size: 7px;
+  opacity: 0.72;
+}
+
+.translation-open span {
+  font-size: 10px;
+}
+
+.translation-copy {
+  color: var(--tone-ink);
+  background: rgba(255, 255, 255, 0.5);
+}
+
+.translation-result-head .link-btn {
+  color: var(--muted);
+}
+
+.translation-result-head .mono {
+  color: var(--ink);
+}
+
+/* Translation detail sheet */
+.translation-detail {
+  padding-top: 4px;
+}
+
+.translation-detail-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.translation-detail-head .translation-emoji {
+  flex-basis: 38px;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  font-size: 21px;
+}
+
+.translation-detail-head h2 {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 19px;
+  font-weight: 760;
+  letter-spacing: -0.03em;
+}
+
+.translation-detail-head .mono {
+  color: var(--tone-ink);
+  font-size: 8px;
+}
+
+.translation-detail-text {
+  margin: 16px 0 0;
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1.4;
+  letter-spacing: -0.02em;
+}
+
+.translation-detail-nuance {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.translation-detail-section {
+  margin-top: 17px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+
+.translation-detail-section h3 {
+  margin: 0 0 8px;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.translation-phrase {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 7px 0;
+  border-bottom: 1px solid rgba(23, 24, 19, 0.06);
+}
+
+.translation-phrase:last-child {
+  border-bottom: 0;
+}
+
+.translation-phrase strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.translation-phrase span {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.translation-points {
+  margin: 0;
+  padding-left: 15px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
+.translation-detail-empty {
+  margin: 0;
+  color: var(--muted-2);
+  font-size: 9px;
+  line-height: 1.6;
+}
+
+.translation-detail-copy {
+  width: 100%;
+  margin-top: 17px;
+}
+
+.translation-emoji,
+.translator-style-emoji {
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+}
+
+.translation-detail-head .mono {
+  color: var(--tone-ink);
+}
+
+.translator-style-chip > .translator-style-emoji,
+.translation-emoji img {
+  display: block;
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+}
+
+.translator-style-chip > .translator-style-emoji {
+  width: 16px;
+  height: 16px;
+}
+
+.translation-emoji {
+  padding: 4px;
+}
+
+.translation-detail-head .translation-emoji img {
+  width: 29px;
+  height: 29px;
+}
+
+.translation-emoji {
+  font-family: inherit;
+}
+
+.module-bar {
+  justify-content: center;
+}
+
+.module-bar-label {
+  position: absolute;
+  left: 16px;
+}
