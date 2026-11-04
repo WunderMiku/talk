@@ -5675,3 +5675,35 @@ textarea:focus-visible,
   border-color: var(--line);
   background: var(--card);
 }
+
+/* Give the detail sheet the same tonal wash as its translation card. */
+.translation-detail {
+  margin-top: 5px;
+  padding: 16px;
+  border: 1px solid var(--tone-border);
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, var(--tone-wash) 0%, var(--card) 58%, var(--paper) 100%);
+  box-shadow: 0 18px 40px -32px var(--tone);
+}
+
+.translation-detail-head .translation-emoji {
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.translation-detail-section {
+  border-top-color: var(--tone-border);
+}
+
+.translation-detail-section h3 {
+  color: var(--tone-ink);
+}
+
+.translation-phrase strong {
+  color: var(--tone-ink);
+}
+
+.translation-detail-copy {
+  border-color: var(--tone-border);
+  background: rgba(255, 255, 255, 0.48);
+}

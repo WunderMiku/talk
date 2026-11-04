@@ -1502,8 +1502,8 @@
   function translationDetailHtml(variant, style) {
     const phrases = variant?.phrases || [];
     const points = variant?.points || [];
-    return `<div class="sheet-content translation-detail">
-      <div class="translation-detail-head tone-${style.tone}">
+    return `<div class="sheet-content translation-detail tone-${style.tone}">
+      <div class="translation-detail-head">
         <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
         <div><span class="mono">${esc(style.name)}</span><h2>搭配与知识点</h2></div>
       </div>
