@@ -213,8 +213,10 @@ were generated before this prompt change may still need **重新生成词条**.
 - **深入**: more senses/relations/examples; `max_tokens` 3800.
 
 The setting lives in model settings and is stored locally. Word entries are
-cached for up to 300 words / 90 days; cached entries are tagged with the depth
-that produced them, so switching depth does not reuse the wrong shape of data.
+cached for up to 300 words / 90 days. A cached word is reused across all
+generation depths; changing fast/standard/deep does not trigger a new API call.
+Use the word page's **重新生成词条** action when a different depth is actually
+wanted.
 
 The default model is `deepseek-chat`. This is a normal chat model, not a
 reasoning model; there is no hidden chain-of-thought budget to tune.

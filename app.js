@@ -731,7 +731,8 @@
     const key = normalizeWord(word);
     const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
-    if (hit.detail && hit.detail !== detail) return null;
+    // Detail is metadata only. A cached word is reusable across fast/standard/deep;
+    // the user can explicitly regenerate if a different depth is desired.
     if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
       void removeWordRecord(key);
       return null;
@@ -2573,7 +2574,7 @@
           ${Object.entries(DETAIL_LEVELS).map(([id, item]) => `
             <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
         </div>
-        <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。</p>
+        <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。切换深度不会让已缓存词条重新请求；需要新长度时用词页的「重新生成词条」。</p>
       </div>
       ${profileSupportsThinking(activeProfile(draft)) ? `
       <div class="thinking-panel">
