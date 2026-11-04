@@ -5647,3 +5647,31 @@ textarea:focus-visible,
 #translator-style-count {
   color: var(--muted-2);
 }
+
+.translator-eyebrow .spark {
+  background: var(--lime-deep);
+  box-shadow: 0 0 0 4px rgba(185, 230, 59, 0.2);
+}
+
+/* Avoid filter raster caching delaying the selected-state repaint. */
+.translator-style-chip {
+  filter: none;
+  will-change: opacity, transform;
+}
+
+.translator-style-chip:not(.selected) {
+  opacity: 0.56;
+}
+
+.translator-style-chip.selected {
+  opacity: 1;
+}
+
+.translator-style-chip .translator-style-emoji {
+  pointer-events: none;
+}
+
+.translator-style-chip:not(.selected) {
+  border-color: var(--line);
+  background: var(--card);
+}

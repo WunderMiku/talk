@@ -1358,7 +1358,7 @@
   }
 
   function styleEmoji(style, className = "") {
-    return `<img class="${className}" src="${esc(style.emoji)}" alt="" loading="lazy" />`;
+    return `<img class="${className}" src="${esc(style.emoji)}" alt="" loading="eager" decoding="async" draggable="false" />`;
   }
 
   function translatorStylesHtml() {
@@ -1389,9 +1389,8 @@
       ${homeTopbar()}
       <main class="result-page translator-page">
         <section class="translator-hero reveal" style="--d:0">
-          <div class="result-kicker">
-            <span class="kicker-pill accent">多风格翻译</span>
-            <span class="kicker-pill">中文 / English</span>
+          <div class="eyebrow translator-eyebrow">
+            <span class="spark"></span>多风格翻译 · 中文 / English
           </div>
           <h1 class="translator-title">一句话，<em>五种说法。</em></h1>
           <p class="translator-lede">中文翻译成英文，或把英文换一种说法。原意不变，只换语气、场合和锋芒。</p>
@@ -1442,12 +1441,13 @@
     label.textContent = detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英";
   }
 
-  function renderTranslatorLoading() {
+  function renderTranslatorLoading(styles = state.translatorStyles) {
     const host = $("#translator-results");
     if (!host) return;
+    const selected = TRANSLATOR_STYLES.filter((style) => styles.includes(style.id));
     host.innerHTML = `<div class="translation-loading">
-      <div class="translation-loading-head"><span class="loading-dots"><i></i><i></i><i></i></span><span>正在写成五种英文…</span></div>
-      ${TRANSLATOR_STYLES.map((style) => `<div class="translation-loading-card"><span>${esc(style.name)}</span><i></i><i></i></div>`).join("")}
+      <div class="translation-loading-head"><span class="loading-dots"><i></i><i></i><i></i></span><span>正在写成 ${selected.length} 个英文版本…</span></div>
+      ${selected.map((style) => `<div class="translation-loading-card tone-${style.tone}"><span>${esc(style.name)}</span><i></i><i></i></div>`).join("")}
     </div>`;
   }
 
@@ -1631,7 +1631,7 @@
       renderTranslatorNoModel();
       return;
     }
-    renderTranslatorLoading();
+    renderTranslatorLoading(selectedStyles);
     try {
       const result = await requestTranslation(text, state.settings, sourceLanguage, selectedStyles);
       if (token !== state.translatorSeq) return;
