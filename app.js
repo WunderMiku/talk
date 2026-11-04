@@ -264,6 +264,7 @@
   }
 
   const wordRequests = new Map();
+  const wordPreviewListeners = new Map();
   let prefetchToken = 0;
   let currentAudio = null;
   let ttsAudio = null;
@@ -839,13 +840,25 @@
     return { average, bytes, label: formatBytes(bytes) };
   }
 
-  function lookupWordDeduped(word) {
+  function lookupWordDeduped(word, options = {}) {
     const key = normalizeWord(word);
     const cached = cacheGetWord(key);
     if (cached) return Promise.resolve({ type: "word", data: cached });
+    if (options.onPreview) {
+      const listeners = wordPreviewListeners.get(key) || new Set();
+      listeners.add(options.onPreview);
+      wordPreviewListeners.set(key, listeners);
+    }
     if (wordRequests.has(key)) return wordRequests.get(key);
-    const request = modelLookup(key, "word", state.settings)
-      .finally(() => wordRequests.delete(key));
+    const listeners = wordPreviewListeners.get(key) || new Set();
+    const request = modelLookup(key, "word", state.settings, {
+      onPreview: (preview) => listeners.forEach((listener) => {
+        try { listener(preview); } catch (_) { /* preview is best-effort */ }
+      })
+    }).finally(() => {
+      wordRequests.delete(key);
+      wordPreviewListeners.delete(key);
+    });
     wordRequests.set(key, request);
     return request;
   }
@@ -1747,6 +1760,7 @@
           <span class="loading-dots"><i></i><i></i><i></i></span>
           <span id="loading-status-text">${type === "sentence" ? "找出真正重要的词" : "正在理解词义"}</span>
         </div>
+        <div class="live-preview" id="live-preview" hidden></div>
         <div class="skeleton-stack reveal" style="--d:1">
           <div class="skeleton hero"></div>
           <div class="skeleton line"></div>
@@ -2807,9 +2821,10 @@
     try {
       let result;
       if (hasModelConfig()) {
+        const onPreview = (preview) => updateStreamPreview(preview, type);
         result = type === "word"
-          ? await lookupWordDeduped(query)
-          : await modelLookup(query, type, state.settings);
+          ? await lookupWordDeduped(query, { onPreview })
+          : await modelLookup(query, type, state.settings, { onPreview });
       } else {
         await wait(820);
         result = lookupDemo(query, type);
@@ -2968,7 +2983,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     return JSON.stringify({ task: "sentence", detail, text: String(query) });
   }
 
-  async function modelLookup(query, type, cfg) {
+  async function modelLookup(query, type, cfg, options = {}) {
     const detail = cfg.detailLevel || "standard";
     if (type === "word") {
       const cached = cacheGetWord(query, detail);
@@ -2982,21 +2997,39 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     ];
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
-    let response;
+    const maxTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
+    let content = "";
     try {
-      response = await postChat(endpoint, cfg, messages, controller.signal, true, (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens);
+      content = await postChatStream(endpoint, cfg, messages, controller.signal, true, maxTokens, (partial) => {
+        if (typeof options.onPreview === "function") {
+          try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
+        }
+      });
+    } catch (error) {
+      // Older/limited gateways may reject streaming. Retry once non-streaming
+      // only when no content has been received.
+      if (!content && error?.name !== "AbortError") {
+        let response;
+        try {
+          response = await postChat(endpoint, cfg, messages, controller.signal, true, maxTokens);
+        } catch (fallbackError) {
+          throw fallbackError;
+        }
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
+        }
+        const json = await response.json();
+        const message = json?.choices?.[0]?.message;
+        content = message?.content;
+        if (Array.isArray(content)) {
+          content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+        }
+      } else {
+        throw error;
+      }
     } finally {
       window.clearTimeout(timer);
-    }
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
-    }
-    const json = await response.json();
-    const message = json?.choices?.[0]?.message;
-    let content = message?.content;
-    if (Array.isArray(content)) {
-      content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
     }
     if (!content) throw new Error("模型返回了空消息。");
     const parsed = parseJsonObject(content);
@@ -3013,6 +3046,160 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     data.model = cfg.model;
     data.source = "语境分析";
     return { type: "sentence", data };
+  }
+
+  function streamDeltaText(delta) {
+    const value = delta?.content;
+    if (typeof value === "string") return value;
+    if (Array.isArray(value)) {
+      return value.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+    }
+    return "";
+  }
+
+  async function postChatStream(endpoint, cfg, messages, signal, allowJsonMode, maxTokens, onDelta) {
+    const body = {
+      model: cfg.model,
+      messages,
+      temperature: 0.3,
+      max_tokens: maxTokens,
+      stream: true,
+      ...thinkingParams(cfg)
+    };
+    if (allowJsonMode) body.response_format = { type: "json_object" };
+
+    const send = async (withJsonMode) => {
+      const payload = { ...body };
+      if (!withJsonMode) delete payload.response_format;
+      return fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "text/event-stream",
+          "Authorization": `Bearer ${String(cfg.apiKey || "").trim()}`
+        },
+        body: JSON.stringify(payload),
+        signal
+      });
+    };
+
+    let response = await send(allowJsonMode);
+    if (!response.ok && allowJsonMode && [400, 422].includes(response.status)) {
+      response = await send(false);
+    }
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
+    }
+
+    const type = response.headers.get("content-type") || "";
+    if (type.includes("application/json")) {
+      const json = await response.json();
+      const message = json?.choices?.[0]?.message;
+      let content = message?.content;
+      if (Array.isArray(content)) {
+        content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+      }
+      if (content) onDelta?.(content);
+      return content || "";
+    }
+
+    if (!response.body?.getReader) {
+      return await response.text();
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let newline;
+      while ((newline = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        if (!line.startsWith("data:")) continue;
+        const payload = line.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        try {
+          const json = JSON.parse(payload);
+          const choice = json?.choices?.[0];
+          const piece = streamDeltaText(choice?.delta) || (typeof choice?.message?.content === "string" ? choice.message.content : "");
+          if (piece) {
+            content += piece;
+            onDelta?.(content);
+          }
+        } catch (_) {
+          // Ignore keep-alive/partial SSE lines.
+        }
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim().startsWith("data:")) {
+      const payload = buffer.trim().slice(5).trim();
+      if (payload && payload !== "[DONE]") {
+        try {
+          const json = JSON.parse(payload);
+          const piece = streamDeltaText(json?.choices?.[0]?.delta);
+          if (piece) content += piece;
+        } catch (_) { /* ignore */ }
+      }
+    }
+    return content;
+  }
+
+  function partialJsonString(text, key) {
+    const pattern = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`);
+    const match = String(text || "").match(pattern);
+    if (!match) return "";
+    try { return JSON.parse(`"${match[1]}"`); } catch (_) { return ""; }
+  }
+
+  function streamPreviewFromJson(text, type, query) {
+    if (type === "sentence") {
+      const translation = partialJsonString(text, "translation");
+      const tone = partialJsonString(text, "tone");
+      const structure = partialJsonString(text, "structure");
+      if (!translation && !tone && !structure) return null;
+      return { kind: "sentence", text: query, translation, tone, structure };
+    }
+    const word = partialJsonString(text, "word") || query;
+    const phonetic = partialJsonString(text, "phonetic");
+    const translation = partialJsonString(text, "translation");
+    const short = partialJsonString(text, "short");
+    const pos = partialJsonString(text, "pos");
+    if (!word && !translation && !short) return null;
+    return { kind: "word", word, phonetic, translation, short, pos };
+  }
+
+  function updateStreamPreview(preview, type) {
+    if (!preview) return;
+    const host = $("#live-preview");
+    if (!host) return;
+    const signature = JSON.stringify(preview);
+    if (host.dataset.signature === signature) return;
+    host.dataset.signature = signature;
+    host.hidden = false;
+    host.classList.add("has-content");
+    const skeleton = $(".skeleton-stack");
+    if (skeleton) skeleton.classList.add("is-streaming");
+    if (type === "sentence") {
+      host.innerHTML = `
+        <span class="live-preview-kicker"><i></i>正在分段返回</span>
+        <h2 class="live-preview-word">${esc(shorten(preview.text || "", 80))}</h2>
+        ${preview.tone ? `<span class="live-preview-meta">${esc(preview.tone)}</span>` : ""}
+        ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理译文…</p>`}
+        ${preview.structure ? `<p class="live-preview-note">${esc(preview.structure)}</p>` : ""}`;
+      return;
+    }
+    host.innerHTML = `
+      <span class="live-preview-kicker"><i></i>正在分段返回</span>
+      <h2 class="live-preview-word">${esc(preview.word || "")}</h2>
+      <div class="live-preview-meta">${esc(preview.phonetic || "")}${preview.pos ? ` · ${esc(posLabel(preview.pos))}` : ""}</div>
+      ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理第一段…</p>`}
+      ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}`;
   }
 
   function thinkingParams(cfg) {

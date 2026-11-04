@@ -168,6 +168,14 @@ into the Pages artifact.
 - Background prefetch is capped at 4 related words per page instead of walking
   the entire relation graph.
 
+## Progressive responses
+
+Model calls use SSE streaming where the provider supports it. The loading page
+shows a live preview as soon as `word`, `phonetic`, `translation`, `short`,
+`sentence translation`, `tone`, or `structure` fields become complete; the full
+word/sentence page replaces it when the JSON object finishes. If a provider
+rejects streaming, the client retries once with a normal non-streaming request.
+
 ## Generation depth and cache
 
 - **快速**: fewer senses/relations/examples; `max_tokens` 1400.
