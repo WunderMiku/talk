@@ -189,6 +189,15 @@ gateways buffer the response when stream and structured-output flags are
 combined; JSON is still enforced by the static system prompt. If a provider
 rejects streaming, the client retries once with a normal non-streaming request.
 
+### Spelling filter
+
+The static word prompt now tells the model to treat common misspellings as
+corrections rather than rare words, including missing/extra letters, adjacent
+keys, repeated letters, and examples such as `recieve`, `definately`,
+`enviroment`, and `accomodate`. It still protects real rare words, names,
+brands, loanwords, and abbreviations. Existing cached typo entries may need
+**重新生成词条**.
+
 ### Timeline labels
 
 The word system prompt requires all explanatory etymology fields
