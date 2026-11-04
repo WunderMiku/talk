@@ -10,6 +10,7 @@
   const app = document.getElementById("app");
   const screen = document.getElementById("screen");
   const layerRoot = document.getElementById("layer-root");
+  const workspaceRoot = document.getElementById("workspace-root");
   const overlayRoot = document.getElementById("overlay-root");
   const cacheCorner = document.getElementById("cache-corner");
   const toastEl = document.getElementById("toast");
@@ -300,6 +301,7 @@
     translatorSeq: 0,
     translatorMode: "auto",
     translatorStyles: [],
+    workspaceOpen: false,
     lastTranslationInput: "",
     lastTranslationResult: null,
     lastAttempt: null,
@@ -1108,6 +1110,7 @@
       state.route = route;
       state.module = route.name === "translator" ? "translator" : "dictionary";
       updateModuleBar();
+      closeTranslationWorkspace({ immediate: true });
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
       screen.innerHTML = pageHtml(route);
@@ -1153,6 +1156,10 @@
   function goBack() {
     if (state.sheetOpen) {
       closeSheet();
+      return;
+    }
+    if (state.workspaceOpen) {
+      closeTranslationWorkspace();
       return;
     }
     if (state.wordLayers.length) {
@@ -1372,6 +1379,10 @@
     }).join("");
   }
 
+  function translatorModeHtml() {
+    return ["auto", "zh", "en"].map((mode) => `<button class="translator-mode-btn ${state.translatorMode === mode ? "active" : ""}" type="button" data-action="translator-mode" data-mode="${mode}" aria-pressed="${state.translatorMode === mode}">${mode === "auto" ? "自动" : mode === "zh" ? "中 → 英" : "英 → 英"}</button>`).join("");
+  }
+
   function updateTranslatorStyleControls() {
     $$(".translator-style-chip").forEach((button) => {
       const selected = state.translatorStyles.includes(button.dataset.style);
@@ -1380,8 +1391,9 @@
       const check = button.querySelector(".translator-style-check");
       if (check) check.textContent = selected ? "✓" : "";
     });
-    const count = $("#translator-style-count");
-    if (count) count.textContent = `已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}`;
+    $$(".translator-style-count").forEach((count) => {
+      count.textContent = `已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}`;
+    });
   }
 
   function translatorPage() {
@@ -1399,19 +1411,17 @@
           <div class="translator-input-shell">
             <div class="translator-input-head">
               <span class="mono">原文</span>
-              <div class="translator-mode-switch" role="group" aria-label="翻译方向">
-                ${["auto", "zh", "en"].map((mode) => `<button class="translator-mode-btn ${state.translatorMode === mode ? "active" : ""}" type="button" data-action="translator-mode" data-mode="${mode}" aria-pressed="${state.translatorMode === mode}">${mode === "auto" ? "自动" : mode === "zh" ? "中 → 英" : "英 → 英"}</button>`).join("")}
-              </div>
+              <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
             </div>
             <textarea id="translator-input" rows="3" maxlength="600" placeholder="输入中文或英文…" spellcheck="false" aria-label="待翻译文本"></textarea>
             <div class="translator-input-foot">
-              <span class="translator-input-meta"><span id="translator-language">自动识别</span><span id="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span></span>
+              <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span></span>
               <button class="search-submit" type="submit" aria-label="生成选中的风格">${icon("arrowUpRight")}</button>
             </div>
           </div>
         </form>
         <div class="translator-styles reveal" style="--d:0.8">${translatorStylesHtml()}</div>
-        <div class="translator-results" id="translator-results">${translatorEmptyHtml()}</div>
+        <div class="translator-landing-hint reveal" style="--d:1">${translatorEmptyHtml()}</div>
       </main>`;
   }
 
@@ -1421,28 +1431,89 @@
     return detectSourceLanguage(input?.value || "");
   }
 
+  function openTranslationWorkspace(text) {
+    const value = String(text || "").trim();
+    if (!value) {
+      toast("先输入一句中文或英文");
+      return;
+    }
+    state.workspaceOpen = true;
+    state.lastTranslationInput = value;
+    workspaceRoot.innerHTML = `<section class="translation-workspace" aria-label="翻译结果">
+      <header class="translation-workspace-head">
+        <div>
+          <span class="mono">MULTI-STYLE</span>
+          <h2>翻译结果</h2>
+        </div>
+        <button class="icon-btn" type="button" data-action="close-workspace" aria-label="关闭翻译结果">${icon("close")}</button>
+      </header>
+      <div class="translation-workspace-body">
+        <form class="workspace-translator-form" id="workspace-translator-form" novalidate>
+          <div class="workspace-input-shell">
+            <textarea id="workspace-translator-input" rows="2" maxlength="600" spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
+            <div class="workspace-input-foot">
+              <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
+              <span class="translator-language">自动识别</span>
+              <button class="search-submit" type="submit" aria-label="重新翻译">${icon("arrowUpRight")}</button>
+            </div>
+          </div>
+        </form>
+        <div class="workspace-style-row">
+          <div class="translator-styles">${translatorStylesHtml()}</div>
+          <span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span>
+        </div>
+        <div class="translation-workspace-results" id="translation-workspace-results"></div>
+      </div>
+    </section>`;
+    updateScrollLock();
+    requestAnimationFrame(() => {
+      const panel = $(".translation-workspace", workspaceRoot);
+      panel?.classList.add("show");
+      $("#workspace-translator-input")?.focus({ preventScroll: true });
+      updateTranslatorLanguage();
+      updateTranslatorStyleControls();
+    });
+    runTranslation(value);
+  }
+
+  function closeTranslationWorkspace({ immediate = false } = {}) {
+    if (!state.workspaceOpen && !workspaceRoot.firstElementChild) return;
+    state.workspaceOpen = false;
+    state.translatorSeq += 1;
+    updateScrollLock();
+    const panel = $(".translation-workspace", workspaceRoot);
+    if (immediate || !panel) {
+      workspaceRoot.innerHTML = "";
+      return;
+    }
+    panel.classList.remove("show");
+    window.setTimeout(() => {
+      if (!state.workspaceOpen) workspaceRoot.innerHTML = "";
+    }, 300);
+  }
+
+  function syncTranslatorInputsFromWorkspace() {
+    const workspaceInput = $("#workspace-translator-input");
+    const landingInput = $("#translator-input");
+    if (workspaceInput && landingInput) landingInput.value = workspaceInput.value;
+    updateTranslatorLanguage();
+  }
+
   function updateTranslatorLanguage() {
     const input = $("#translator-input");
-    const label = $("#translator-language");
-    if (!input || !label) return;
-    const value = input.value.trim();
-    if (state.translatorMode === "zh") {
-      label.textContent = "中 → 英";
-      return;
-    }
-    if (state.translatorMode === "en") {
-      label.textContent = "英 → 英";
-      return;
-    }
-    if (!value) {
-      label.textContent = "自动识别";
-      return;
-    }
-    label.textContent = detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英";
+    const value = input?.value.trim() || "";
+    const text = state.translatorMode === "zh"
+      ? "中 → 英"
+      : state.translatorMode === "en"
+        ? "英 → 英"
+        : value
+          ? detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英"
+          : "自动识别";
+    $$(".translator-language").forEach((label) => { label.textContent = text; });
   }
 
   function renderTranslatorLoading(styles = state.translatorStyles) {
-    const host = $("#translator-results");
+    const host = $("#translation-workspace-results");
     if (!host) return;
     const selected = TRANSLATOR_STYLES.filter((style) => styles.includes(style.id));
     host.innerHTML = `<div class="translation-loading">
@@ -1452,7 +1523,7 @@
   }
 
   function renderTranslatorNoModel() {
-    const host = $("#translator-results");
+    const host = $("#translation-workspace-results");
     if (!host) return;
     host.innerHTML = `<div class="translator-empty">
       <span class="translator-empty-mark">!</span>
@@ -1462,7 +1533,7 @@
   }
 
   function renderTranslatorError(message) {
-    const host = $("#translator-results");
+    const host = $("#translation-workspace-results");
     if (!host) return;
     host.innerHTML = `<div class="translator-empty error">
       <span class="translator-empty-mark">!</span>
@@ -1472,7 +1543,7 @@
   }
 
   function renderTranslatorResult(result) {
-    const host = $("#translator-results");
+    const host = $("#translation-workspace-results");
     if (!host || !result?.variants?.length) return;
     const source = result.sourceLanguage === "zh" ? "中 → 英" : "英 → 英";
     const styleMap = new Map(TRANSLATOR_STYLES.map((style) => [style.id, style]));
@@ -2211,7 +2282,7 @@
 
   function updateScrollLock() {
     if (!screen) return;
-    screen.classList.toggle("is-locked", state.sheetOpen || state.wordLayers.length > 0);
+    screen.classList.toggle("is-locked", state.sheetOpen || state.workspaceOpen || state.wordLayers.length > 0);
   }
 
   function currentLayerData() {
@@ -4156,6 +4227,11 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         break;
       }
 
+      case "close-workspace":
+        event.preventDefault();
+        closeTranslationWorkspace();
+        break;
+
       case "translation-detail":
         event.preventDefault();
         openTranslationDetail(Number(target.dataset.index));
@@ -4177,7 +4253,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         if (!input) break;
         input.value = target.dataset.text || "";
         updateTranslatorLanguage();
-        runTranslation(input.value);
+        openTranslationWorkspace(input.value);
         break;
       }
 
@@ -4412,6 +4488,10 @@ Few-shot（只示意字段和语气，不要照抄内容）：
       updateTranslatorLanguage();
       return;
     }
+    if (target.id === "workspace-translator-input") {
+      syncTranslatorInputsFromWorkspace();
+      return;
+    }
     if (target.id === "search-input") {
       autoGrow(target);
       updateSearchMeta();
@@ -4459,7 +4539,16 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     if (event.target.id === "translator-form") {
       event.preventDefault();
       const input = $("#translator-input");
-      if (input) runTranslation(input.value);
+      if (input) openTranslationWorkspace(input.value);
+      return;
+    }
+    if (event.target.id === "workspace-translator-form") {
+      event.preventDefault();
+      const input = $("#workspace-translator-input");
+      if (input) {
+        syncTranslatorInputsFromWorkspace();
+        runTranslation(input.value);
+      }
       return;
     }
     if (event.target.id !== "search-form") return;
@@ -5120,6 +5209,11 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         closeSheet();
         return;
       }
+      if (state.workspaceOpen) {
+        event.preventDefault();
+        closeTranslationWorkspace();
+        return;
+      }
       if (state.wordLayers.length) {
         event.preventDefault();
         popWordLayer();
@@ -5189,8 +5283,9 @@ Few-shot（只示意字段和语气，不要照抄内容）：
       // moved to the previous history entry, so immediately move forward
       // again while closing the overlay; otherwise the app would jump to the
       // previous page and close every layer at once.
-      if (state.sheetOpen || state.wordLayers.length) {
+      if (state.sheetOpen || state.workspaceOpen || state.wordLayers.length) {
         if (state.sheetOpen) closeSheet();
+        else if (state.workspaceOpen) closeTranslationWorkspace();
         else popWordLayer();
         suppressNextPopstate = true;
         history.forward();
