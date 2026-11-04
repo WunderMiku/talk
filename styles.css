@@ -5707,3 +5707,26 @@ textarea:focus-visible,
   border-color: var(--tone-border);
   background: rgba(255, 255, 255, 0.48);
 }
+
+/* One frame: the detail sheet itself carries the tonal wash. */
+.sheet.translation-detail-sheet {
+  background:
+    linear-gradient(135deg, var(--tone-wash) 0%, var(--card) 58%, var(--paper) 100%);
+}
+
+.translation-detail {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.sheet.translation-detail-sheet .sheet-head {
+  background: transparent;
+}
+
+.translation-detail-head .translation-emoji {
+  background: rgba(255, 255, 255, 0.55);
+}

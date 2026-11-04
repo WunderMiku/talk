@@ -1530,6 +1530,11 @@
     if (!variant) return;
     const style = TRANSLATOR_STYLES.find((item) => item.id === variant.style) || TRANSLATOR_STYLES[0];
     openSheetShell({ kicker: "风格拆解", title: style.name });
+    const sheet = $(".sheet", overlayRoot);
+    if (sheet) {
+      TRANSLATOR_STYLES.forEach((item) => sheet.classList.remove(`tone-${item.tone}`));
+      sheet.classList.add("translation-detail-sheet", `tone-${style.tone}`);
+    }
     const holder = $("#sheet-scroll");
     if (holder) holder.innerHTML = translationDetailHtml(variant, style);
   }
