@@ -120,6 +120,14 @@ remove or ignore the Pages workflow if you do not want it to run.
 The GitHub web upload form has a 25 MB limit, so the branch route requires Git
 for the 92 MB model.
 
+## Settings UX
+
+Settings is split into three tabs: **模型 / 发音 / 数据**. Only the active tab is
+rendered. All preference and model-field changes are autosaved after a short
+debounce; the sticky footer reports `正在保存…` / `已自动保存` and provides a
+single `完成` action. Clicking the backdrop during the opening animation is
+ignored, so a double tap cannot immediately close the sheet.
+
 ## Model profiles
 
 Settings includes independent model profiles for DeepSeek, OpenAI, Qwen,

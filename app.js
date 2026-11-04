@@ -291,6 +291,11 @@
     loadingTimer: null,
     toastTimer: null,
     sheetCloseTimer: null,
+    sheetOpenedAt: 0,
+    settingsOpen: false,
+    settingsTab: "model",
+    settingsDirty: false,
+    settingsSaveTimer: null,
     lastAttempt: null,
     openKey: 0,
     moodOffset: 0,
@@ -2256,6 +2261,7 @@
   }
 
   function openSheetShell({ kicker, title }) {
+    state.sheetOpenedAt = performance.now();
     if (state.sheetCloseTimer) {
       window.clearTimeout(state.sheetCloseTimer);
       state.sheetCloseTimer = null;
@@ -2287,6 +2293,8 @@
 
   function closeSheet({ immediate = false } = {}) {
     if (!state.sheetOpen && !overlayRoot.firstElementChild) return;
+    if (state.settingsOpen) flushSettingsDraft();
+    state.settingsOpen = false;
     state.sheetOpen = false;
     state.sheetStack = [];
     updateScrollLock();
@@ -2439,19 +2447,68 @@
   }
 
   function openSettingsSheet() {
+    state.settingsOpen = true;
+    state.settingsDirty = false;
+    state.settingsTab = state.settingsTab || "model";
     state.draft = {
       ...state.settings,
       profiles: (state.settings.profiles || []).map((profile) => ({ ...profile }))
     };
-    openSheetShell({ kicker: "模型设置", title: "连接模型" });
+    openSheetShell({ kicker: "偏好与连接", title: "设置" });
     renderSettingsContent();
-    requestAnimationFrame(updateTtsBackendStatus);
+  }
+
+  function settingsStatus(text) {
+    const target = $("#settings-save-status");
+    if (target) target.textContent = text;
+  }
+
+  function scheduleSettingsCommit() {
+    if (!state.draft) return;
+    state.settingsDirty = true;
+    settingsStatus("正在保存…");
+    if (state.settingsSaveTimer) window.clearTimeout(state.settingsSaveTimer);
+    state.settingsSaveTimer = window.setTimeout(commitSettingsDraft, 240);
+  }
+
+  function commitSettingsDraft() {
+    if (!state.draft) return;
+    if (state.settingsSaveTimer) {
+      window.clearTimeout(state.settingsSaveTimer);
+      state.settingsSaveTimer = null;
+    }
+    const previous = state.settings;
+    syncDraftProfile(state.draft);
+    state.draft.apiKey = String(state.draft.apiKey || "").trim();
+    state.draft.baseUrl = String(state.draft.baseUrl || "").trim();
+    state.draft.model = String(state.draft.model || "").trim();
+    state.settings = {
+      ...state.draft,
+      profiles: state.draft.profiles.map((profile) => ({ ...profile }))
+    };
+    persistSettings(state.settings);
+    state.settingsDirty = false;
+    if (previous.kokoroBackendMode !== state.settings.kokoroBackendMode) {
+      kokoroTTSPromise = null;
+      kokoroBackend = "";
+      kokoroBackendDetail = "";
+      updateTtsBackendStatus();
+    }
+    applyCacheDisplay();
+    refreshCacheBorders();
+    const active = activeWordData();
+    if (active) schedulePrefetch(active);
+    settingsStatus("已自动保存");
+  }
+
+  function flushSettingsDraft() {
+    if (!state.settingsDirty) return;
+    commitSettingsDraft();
   }
 
   function ttsSettingsHtml(draft) {
     const engine = draft.ttsEngine || "kokoro";
     return `
-      <div class="settings-divider"></div>
       <div class="tts-head">
         <span class="settings-subhead">发音</span>
         <div class="tts-engine-switch" role="group" aria-label="发音引擎">
@@ -2482,105 +2539,136 @@
         <p class="tts-error" id="tts-error" hidden></p>`}`;
   }
 
+  function modelSettingsHtml(draft) {
+    return `
+      <p class="settings-intro">接入你自己的模型。Talk 使用 OpenAI 兼容的 Chat Completions 格式；所有修改会自动保存。</p>
+      <div class="model-profile-head">
+        <span class="settings-subhead">模型配置</span>
+        <span class="mono">${draft.profiles.length} 个</span>
+      </div>
+      <div class="model-profile-strip" role="list" aria-label="模型配置">
+        ${draft.profiles.map((profile) => `
+          <button class="model-profile-chip ${profile.id === draft.activeProfileId ? "active" : ""}" type="button" role="listitem" data-action="select-profile" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
+            <strong>${esc(profile.name)}</strong>
+            <small>${esc(profile.model || profile.baseUrl || "未配置")}</small>
+          </button>`).join("")}
+        <button class="model-profile-add" type="button" data-action="add-profile" aria-label="新增模型配置">+</button>
+      </div>
+      <p class="field-hint">每个配置独立保存地址、模型和密钥，切换不会覆盖。</p>
+      <div class="field">
+        <label for="profile-name">配置名称</label>
+        <input id="profile-name" type="text" data-profile-name value="${attr(activeProfile(draft)?.name || "")}" placeholder="例如：DeepSeek 主力" spellcheck="false" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="base-url">API 地址</label>
+        <input id="base-url" type="url" inputmode="url" data-setting="baseUrl" value="${attr(draft.baseUrl)}" placeholder="https://api.deepseek.com" spellcheck="false" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label for="model-name">模型</label>
+        <input id="model-name" type="text" data-setting="model" value="${attr(draft.model)}" placeholder="deepseek-chat" spellcheck="false" autocomplete="off" />
+      </div>
+      <div class="field">
+        <label>生成深度</label>
+        <div class="detail-switch" role="group" aria-label="生成深度">
+          ${Object.entries(DETAIL_LEVELS).map(([id, item]) => `
+            <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
+        </div>
+        <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。</p>
+      </div>
+      ${profileSupportsThinking(activeProfile(draft)) ? `
+      <div class="thinking-panel">
+        <label class="check-row">
+          <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
+          开启深度思考
+        </label>
+        <div class="thinking-budget-row">
+          <label for="thinking-budget">思考预算（tokens）</label>
+          <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
+        </div>
+        <p class="field-hint">关闭思考通常快 60%–75%；预算 0 = 模型默认，建议 256–1024。</p>
+      </div>` : ""}
+      ${activeProfile(draft)?.note ? `<p class="field-hint model-profile-note">${esc(activeProfile(draft).note)}</p>` : ""}
+      <div class="field">
+        <label for="api-key">API 密钥</label>
+        <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
+        <p class="field-hint">只发送到你的接口；不勾选“记住”时仅保存在当前会话。</p>
+      </div>
+      <label class="check-row">
+        <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
+        在这台设备上记住密钥
+      </label>
+      ${draft.profiles.length > 1 ? `<button class="link-btn model-profile-delete" type="button" data-action="delete-profile">删除当前配置</button>` : ""}
+      <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
+        ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(activeProfile(draft)?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
+      </div>
+      <div class="settings-inline-actions">
+        <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试连接</button>
+      </div>
+      <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。Android 原生请求不受这个限制。</p>`;
+  }
+
+  function dataSettingsHtml(draft) {
+    const stats = wordCacheStats();
+    return `
+      <p class="settings-intro">本机数据与阅读偏好。修改会自动保存。</p>
+      <label class="pref-toggle">
+        <span class="pref-copy">
+          <strong>预加载二级词条</strong>
+          <span>词页出现后，在后台生成最多 ${PREFETCH_LIMIT} 个相关词；会额外消耗模型额度。</span>
+        </span>
+        <span class="pref-switch">
+          <input type="checkbox" data-setting="prefetch" ${draft.prefetch ? "checked" : ""} />
+          <span class="pref-slider" aria-hidden="true"></span>
+        </span>
+      </label>
+      <div class="cache-display-setting">
+        <span class="pref-copy">
+          <strong>缓存提示方式</strong>
+          <span>边框：相关词的虚线为未缓存、实线为已缓存。三角标：只在词页右下角显示整页缓存状态。</span>
+        </span>
+        <div class="cache-display-switch" role="group" aria-label="缓存提示方式">
+          <button class="cache-display-btn ${draft.cacheDisplay !== "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="borders" aria-pressed="${draft.cacheDisplay !== "corner"}">边框</button>
+          <button class="cache-display-btn ${draft.cacheDisplay === "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="corner" aria-pressed="${draft.cacheDisplay === "corner"}">三角标</button>
+        </div>
+      </div>
+      <div class="cache-settings-summary">
+        <span><strong>${stats.count}</strong> / ${stats.max} 个词条</span>
+        <span>${formatBytes(stats.bytes)} · ${stats.backend}</span>
+      </div>
+      <div class="cache-actions">
+        <button class="btn btn-secondary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
+        <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
+        <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
+        <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
+      </div>
+      <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
+      <p class="api-note">词条缓存优先从 IndexedDB 读取，未命中才请求模型。Kokoro 模型文件约 115MB，由浏览器单独缓存。</p>`;
+  }
+
   function renderSettingsContent() {
     const holder = $("#sheet-scroll");
     if (!holder || !state.draft) return;
     const draft = state.draft;
+    const tab = state.settingsTab || "model";
+    const tabs = [
+      ["model", "模型"],
+      ["tts", "发音"],
+      ["data", "数据"]
+    ];
     holder.innerHTML = `
-      <div class="sheet-content">
-        <p class="settings-intro">接入你自己的模型。Talk 使用 OpenAI 兼容的 Chat Completions 格式，DeepSeek、OpenAI 或本地服务都可以。</p>
-        <div class="model-profile-head">
-          <span class="settings-subhead">模型配置</span>
-          <span class="mono">${draft.profiles.length} 个</span>
+      <div class="sheet-content settings-sheet">
+        <div class="settings-tabs" role="tablist" aria-label="设置分类">
+          ${tabs.map(([id, label]) => `<button class="settings-tab ${tab === id ? "active" : ""}" type="button" role="tab" aria-selected="${tab === id}" data-action="settings-tab" data-tab="${id}">${label}</button>`).join("")}
         </div>
-        <div class="model-profile-strip" role="list" aria-label="模型配置">
-          ${draft.profiles.map((profile) => `
-            <button class="model-profile-chip ${profile.id === draft.activeProfileId ? "active" : ""}" type="button" role="listitem" data-action="select-profile" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
-              <strong>${esc(profile.name)}</strong>
-              <small>${esc(profile.model || profile.baseUrl || "未配置")}</small>
-            </button>`).join("")}
-          <button class="model-profile-add" type="button" data-action="add-profile" aria-label="新增模型配置">+</button>
+        <div class="settings-pane" role="tabpanel">
+          ${tab === "tts" ? ttsSettingsHtml(draft) : tab === "data" ? dataSettingsHtml(draft) : modelSettingsHtml(draft)}
         </div>
-        <p class="field-hint">每个配置独立保存地址、模型和密钥，切换不会覆盖。预设已包含 DeepSeek、OpenAI、Qwen、Kimi、GLM、OpenRouter、Claude。</p>
-        <div class="field">
-          <label for="profile-name">配置名称</label>
-          <input id="profile-name" type="text" data-profile-name value="${attr(activeProfile(draft)?.name || "")}" placeholder="例如：DeepSeek 主力" spellcheck="false" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label for="base-url">API 地址</label>
-          <input id="base-url" type="url" inputmode="url" data-setting="baseUrl" value="${attr(draft.baseUrl)}" placeholder="https://api.deepseek.com" spellcheck="false" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label for="model-name">模型</label>
-          <input id="model-name" type="text" data-setting="model" value="${attr(draft.model)}" placeholder="deepseek-chat" spellcheck="false" autocomplete="off" />
-        </div>
-        <div class="field">
-          <label>生成深度</label>
-          <div class="detail-switch" role="group" aria-label="生成深度">
-            ${Object.entries(DETAIL_LEVELS).map(([id, item]) => `
-              <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
-          </div>
-          <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。词典建议使用 deepseek-chat，deepseek-reasoner 会更慢。</p>
-        </div>
-        ${profileSupportsThinking(activeProfile(draft)) ? `
-        <div class="thinking-panel">
-          <label class="check-row">
-            <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
-            开启深度思考
-          </label>
-          <div class="thinking-budget-row">
-            <label for="thinking-budget">思考预算（tokens）</label>
-            <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
-          </div>
-          <p class="field-hint">0 = 模型默认；越小越快。Qwen3.7 Flash 默认开启思考，关闭后延迟通常降低 60%–75%。</p>
-        </div>` : ""}
-        <div class="field">
-          <label for="api-key">API 密钥</label>
-          <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
-          <p class="field-hint">密钥只会发送到你的接口。当前 HTML 原型保存在浏览器中；Android 版会改用系统 Keystore。</p>
-        </div>
-        <label class="check-row">
-          <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
-          在这台设备上记住密钥
-        </label>
-        ${draft.profiles.length > 1 ? `<button class="link-btn model-profile-delete" type="button" data-action="delete-profile">删除当前配置</button>` : ""}
-        <label class="pref-toggle">
-          <span class="pref-copy">
-            <strong>预加载二级词条</strong>
-            <span>词页出现后，在后台生成最多 ${PREFETCH_LIMIT} 个相关词，点开更快；会额外消耗模型额度。开关立即生效，无需点保存。</span>
-          </span>
-          <span class="pref-switch">
-            <input type="checkbox" data-setting="prefetch" ${draft.prefetch ? "checked" : ""} />
-            <span class="pref-slider" aria-hidden="true"></span>
-          </span>
-        </label>
-        <div class="cache-display-setting">
-          <span class="pref-copy">
-            <strong>缓存提示方式</strong>
-            <span>边框：相关词的边框虚线为未缓存、实线为已缓存。三角标：只在词页右下角显示整页缓存状态。切换立即生效。</span>
-          </span>
-          <div class="cache-display-switch" role="group" aria-label="缓存提示方式">
-            <button class="cache-display-btn ${draft.cacheDisplay !== "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="borders" aria-pressed="${draft.cacheDisplay !== "corner"}">边框</button>
-            <button class="cache-display-btn ${draft.cacheDisplay === "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="corner" aria-pressed="${draft.cacheDisplay === "corner"}">三角标</button>
-          </div>
-        </div>
-        <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
-          ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(activeProfile(draft)?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
-        </div>
-        ${ttsSettingsHtml(draft)}
-        <div class="settings-actions">
-          <button class="btn btn-primary" type="button" data-action="save-settings">${icon("check")} 保存</button>
-          <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试</button>
-          <button class="btn btn-secondary" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
-        </div>
-        <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>词条缓存：</b>优先读取本机 IndexedDB，未命中才请求模型。<span id="word-cache-stats">${wordCacheStats().count}/${wordCacheStats().max} 条 · ${formatBytes(wordCacheStats().bytes)}</span></p>
-        <div class="cache-actions">
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
-          <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
+        <div class="settings-footer">
+          <span id="settings-save-status">${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
+          <button class="btn btn-primary" type="button" data-action="save-settings">完成</button>
         </div>
       </div>`;
+    if (tab === "tts") requestAnimationFrame(updateTtsBackendStatus);
   }
 
   function refreshCacheUi() {
@@ -2695,21 +2783,13 @@
 
   function saveSettings() {
     if (!state.draft) return;
-    syncDraftProfile(state.draft);
-    state.draft.apiKey = String(state.draft.apiKey || "").trim();
-    state.draft.baseUrl = String(state.draft.baseUrl || "").trim();
-    state.draft.model = String(state.draft.model || "").trim();
-    state.settings = {
-      ...state.draft,
-      profiles: state.draft.profiles.map((profile) => ({ ...profile }))
-    };
-    persistSettings(state.settings);
+    flushSettingsDraft();
     closeSheet();
     const topLayer = state.wordLayers[state.wordLayers.length - 1];
     if (topLayer && !topLayer.data) void hydrateLayerWithModel(topLayer);
     const active = activeWordData();
     if (active) schedulePrefetch(active);
-    toast(hasModelConfig() ? "模型已连接" : "已切换到演示模式");
+    toast(hasModelConfig() ? "设置已保存" : "已切换到演示模式");
   }
 
   async function testConnection() {
@@ -3587,6 +3667,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 
       case "close-sheet":
         event.preventDefault();
+        if (target.classList.contains("sheet-backdrop") && performance.now() - state.sheetOpenedAt < 480) break;
         closeSheet();
         break;
 
@@ -3626,6 +3707,13 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         copyCurrentPage();
         break;
 
+      case "settings-tab":
+        event.preventDefault();
+        state.settingsTab = target.dataset.tab || "model";
+        renderSettingsContent();
+        $("#sheet-scroll")?.scrollTo({ top: 0 });
+        break;
+
       case "select-profile": {
         event.preventDefault();
         if (!state.draft) break;
@@ -3633,12 +3721,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         const profile = state.draft.profiles.find((item) => item.id === target.dataset.profile);
         if (!profile) break;
         state.draft = applyProfileToSettings(state.draft, profile);
-        state.settings = {
-          ...state.settings,
-          ...state.draft,
-          profiles: state.draft.profiles.map((item) => ({ ...item }))
-        };
-        persistSettings(state.settings);
+        scheduleSettingsCommit();
         renderSettingsContent();
         break;
       }
@@ -3660,12 +3743,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         };
         state.draft.profiles = [...state.draft.profiles, profile];
         state.draft = applyProfileToSettings(state.draft, profile);
-        state.settings = {
-          ...state.settings,
-          ...state.draft,
-          profiles: state.draft.profiles.map((item) => ({ ...item }))
-        };
-        persistSettings(state.settings);
+        scheduleSettingsCommit();
         renderSettingsContent();
         break;
       }
@@ -3679,12 +3757,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         state.draft.profiles = state.draft.profiles.filter((item) => item.id !== current.id);
         const next = state.draft.profiles[0];
         state.draft = applyProfileToSettings(state.draft, next);
-        state.settings = {
-          ...state.settings,
-          ...state.draft,
-          profiles: state.draft.profiles.map((item) => ({ ...item }))
-        };
-        persistSettings(state.settings);
+        scheduleSettingsCommit();
         renderSettingsContent();
         break;
       }
@@ -3700,8 +3773,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         event.preventDefault();
         if (!state.draft) break;
         state.draft.detailLevel = target.dataset.level || "standard";
-        state.settings = { ...state.settings, detailLevel: state.draft.detailLevel };
-        persistSettings(state.settings);
+        scheduleSettingsCommit();
         renderSettingsContent();
         break;
 
@@ -3709,8 +3781,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         event.preventDefault();
         if (!state.draft) break;
         state.draft.ttsEngine = target.dataset.engine === "native" ? "native" : "kokoro";
-        state.settings = { ...state.settings, ttsEngine: state.draft.ttsEngine };
-        persistSettings(state.settings);
+        scheduleSettingsCommit();
         renderSettingsContent();
         break;
 
@@ -3718,16 +3789,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         event.preventDefault();
         if (!state.draft) break;
         state.draft.cacheDisplay = target.dataset.display === "corner" ? "corner" : "borders";
-        state.settings = { ...state.settings, cacheDisplay: state.draft.cacheDisplay };
-        persistSettings(state.settings);
-        applyCacheDisplay();
-        refreshCacheBorders();
-        if (state.draft.cacheDisplay === "corner") {
-          const active = activeWordData();
-          if (active) schedulePrefetch(active);
-        } else {
-          hideCacheCorner();
-        }
+        scheduleSettingsCommit();
         renderSettingsContent();
         break;
 
@@ -3885,30 +3947,18 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         profile.thinkingBudget = value;
         state.draft.thinkingBudget = value;
       }
+      scheduleSettingsCommit();
       return;
     }
     if (target.matches("[data-profile-name]") && state.draft) {
       const profile = activeProfile(state.draft);
       if (profile) profile.name = target.value;
+      scheduleSettingsCommit();
       return;
     }
     if (target.matches("[data-setting]") && state.draft) {
       const key = target.dataset.setting;
       state.draft[key] = target.type === "checkbox" ? target.checked : target.value;
-      if (key === "kokoroBackendMode") {
-        state.settings = { ...state.settings, kokoroBackendMode: state.draft.kokoroBackendMode || "wasm" };
-        kokoroTTSPromise = null;
-        kokoroBackend = "";
-        kokoroBackendDetail = "";
-        persistSettings(state.settings);
-        updateTtsBackendStatus();
-      }
-      if (key === "prefetch") {
-        state.settings = { ...state.settings, prefetch: Boolean(target.checked) };
-        persistSettings(state.settings);
-        const active = activeWordData();
-        if (active) schedulePrefetch(active);
-      }
       if (key === "apiKey" || key === "baseUrl" || key === "model") {
         const status = $("#api-test-status");
         if (status) {
@@ -3918,6 +3968,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
             : "<span>演示模式 · 无需密钥</span>";
         }
       }
+      scheduleSettingsCommit();
     }
   }
 
