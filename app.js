@@ -26,6 +26,7 @@
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
   const DEFAULT_CACHE_MAX = 300;
+  const PREFETCH_LIMIT = 4;
   const DEFAULT_CACHE_TTL_DAYS = 90;
   let wordDb = null;
   let wordStoreFallback = false;
@@ -59,7 +60,7 @@
   const DETAIL_LEVELS = {
     fast: {
       label: "快速",
-      maxTokens: 1400,
+      maxTokens: 1200,
       senses: 1,
       family: 2,
       synonyms: 2,
@@ -71,7 +72,7 @@
     },
     standard: {
       label: "标准",
-      maxTokens: 2600,
+      maxTokens: 2200,
       senses: 2,
       family: 3,
       synonyms: 3,
@@ -83,7 +84,7 @@
     },
     deep: {
       label: "深入",
-      maxTokens: 3800,
+      maxTokens: 3200,
       senses: 3,
       family: 4,
       synonyms: 4,
@@ -777,7 +778,7 @@
   }
 
   async function runPrefetch(plan, token) {
-    const queue = [...plan.fresh];
+    const queue = [...plan.fresh].slice(0, PREFETCH_LIMIT);
     const worker = async () => {
       while (queue.length) {
         if (token !== prefetchToken || !state.settings.prefetch) return;
@@ -2324,7 +2325,7 @@
         <label class="pref-toggle">
           <span class="pref-copy">
             <strong>预加载二级词条</strong>
-            <span>词页出现后，在后台生成同根词、近反义词等相关词，点开更快；会额外消耗模型额度。开关立即生效，无需点保存。</span>
+            <span>词页出现后，在后台生成最多 ${PREFETCH_LIMIT} 个相关词，点开更快；会额外消耗模型额度。开关立即生效，无需点保存。</span>
           </span>
           <span class="pref-switch">
             <input type="checkbox" data-setting="prefetch" ${draft.prefetch ? "checked" : ""} />
@@ -2660,24 +2661,9 @@
     return base;
   }
 
-  function systemPrompt() {
-    return [
-      "你是 Talk，一位面向中文母语者的双语英语词典编辑。",
-      "用户主要看中文，所以解释、提示、语气判断都用自然、简洁的简体中文。",
-      "英文只用来保留词汇本身的定义、例句和必要的语感说明，不要写大段英文导语。",
-      "解释词在语境中的真实用法，而不是只给一个对译词。",
-      "定义与例句用自然英文；中文翻译要像中文，不要逐字硬译。",
-      "只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。",
-      "不确定音标时返回空字符串，不要编造。",
-      "例句要短、自然、值得记住。"
-    ].join(" ");
-  }
+  const WORD_SYSTEM_PROMPT = `你是 Talk，一位面向中文母语者的双语英语词典编辑。用户主要看中文，所以解释、提示、语气判断都用自然、简洁的简体中文；英文只保留词汇定义、例句和必要的语感说明。解释词在语境中的真实用法，不只给对译词。定义与例句用自然英文，中文翻译要像中文。只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。不确定音标时返回空字符串，不要编造。例句要短、自然、值得记住。
 
-  function wordPrompt(query, detail = "standard") {
-    const level = DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard;
-    return `请为一位中文母语学习者查这个词或短语：「${query}」。
-
-只返回下面结构的 JSON：
+输出结构（字段名和嵌套结构必须保持不变）：
 {
   "kind": "word",
   "word": "词头，小写",
@@ -2687,54 +2673,60 @@
   "register": "common | formal | literary | informal | technical",
   "spelling": {
     "input": "用户原始输入，原样保留",
-    "corrected": "用户真正想查的正确拼写；如果拼写正确就重复原词",
+    "corrected": "用户真正想查的正确拼写；拼写正确时重复原词",
     "changed": false,
     "confidence": 0.0,
     "note": "中文，一句话说明为什么判断为拼写错误"
   },
   "short": "一句简洁、自然的英文释义",
   "translation": "简体中文释义，放在最显眼的位置",
-  "note": "一条中文使用提示，讲清楚什么时候用、容易错在哪",
-  "senses": [{"en": "英文定义", "zh": "中文解释", "tag": "中文标签，如：核心义 / 正式 / 引申义"}],
+  "note": "一条中文使用提示",
+  "senses": [{"en": "英文定义", "zh": "中文解释", "tag": "中文标签"}],
   "family": [{"word": "派生词", "pos": "adj.", "gloss": "简短英文释义"}],
-  "synonyms": [{"word": "近义词", "gloss": "用英文点出细微差别"}],
-  "antonyms": [{"word": "反义词", "gloss": "用英文点出细微差别"}],
+  "synonyms": [{"word": "近义词", "gloss": "英文细微差别"}],
+  "antonyms": [{"word": "反义词", "gloss": "英文细微差别"}],
   "examples": [{"en": "自然英文例句", "zh": "中文翻译"}],
   "collocations": ["常见搭配"],
-  "memory": "一句中文记忆钩子，可以保留少量英文，并可用 <em>强调</em>",
+  "memory": "一句中文记忆钩子，可含少量英文和 <em>强调</em>",
   "related": ["相关词头"],
   "origin": {
-    "root": "词根与构词，例如：拉丁语 re- + salire",
-    "original": "这个词最初的意思，用中文说明",
-    "story": "一段简短的中文词源故事，讲清楚它怎么从原义走到今天",
-    "stages": [{"when": "时间", "label": "阶段名", "text": "这一阶段的变化，用中文"}]
+    "root": "词根与构词",
+    "original": "最初的意思",
+    "story": "简短中文词源故事",
+    "stages": [{"when": "时间", "label": "阶段名", "text": "变化"}]
   }
 }
 
-规则：在生成词条前先判断输入是否像拼写错误。只有当你高置信度地知道用户想查哪个正确英文词时，才把 spelling.changed 设为 true，并把 spelling.corrected 设为该词；随后整条词条必须针对 corrected 生成。拼写正确时 changed 为 false，corrected 重复原词。不要为了“纠正”而改动真实存在的生僻词、人名、品牌名或外来词。本次深度为「${level.label}」：义项 ${level.senses} 个；同根词 ${level.family} 个；近义词 ${level.synonyms} 个；反义词 ${level.antonyms} 个；例句 ${level.examples} 个；搭配 ${level.collocations} 个；词源演变 ${level.stages} 个阶段。近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作为词汇本身的补充。词源必须尽量准确；不确定的词源可以给空对象，不要编故事。`;
-  }
+规则：
+1. 先判断输入是否像拼写错误。只有高置信度知道正确英文词时，才把 spelling.changed 设为 true，把 spelling.corrected 设为该词，随后整条词条针对 corrected 生成。拼写正确时 changed=false，corrected 重复原词。不要改动真实存在的生僻词、人名、品牌名或外来词。
+2. 用户消息的 detail 字段决定输出深度，必须严格执行：
+   - fast：义项 1 个；同根词 2 个；近义词 2 个；反义词 1 个；例句 1 个；搭配 2 个；词源阶段 2 个。
+   - standard：义项 2 个；同根词 3 个；近义词 3 个；反义词 2 个；例句 2 个；搭配 4 个；词源阶段 3 个。
+   - deep：义项 3 个；同根词 4 个；近义词 4 个；反义词 3 个；例句 3 个；搭配 5 个；词源阶段 4 个。
+3. 近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作补充。词源必须尽量准确；不确定时给空对象，不要编故事。
 
-  function sentencePrompt(query, detail = "standard") {
-    const level = DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard;
-    return `请为一位中文母语学习者拆解这句英文：
-"${query}"
+Few-shot（只示意字段和语气，不要照抄内容）：
+用户：{"task":"word","detail":"fast","query":"serendipity"}
+助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","pos":"noun","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"常用于描述计划之外的好结果。","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","related":[],"origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`;
 
-只返回下面结构的 JSON：
+  const SENTENCE_SYSTEM_PROMPT = `你是 Talk，一位面向中文母语者的双语英语阅读教练。用户主要看中文，所以语气、结构说明和解释都用自然、简洁的简体中文；英文只保留词汇和例句本身。只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。挑选真正支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。中文负责解释，英文负责呈现词汇。
+
+输出结构（字段名和嵌套结构必须保持不变）：
 {
   "kind": "sentence",
   "text": "原句，保持完全不变",
   "translation": "自然、通顺的简体中文翻译",
-  "tone": "用 2-4 个中文词描述语气与文体，例如：克制 · 略带讽刺",
-  "structure": "一句中文句式观察，讲清楚这句话是怎么搭起来的",
+  "tone": "用 2-4 个中文词描述语气与文体",
+  "structure": "一句中文句式观察",
   "keyWords": [
     {
       "word": "词头",
       "surface": "在句中出现的原样子串",
       "phonetic": "/IPA/",
       "pos": "词性",
-      "meaning": "英文：这个词在本句中的意思",
-      "meaningZh": "中文：这个词在本句中的意思，放在最显眼的位置",
-      "why": "用中文说明：为什么这个词值得注意，它对句子的意思做了什么",
+      "meaning": "英文：在本句中的意思",
+      "meaningZh": "中文：在本句中的意思",
+      "why": "中文说明这个词为什么值得注意",
       "family": [{"word": "派生词", "pos": "adj.", "gloss": "简短英文释义"}],
       "synonyms": [{"word": "近义词", "gloss": "英文细微差别"}],
       "antonyms": [{"word": "反义词", "gloss": "英文细微差别"}],
@@ -2743,7 +2735,30 @@
   ]
 }
 
-挑选 ${level.keyWords} 个真正重要的词：支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。每个重点词至少给 1 个同根词、${level.synonyms} 个近义词、${level.antonyms} 个反义词和 1 个例句。中文负责解释，英文负责呈现词汇本身。`;
+规则：
+1. 用户消息的 detail 字段决定重点词和关系词数量，必须严格执行：
+   - fast：重点词 3 个；每个词近义词 2 个；反义词 1 个。
+   - standard：重点词 4 个；每个词近义词 3 个；反义词 2 个。
+   - deep：重点词 5 个；每个词近义词 4 个；反义词 3 个。
+2. 每个重点词至少给 1 个同根词、1 个例句；surface 必须原样出现在原句中。
+3. 原句逐字保留，不要改写、翻译或补全。
+
+Few-shot（只示意字段和语气，不要照抄内容）：
+用户：{"task":"sentence","detail":"fast","text":"Hope is not a prediction."}
+助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"noun","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}`;
+
+  function systemPrompt(type) {
+    return type === "sentence" ? SENTENCE_SYSTEM_PROMPT : WORD_SYSTEM_PROMPT;
+  }
+
+  function wordPrompt(query, detail = "standard") {
+    // Dynamic query is deliberately last so the static system prefix and the
+    // task/detail prefix can be reused by provider prompt caches.
+    return JSON.stringify({ task: "word", detail, query: String(query) });
+  }
+
+  function sentencePrompt(query, detail = "standard") {
+    return JSON.stringify({ task: "sentence", detail, text: String(query) });
   }
 
   async function modelLookup(query, type, cfg) {
@@ -2755,7 +2770,7 @@
     const endpoint = endpointFor(cfg.baseUrl);
     const prompt = type === "sentence" ? sentencePrompt(query, detail) : wordPrompt(query, detail);
     const messages = [
-      { role: "system", content: systemPrompt() },
+      { role: "system", content: systemPrompt(type) },
       { role: "user", content: prompt }
     ];
     const controller = new AbortController();
@@ -2797,7 +2812,7 @@
     const body = {
       model: cfg.model,
       messages,
-      temperature: 0.4,
+      temperature: 0.3,
       max_tokens: maxTokens,
       stream: false
     };

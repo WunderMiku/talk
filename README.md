@@ -137,6 +137,18 @@ offline launch. TTS model loading remains a first-use online download.
 The deployment workflow copies `manifest.webmanifest`, `sw.js`, and `icons/`
 into the Pages artifact.
 
+## Model prompt/cost optimizations
+
+- Word and sentence system prompts are fully static: role, JSON schema, rules,
+  depth counts, and few-shot examples live there.
+- The user message only contains `task`, `detail`, and the dynamic query/text,
+  with the query/text placed last so provider prefix caches can reuse the
+  static system prefix across lookups.
+- JSON mode is sent through `response_format`, and output caps are reduced
+  (fast 1200 / standard 2200 / deep 3200 tokens).
+- Background prefetch is capped at 4 related words per page instead of walking
+  the entire relation graph.
+
 ## Generation depth and cache
 
 - **快速**: fewer senses/relations/examples; `max_tokens` 1400.
