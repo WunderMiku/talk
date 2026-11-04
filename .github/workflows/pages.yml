@@ -27,7 +27,8 @@ jobs:
       - name: Assemble static site
         run: |
           mkdir -p dist
-          cp index.html styles.css data.js app.js favicon.svg .nojekyll dist/
+          cp index.html styles.css data.js app.js favicon.svg manifest.webmanifest sw.js .nojekyll dist/
+          cp -r icons dist/
           bash scripts/fetch-assets.sh dist
 
       - name: Configure Pages

@@ -123,7 +123,8 @@
     sheetCloseTimer: null,
     lastAttempt: null,
     openKey: 0,
-    moodOffset: 0
+    moodOffset: 0,
+    installPrompt: null
   };
 
   /* ============================================================
@@ -2346,6 +2347,7 @@
         <div class="settings-actions">
           <button class="btn btn-primary" type="button" data-action="save-settings">${icon("check")} 保存</button>
           <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试</button>
+          <button class="btn btn-secondary" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
         </div>
         <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误，Android 原生请求不会有这个限制。<br /><b>词条缓存：</b>优先读取本机 IndexedDB，未命中才请求模型。<span id="word-cache-stats">${wordCacheStats().count}/${wordCacheStats().max} 条 · ${formatBytes(wordCacheStats().bytes)}</span></p>
         <div class="cache-actions">
@@ -3284,6 +3286,18 @@
         $("#word-cache-file")?.click();
         break;
 
+      case "install-app":
+        event.preventDefault();
+        if (!state.installPrompt) {
+          toast("请用浏览器菜单安装到主屏幕");
+          break;
+        }
+        state.installPrompt.prompt();
+        await state.installPrompt.userChoice.catch(() => null);
+        state.installPrompt = null;
+        target.hidden = true;
+        break;
+
       case "open-cache":
         event.preventDefault();
         openCacheSheet();
@@ -4038,7 +4052,30 @@
      Init
      ============================================================ */
 
+  function registerServiceWorker() {
+    if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+    navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => {
+      console.warn("PWA service worker registration failed.", error);
+    });
+  }
+
+  function setupInstallPrompt() {
+    window.addEventListener("beforeinstallprompt", (event) => {
+      event.preventDefault();
+      state.installPrompt = event;
+      const button = $("#install-app");
+      if (button) button.hidden = false;
+    });
+    window.addEventListener("appinstalled", () => {
+      state.installPrompt = null;
+      const button = $("#install-app");
+      if (button) button.hidden = true;
+      toast("已安装到主屏幕");
+    });
+  }
+
   async function init() {
+    setupInstallPrompt();
     applyCacheDisplay();
     await initWordStore();
     app.addEventListener("click", handleClick);
@@ -4059,6 +4096,7 @@
     const initial = routeFromHash();
     history.replaceState({ route: initial, depth: 0 }, "", routeHash(initial));
     renderRoute(initial, "forward", { instant: true });
+    registerServiceWorker();
 
     // Expose a tiny debugging surface for the design review.
     window.TALK_APP = {

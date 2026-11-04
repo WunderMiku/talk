@@ -120,6 +120,23 @@ remove or ignore the Pages workflow if you do not want it to run.
 The GitHub web upload form has a 25 MB limit, so the branch route requires Git
 for the 92 MB model.
 
+## PWA
+
+The site includes:
+
+- `manifest.webmanifest` with 192/512 any + maskable icons
+- `sw.js` app-shell service worker with offline navigation fallback
+- Apple touch icon and standalone meta tags
+- An install button in model settings when the browser emits
+  `beforeinstallprompt`
+
+The 115 MB Kokoro model/voices are deliberately **not** pre-cached by the
+service worker; the app shell (HTML/CSS/JS/IDB helper/icons) is cached for
+offline launch. TTS model loading remains a first-use online download.
+
+The deployment workflow copies `manifest.webmanifest`, `sw.js`, and `icons/`
+into the Pages artifact.
+
 ## Generation depth and cache
 
 - **快速**: fewer senses/relations/examples; `max_tokens` 1400.

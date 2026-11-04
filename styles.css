@@ -2836,8 +2836,13 @@ textarea:focus-visible,
 
 .settings-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
   margin-top: 16px;
+}
+
+#install-app {
+  flex-basis: 100%;
 }
 
 .settings-actions .btn {
