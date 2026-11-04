@@ -102,6 +102,143 @@
     custom: { baseUrl: "", model: "" }
   };
 
+  const MODEL_PRESETS = [
+    {
+      id: "deepseek",
+      name: "DeepSeek",
+      provider: "deepseek",
+      baseUrl: "https://api.deepseek.com",
+      model: "deepseek-chat",
+      note: "OpenAI 兼容；浏览器直连 CORS 可用。"
+    },
+    {
+      id: "openai",
+      name: "OpenAI",
+      provider: "openai",
+      baseUrl: "https://api.openai.com/v1",
+      model: "gpt-4o-mini",
+      note: "OpenAI 官方接口；浏览器直连可能受 CORS 限制。"
+    },
+    {
+      id: "qwen",
+      name: "Qwen",
+      provider: "custom",
+      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      model: "qwen-plus",
+      note: "阿里云百炼兼容模式；需要该平台 API Key。"
+    },
+    {
+      id: "kimi",
+      name: "Kimi",
+      provider: "custom",
+      baseUrl: "https://api.moonshot.cn/v1",
+      model: "moonshot-v1-8k",
+      note: "Moonshot 开放平台；浏览器直连可能受 CORS 限制。"
+    },
+    {
+      id: "glm",
+      name: "GLM",
+      provider: "custom",
+      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+      model: "glm-4-flash",
+      note: "智谱开放平台；浏览器直连可能受 CORS 限制。"
+    },
+    {
+      id: "openrouter",
+      name: "OpenRouter",
+      provider: "custom",
+      baseUrl: "https://openrouter.ai/api/v1",
+      model: "anthropic/claude-3.5-sonnet",
+      note: "OpenRouter 可转接 Claude 等多种模型。"
+    },
+    {
+      id: "claude",
+      name: "Claude",
+      provider: "custom",
+      baseUrl: "",
+      model: "claude-sonnet-4-5",
+      note: "Anthropic 原生协议不是 OpenAI 格式；请填写兼容代理地址。"
+    },
+    {
+      id: "custom",
+      name: "自定义",
+      provider: "custom",
+      baseUrl: "",
+      model: "",
+      note: "任意 OpenAI 兼容服务。"
+    }
+  ];
+
+  function defaultModelProfiles() {
+    return MODEL_PRESETS.map((preset) => ({ ...preset, apiKey: "" }));
+  }
+
+  function legacyModelProfiles(parsed = {}) {
+    const profiles = defaultModelProfiles();
+    const baseUrl = String(parsed.baseUrl || "").trim();
+    const model = String(parsed.model || "").trim();
+    const apiKey = String(parsed.apiKey || "");
+    if (!baseUrl && !model && !apiKey) return { profiles, activeProfileId: profiles[0].id };
+    const matched = profiles.find((profile) => profile.baseUrl && profile.baseUrl === baseUrl);
+    if (matched) {
+      matched.baseUrl = baseUrl;
+      matched.model = model || matched.model;
+      matched.apiKey = apiKey;
+      return { profiles, activeProfileId: matched.id };
+    }
+    profiles.unshift({
+      id: "legacy-custom",
+      name: "我的配置",
+      provider: parsed.provider || "custom",
+      baseUrl,
+      model,
+      apiKey,
+      note: "从旧版单配置迁移而来。"
+    });
+    return { profiles, activeProfileId: "legacy-custom" };
+  }
+
+  function normalizeModelProfiles(raw, parsed = {}) {
+    if (!Array.isArray(raw) || !raw.length) return legacyModelProfiles(parsed);
+    const profiles = raw.map((profile, index) => ({
+      id: String(profile.id || `profile-${index + 1}`),
+      name: String(profile.name || `模型 ${index + 1}`),
+      provider: String(profile.provider || "custom"),
+      baseUrl: String(profile.baseUrl || ""),
+      model: String(profile.model || ""),
+      apiKey: String(profile.apiKey || ""),
+      note: String(profile.note || "")
+    }));
+    return { profiles, activeProfileId: String(parsed.activeProfileId || profiles[0].id) };
+  }
+
+  function activeProfile(settings) {
+    if (!settings?.profiles?.length) return null;
+    return settings.profiles.find((profile) => profile.id === settings.activeProfileId) || settings.profiles[0];
+  }
+
+  function applyProfileToSettings(settings, profile) {
+    if (!profile) return settings;
+    return {
+      ...settings,
+      provider: profile.provider || "custom",
+      baseUrl: profile.baseUrl || "",
+      model: profile.model || "",
+      apiKey: profile.apiKey || "",
+      activeProfileId: profile.id
+    };
+  }
+
+  function syncDraftProfile(draft) {
+    if (!draft?.profiles?.length) return;
+    const profile = activeProfile(draft);
+    if (!profile) return;
+    profile.provider = draft.provider || profile.provider || "custom";
+    profile.baseUrl = String(draft.baseUrl || "");
+    profile.model = String(draft.model || "");
+    profile.apiKey = String(draft.apiKey || "");
+  }
+
   const wordRequests = new Map();
   let prefetchToken = 0;
   let currentAudio = null;
@@ -343,23 +480,33 @@
       }
     } catch (_) { /* no-op */ }
 
-    return {
+    const normalized = normalizeModelProfiles(parsed.profiles, parsed);
+    const selected = normalized.profiles.find((profile) => profile.id === normalized.activeProfileId) || normalized.profiles[0];
+    return applyProfileToSettings({
       ...fallback,
       ...preferences,
       ...parsed,
       prefetch: Boolean(preferences.prefetch || parsed.prefetch),
-      apiKey: String(parsed.apiKey || ""),
       remember: Boolean(parsed.remember),
       ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "kokoro",
       kokoroBackendMode: preferences.kokoroBackendMode || parsed.kokoroBackendMode || "wasm",
       detailLevel: preferences.detailLevel || parsed.detailLevel || "standard",
       cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
       cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
-      kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart"
-    };
+      kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart",
+      profiles: normalized.profiles,
+      activeProfileId: selected.id
+    }, selected);
   }
 
   function persistSettings(settings) {
+    const active = activeProfile(settings);
+    if (active) {
+      active.baseUrl = String(settings.baseUrl || "");
+      active.model = String(settings.model || "");
+      active.apiKey = String(settings.apiKey || "");
+      active.provider = String(settings.provider || active.provider || "custom");
+    }
     const raw = JSON.stringify(settings);
     try { sessionStorage.setItem(CONFIG_KEY, raw); } catch (_) { /* no-op */ }
     try {
@@ -2246,7 +2393,10 @@
   }
 
   function openSettingsSheet() {
-    state.draft = { ...state.settings };
+    state.draft = {
+      ...state.settings,
+      profiles: (state.settings.profiles || []).map((profile) => ({ ...profile }))
+    };
     openSheetShell({ kicker: "模型设置", title: "连接模型" });
     renderSettingsContent();
     requestAnimationFrame(updateTtsBackendStatus);
@@ -2293,9 +2443,22 @@
     holder.innerHTML = `
       <div class="sheet-content">
         <p class="settings-intro">接入你自己的模型。Talk 使用 OpenAI 兼容的 Chat Completions 格式，DeepSeek、OpenAI 或本地服务都可以。</p>
-        <div class="provider-switch" role="group" aria-label="服务商">
-          ${Object.entries({ deepseek: "DeepSeek", openai: "OpenAI", custom: "自定义" }).map(([id, label]) => `
-            <button class="provider-btn ${draft.provider === id ? "active" : ""}" type="button" data-action="provider" data-provider="${id}">${label}</button>`).join("")}
+        <div class="model-profile-head">
+          <span class="settings-subhead">模型配置</span>
+          <span class="mono">${draft.profiles.length} 个</span>
+        </div>
+        <div class="model-profile-strip" role="list" aria-label="模型配置">
+          ${draft.profiles.map((profile) => `
+            <button class="model-profile-chip ${profile.id === draft.activeProfileId ? "active" : ""}" type="button" role="listitem" data-action="select-profile" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
+              <strong>${esc(profile.name)}</strong>
+              <small>${esc(profile.model || profile.baseUrl || "未配置")}</small>
+            </button>`).join("")}
+          <button class="model-profile-add" type="button" data-action="add-profile" aria-label="新增模型配置">+</button>
+        </div>
+        <p class="field-hint">每个配置独立保存地址、模型和密钥，切换不会覆盖。预设已包含 DeepSeek、OpenAI、Qwen、Kimi、GLM、OpenRouter、Claude。</p>
+        <div class="field">
+          <label for="profile-name">配置名称</label>
+          <input id="profile-name" type="text" data-profile-name value="${attr(activeProfile(draft)?.name || "")}" placeholder="例如：DeepSeek 主力" spellcheck="false" autocomplete="off" />
         </div>
         <div class="field">
           <label for="base-url">API 地址</label>
@@ -2313,6 +2476,7 @@
           </div>
           <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。词典建议使用 deepseek-chat，deepseek-reasoner 会更慢。</p>
         </div>
+        ${activeProfile(draft)?.note ? `<p class="field-hint model-profile-note">${esc(activeProfile(draft).note)}</p>` : ""}
         <div class="field">
           <label for="api-key">API 密钥</label>
           <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
@@ -2322,6 +2486,7 @@
           <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
           在这台设备上记住密钥
         </label>
+        ${draft.profiles.length > 1 ? `<button class="link-btn model-profile-delete" type="button" data-action="delete-profile">删除当前配置</button>` : ""}
         <label class="pref-toggle">
           <span class="pref-copy">
             <strong>预加载二级词条</strong>
@@ -2343,7 +2508,7 @@
           </div>
         </div>
         <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
-          ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置模型 · ${esc(draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
+          ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(activeProfile(draft)?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
         </div>
         ${ttsSettingsHtml(draft)}
         <div class="settings-actions">
@@ -2473,10 +2638,14 @@
 
   function saveSettings() {
     if (!state.draft) return;
+    syncDraftProfile(state.draft);
     state.draft.apiKey = String(state.draft.apiKey || "").trim();
     state.draft.baseUrl = String(state.draft.baseUrl || "").trim();
     state.draft.model = String(state.draft.model || "").trim();
-    state.settings = { ...state.draft };
+    state.settings = {
+      ...state.draft,
+      profiles: state.draft.profiles.map((profile) => ({ ...profile }))
+    };
     persistSettings(state.settings);
     closeSheet();
     const topLayer = state.wordLayers[state.wordLayers.length - 1];
@@ -3175,16 +3344,68 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         copyCurrentPage();
         break;
 
-      case "provider":
+      case "select-profile": {
         event.preventDefault();
         if (!state.draft) break;
-        state.draft.provider = target.dataset.provider || "custom";
-        if (PROVIDERS[state.draft.provider]) {
-          state.draft.baseUrl = PROVIDERS[state.draft.provider].baseUrl || state.draft.baseUrl;
-          state.draft.model = PROVIDERS[state.draft.provider].model || state.draft.model;
-        }
+        syncDraftProfile(state.draft);
+        const profile = state.draft.profiles.find((item) => item.id === target.dataset.profile);
+        if (!profile) break;
+        state.draft = applyProfileToSettings(state.draft, profile);
+        state.settings = {
+          ...state.settings,
+          ...state.draft,
+          profiles: state.draft.profiles.map((item) => ({ ...item }))
+        };
+        persistSettings(state.settings);
         renderSettingsContent();
         break;
+      }
+
+      case "add-profile": {
+        event.preventDefault();
+        if (!state.draft) break;
+        syncDraftProfile(state.draft);
+        const number = state.draft.profiles.filter((item) => item.id.startsWith("custom-")).length + 1;
+        const id = `custom-${Date.now()}`;
+        const profile = {
+          id,
+          name: `新模型 ${number}`,
+          provider: "custom",
+          baseUrl: "",
+          model: "",
+          apiKey: "",
+          note: "自定义 OpenAI 兼容服务。"
+        };
+        state.draft.profiles = [...state.draft.profiles, profile];
+        state.draft = applyProfileToSettings(state.draft, profile);
+        state.settings = {
+          ...state.settings,
+          ...state.draft,
+          profiles: state.draft.profiles.map((item) => ({ ...item }))
+        };
+        persistSettings(state.settings);
+        renderSettingsContent();
+        break;
+      }
+
+      case "delete-profile": {
+        event.preventDefault();
+        if (!state.draft || state.draft.profiles.length <= 1) break;
+        const current = activeProfile(state.draft);
+        if (!current) break;
+        if (!window.confirm(`删除「${current.name}」？`)) break;
+        state.draft.profiles = state.draft.profiles.filter((item) => item.id !== current.id);
+        const next = state.draft.profiles[0];
+        state.draft = applyProfileToSettings(state.draft, next);
+        state.settings = {
+          ...state.settings,
+          ...state.draft,
+          profiles: state.draft.profiles.map((item) => ({ ...item }))
+        };
+        persistSettings(state.settings);
+        renderSettingsContent();
+        break;
+      }
 
       case "shuffle-moods":
         event.preventDefault();
@@ -3367,6 +3588,11 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     if (target.id === "search-input") {
       autoGrow(target);
       updateSearchMeta();
+      return;
+    }
+    if (target.matches("[data-profile-name]") && state.draft) {
+      const profile = activeProfile(state.draft);
+      if (profile) profile.name = target.value;
       return;
     }
     if (target.matches("[data-setting]") && state.draft) {

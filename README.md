@@ -120,6 +120,19 @@ remove or ignore the Pages workflow if you do not want it to run.
 The GitHub web upload form has a 25 MB limit, so the branch route requires Git
 for the 92 MB model.
 
+## Model profiles
+
+Settings includes independent model profiles for DeepSeek, OpenAI, Qwen,
+Kimi, GLM, OpenRouter, Claude, and a blank custom profile. Each profile stores
+its own base URL, model name, API key, and display name; switching profiles no
+longer overwrites the previous one. Profiles can be added or deleted, and the
+selection is persisted.
+
+Claude's native API is not OpenAI-compatible, so the Claude preset ships with
+a blank base URL and a note to use a compatible proxy. Qwen, Kimi, GLM and
+OpenRouter are OpenAI-compatible endpoints; browser CORS behavior depends on
+the provider.
+
 ## PWA
 
 The site includes:
