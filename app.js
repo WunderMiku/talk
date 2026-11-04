@@ -240,7 +240,7 @@
   function profileSupportsThinking(profile) {
     if (!profile) return false;
     if (profile.thinkingCapable) return true;
-    return /(?:qwen3\.[5-9]|deepseek-v4|glm-5|kimi-k[2-9])/i.test(String(profile.model || ""));
+    return /(?:qwen(?:3\.[5-9]|[4-9]\.\d)|deepseek-v4|glm-5|kimi-k[2-9])/i.test(String(profile.model || ""));
   }
 
   function applyProfileToSettings(settings, profile) {
