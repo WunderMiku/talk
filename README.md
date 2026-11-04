@@ -191,10 +191,11 @@ rejects streaming, the client retries once with a normal non-streaming request.
 
 ### Timeline labels
 
-The word system prompt requires `origin.stages[*].when` (and label/text) to be
-Chinese, e.g. `19 世纪`, `古英语时期`, `1754 年`. Older cached entries are also
-normalized on render, so English labels such as `19th century` or `Old English`
-are converted without forcing a new API request.
+The word system prompt requires all explanatory etymology fields
+(`origin.original`, `origin.story`, and stage label/text) to be Chinese, with a
+negative example forbidding English paragraphs. Timeline `when` values such as
+`19th century`/`Old English` are also normalized on render. Cached entries that
+were generated before this prompt change may still need **重新生成词条**.
 
 ## Generation depth and cache
 
