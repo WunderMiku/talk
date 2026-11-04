@@ -37,6 +37,8 @@
     baseUrl: "https://api.deepseek.com",
     model: "deepseek-chat",
     apiKey: "",
+    enableThinking: false,
+    thinkingBudget: 0,
     remember: false,
     prefetch: false,
     cacheDisplay: "borders",
@@ -123,9 +125,12 @@
       id: "qwen",
       name: "Qwen",
       provider: "custom",
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1",
-      model: "qwen-plus",
-      note: "阿里云百炼兼容模式；需要该平台 API Key。"
+      baseUrl: "https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1",
+      model: "qwen3.7-flash",
+      note: "Qwen3.7 Flash 混合思考模型；默认关闭思考以降低延迟，可在下方单独调整。",
+      thinkingCapable: true,
+      enableThinking: false,
+      thinkingBudget: 0
     },
     {
       id: "kimi",
@@ -170,7 +175,13 @@
   ];
 
   function defaultModelProfiles() {
-    return MODEL_PRESETS.map((preset) => ({ ...preset, apiKey: "" }));
+    return MODEL_PRESETS.map((preset) => ({
+      ...preset,
+      apiKey: "",
+      thinkingCapable: Boolean(preset.thinkingCapable),
+      enableThinking: Boolean(preset.enableThinking),
+      thinkingBudget: Number(preset.thinkingBudget) || 0
+    }));
   }
 
   function legacyModelProfiles(parsed = {}) {
@@ -200,15 +211,24 @@
 
   function normalizeModelProfiles(raw, parsed = {}) {
     if (!Array.isArray(raw) || !raw.length) return legacyModelProfiles(parsed);
-    const profiles = raw.map((profile, index) => ({
-      id: String(profile.id || `profile-${index + 1}`),
-      name: String(profile.name || `模型 ${index + 1}`),
-      provider: String(profile.provider || "custom"),
-      baseUrl: String(profile.baseUrl || ""),
-      model: String(profile.model || ""),
-      apiKey: String(profile.apiKey || ""),
-      note: String(profile.note || "")
-    }));
+    const profiles = raw.map((profile, index) => {
+      const id = String(profile.id || `profile-${index + 1}`);
+      const isQwen = id === "qwen";
+      const oldQwen = isQwen && String(profile.baseUrl || "").includes("dashscope.aliyuncs.com") && profile.model === "qwen-plus";
+      const preset = MODEL_PRESETS.find((item) => item.id === id);
+      return {
+        id,
+        name: String(profile.name || `模型 ${index + 1}`),
+        provider: String(profile.provider || "custom"),
+        baseUrl: oldQwen ? preset.baseUrl : String(profile.baseUrl || ""),
+        model: oldQwen ? preset.model : String(profile.model || ""),
+        apiKey: String(profile.apiKey || ""),
+        note: String(profile.note || (oldQwen ? preset.note : "")),
+        thinkingCapable: Boolean(profile.thinkingCapable) || isQwen,
+        enableThinking: Boolean(profile.enableThinking),
+        thinkingBudget: Math.max(0, Math.min(262144, Number(profile.thinkingBudget) || 0))
+      };
+    });
     return { profiles, activeProfileId: String(parsed.activeProfileId || profiles[0].id) };
   }
 
@@ -225,6 +245,8 @@
       baseUrl: profile.baseUrl || "",
       model: profile.model || "",
       apiKey: profile.apiKey || "",
+      enableThinking: Boolean(profile.enableThinking),
+      thinkingBudget: Number(profile.thinkingBudget) || 0,
       activeProfileId: profile.id
     };
   }
@@ -237,6 +259,8 @@
     profile.baseUrl = String(draft.baseUrl || "");
     profile.model = String(draft.model || "");
     profile.apiKey = String(draft.apiKey || "");
+    profile.enableThinking = Boolean(draft.enableThinking);
+    profile.thinkingBudget = Math.max(0, Math.min(262144, Number(draft.thinkingBudget) || 0));
   }
 
   const wordRequests = new Map();
@@ -494,6 +518,8 @@
       cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
       cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
       kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart",
+      enableThinking: Boolean(selected.enableThinking),
+      thinkingBudget: Number(selected.thinkingBudget) || 0,
       profiles: normalized.profiles,
       activeProfileId: selected.id
     }, selected);
@@ -2476,7 +2502,18 @@
           </div>
           <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。词典建议使用 deepseek-chat，deepseek-reasoner 会更慢。</p>
         </div>
-        ${activeProfile(draft)?.note ? `<p class="field-hint model-profile-note">${esc(activeProfile(draft).note)}</p>` : ""}
+        ${activeProfile(draft)?.thinkingCapable ? `
+        <div class="thinking-panel">
+          <label class="check-row">
+            <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
+            开启深度思考
+          </label>
+          <div class="thinking-budget-row">
+            <label for="thinking-budget">思考预算（tokens）</label>
+            <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
+          </div>
+          <p class="field-hint">0 = 模型默认；越小越快。Qwen3.7 Flash 默认开启思考，关闭后延迟通常降低 60%–75%。</p>
+        </div>` : ""}
         <div class="field">
           <label for="api-key">API 密钥</label>
           <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
@@ -2681,7 +2718,8 @@
           messages: [{ role: "user", content: "Reply with exactly: OK" }],
           temperature: 0,
           max_tokens: 8,
-          stream: false
+          stream: false,
+          ...thinkingParams(state.draft)
         }),
         signal: controller.signal
       });
@@ -2977,13 +3015,23 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     return { type: "sentence", data };
   }
 
+  function thinkingParams(cfg) {
+    const profile = activeProfile(cfg);
+    if (!profile?.thinkingCapable && !cfg.enableThinking) return {};
+    const params = { enable_thinking: Boolean(cfg.enableThinking) };
+    const budget = Number(cfg.thinkingBudget) || 0;
+    if (params.enable_thinking && budget > 0) params.thinking_budget = budget;
+    return params;
+  }
+
   async function postChat(endpoint, cfg, messages, signal, allowJsonMode, maxTokens = 2600) {
     const body = {
       model: cfg.model,
       messages,
       temperature: 0.3,
       max_tokens: maxTokens,
-      stream: false
+      stream: false,
+      ...thinkingParams(cfg)
     };
     if (allowJsonMode) body.response_format = { type: "json_object" };
 
@@ -3588,6 +3636,21 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     if (target.id === "search-input") {
       autoGrow(target);
       updateSearchMeta();
+      return;
+    }
+    if (target.matches("[data-profile-option]") && state.draft) {
+      const profile = activeProfile(state.draft);
+      if (!profile) return;
+      const key = target.dataset.profileOption;
+      if (key === "enableThinking") {
+        profile.enableThinking = Boolean(target.checked);
+        state.draft.enableThinking = profile.enableThinking;
+      }
+      if (key === "thinkingBudget") {
+        const value = Math.max(0, Math.min(262144, Math.round(Number(target.value) || 0)));
+        profile.thinkingBudget = value;
+        state.draft.thinkingBudget = value;
+      }
       return;
     }
     if (target.matches("[data-profile-name]") && state.draft) {

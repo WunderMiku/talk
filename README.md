@@ -133,6 +133,12 @@ a blank base URL and a note to use a compatible proxy. Qwen, Kimi, GLM and
 OpenRouter are OpenAI-compatible endpoints; browser CORS behavior depends on
 the provider.
 
+The Qwen preset uses `qwen3.7-flash` on the QianwenAI compatible endpoint and
+ships with **thinking disabled**, because Qwen3.7 Flash defaults to a thinking
+mode that can consume most of the output budget and make lookups slow. The
+profile also exposes an optional thinking budget; set it to 0 to use the model
+default, or a small value such as 256–1024 for a bounded reasoning pass.
+
 ## PWA
 
 The site includes:
