@@ -1469,7 +1469,8 @@
     requestAnimationFrame(() => {
       const panel = $(".translation-workspace", workspaceRoot);
       panel?.classList.add("show");
-      $("#workspace-translator-input")?.focus({ preventScroll: true });
+      // Do not auto-focus the textarea: opening the result view should not
+      // summon the on-screen keyboard every time.
       updateTranslatorLanguage();
       updateTranslatorStyleControls();
     });
