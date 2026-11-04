@@ -5730,3 +5730,70 @@ textarea:focus-visible,
 .translation-detail-head .translation-emoji {
   background: rgba(255, 255, 255, 0.55);
 }
+
+/* Stronger, more legible style tones. */
+.tone-yellow {
+  --tone: #d6a300;
+  --tone-ink: #634800;
+  --tone-wash: #ffef9d;
+  --tone-border: rgba(214, 163, 0, 0.34);
+}
+
+.tone-lime {
+  --tone: #d6a300;
+  --tone-ink: #634800;
+  --tone-wash: #ffef9d;
+  --tone-border: rgba(214, 163, 0, 0.34);
+}
+
+.tone-sage {
+  --tone: #4f7d35;
+  --tone-ink: #2f5522;
+  --tone-wash: #d9ecc8;
+  --tone-border: rgba(79, 125, 53, 0.3);
+}
+
+.tone-sky {
+  --tone: #3f7398;
+  --tone-ink: #285270;
+  --tone-wash: #cfe7fa;
+  --tone-border: rgba(63, 115, 152, 0.3);
+}
+
+.tone-coral {
+  --tone: #c45b3e;
+  --tone-ink: #8a301b;
+  --tone-wash: #ffd8ca;
+  --tone-border: rgba(196, 91, 62, 0.3);
+}
+
+.tone-lavender {
+  --tone: #7060a8;
+  --tone-ink: #514184;
+  --tone-wash: #e0d8ff;
+  --tone-border: rgba(112, 96, 168, 0.3);
+}
+
+.translator-style-chip.tone-yellow,
+.translator-style-chip.tone-sage,
+.translator-style-chip.tone-sky,
+.translator-style-chip.tone-coral,
+.translator-style-chip.tone-lavender {
+  border-color: var(--tone-border);
+}
+
+.translator-style-chip.selected.tone-yellow,
+.translator-style-chip.selected.tone-sage,
+.translator-style-chip.selected.tone-sky,
+.translator-style-chip.selected.tone-coral,
+.translator-style-chip.selected.tone-lavender {
+  background: var(--tone-wash);
+}
+
+.translation-card.tone-yellow,
+.translation-card.tone-sage,
+.translation-card.tone-sky,
+.translation-card.tone-coral,
+.translation-card.tone-lavender {
+  background: linear-gradient(135deg, var(--tone-wash) 0%, var(--card) 58%);
+}

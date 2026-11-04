@@ -3427,7 +3427,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"noun","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}`;
 
   const TRANSLATOR_STYLES = [
-    { id: "minimal", name: "极简口语", emoji: "icons/style/minimal.svg", tone: "lime", hint: "短、直接，像日常对话" },
+    { id: "minimal", name: "极简口语", emoji: "icons/style/minimal.svg", tone: "yellow", hint: "短、直接，像日常对话" },
     { id: "idiom", name: "地道习语", emoji: "icons/style/idiom.svg", tone: "sage", hint: "像母语者会脱口而出的说法" },
     { id: "formal", name: "书面正式", emoji: "icons/style/formal.svg", tone: "sky", hint: "邮件、报告、正式场合" },
     { id: "slang", name: "网络流行", emoji: "icons/style/slang.svg", tone: "coral", hint: "社交媒体、轻松俚语" },
