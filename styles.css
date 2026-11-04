@@ -5797,3 +5797,13 @@ textarea:focus-visible,
 .translation-card.tone-lavender {
   background: linear-gradient(135deg, var(--tone-wash) 0%, var(--card) 58%);
 }
+
+/* The decorative quote is never a hit target; it was swallowing card actions. */
+.translation-card::after {
+  pointer-events: none;
+}
+
+.translation-copy {
+  position: relative;
+  z-index: 2;
+}

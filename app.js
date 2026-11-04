@@ -4165,9 +4165,9 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         event.preventDefault();
         const text = target.dataset.text || "";
         if (!text) break;
-        navigator.clipboard?.writeText(text)
-          .then(() => toast("已复制这个版本"))
-          .catch(() => toast("复制失败"));
+        void copyText(text).then((copied) => {
+          toast(copied ? "已复制这个版本" : "复制失败");
+        });
         break;
       }
 
@@ -5054,6 +5054,36 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     if ((selected.ttsEngine || "kokoro") !== "native") updateTtsBackendStatus();
   }
 
+  async function copyText(text) {
+    const value = String(text ?? "");
+    if (!value) return false;
+    try {
+      if (window.isSecureContext && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+        return true;
+      }
+    } catch (_) {
+      // Fall through to the selection fallback (HTTP LAN preview, etc.).
+    }
+    try {
+      const area = document.createElement("textarea");
+      area.value = value;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.left = "-9999px";
+      area.style.top = "0";
+      document.body.appendChild(area);
+      area.focus({ preventScroll: true });
+      area.select();
+      area.setSelectionRange(0, area.value.length);
+      const copied = document.execCommand("copy");
+      area.remove();
+      return Boolean(copied);
+    } catch (_) {
+      return false;
+    }
+  }
+
   async function copyCurrentPage() {
     let text = "";
     const active = activeWordData();
@@ -5064,21 +5094,8 @@ Few-shot（只示意字段和语气，不要照抄内容）：
       if (sentence) text = `${sentence.text}\n${sentence.translation}`;
     }
     if (!text) return;
-    try {
-      if (navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(text);
-      } else {
-        const area = document.createElement("textarea");
-        area.value = text;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand("copy");
-        area.remove();
-      }
-      toast("Copied to clipboard");
-    } catch (_) {
-      toast("Could not copy in this browser");
-    }
+    const copied = await copyText(text);
+    toast(copied ? "Copied to clipboard" : "Could not copy in this browser");
   }
 
   function toast(message) {
