@@ -134,7 +134,10 @@ The top module bar switches between **词典** and **翻译**. The translator ac
 Chinese or English and produces five English versions in one model call:
 极简口语, 地道习语, 书面正式, 网络流行, 优雅文句.
 
-The translator has an explicit `自动 / 中 → 英 / 英 → 英` mode switch. The
+Style chips are selectable buttons; only selected styles are sent in the user
+message, so choosing 2 of 5 genuinely reduces output tokens. The counter shows
+`已选 n / 5`, and submitting with none selected is blocked. The translator has
+an explicit `自动 / 中 → 英 / 英 → 英` mode switch. The
 translator system prompt is static (styles, schema, and rules), with only the
 source text and source language in the final user message, so it benefits from
 prefix caching. Results are cached locally by source language + exact input for

@@ -299,6 +299,7 @@
     module: "dictionary",
     translatorSeq: 0,
     translatorMode: "auto",
+    translatorStyles: [],
     lastTranslationInput: "",
     lastTranslationResult: null,
     lastAttempt: null,
@@ -1125,7 +1126,10 @@
       screen.classList.add("is-entering");
       window.setTimeout(() => screen.classList.remove("is-entering"), 1300);
       document.title = pageTitle(route);
-      if (route.name === "translator") updateTranslatorLanguage();
+      if (route.name === "translator") {
+        updateTranslatorLanguage();
+        updateTranslatorStyleControls();
+      }
     };
 
     if (!instant && !reduceMotion && document.startViewTransition) {
@@ -1358,11 +1362,26 @@
   }
 
   function translatorStylesHtml() {
-    return TRANSLATOR_STYLES.map((style) => `
-      <div class="translator-style-chip tone-${style.tone}">
+    return TRANSLATOR_STYLES.map((style) => {
+      const selected = state.translatorStyles.includes(style.id);
+      return `<button class="translator-style-chip tone-${style.tone} ${selected ? "selected" : ""}" type="button" data-action="translator-style" data-style="${style.id}" aria-pressed="${selected}">
         ${styleEmoji(style, "translator-style-emoji")}
         <strong>${esc(style.name)}</strong>
-      </div>`).join("");
+        <span class="translator-style-check" aria-hidden="true">${selected ? "✓" : ""}</span>
+      </button>`;
+    }).join("");
+  }
+
+  function updateTranslatorStyleControls() {
+    $$(".translator-style-chip").forEach((button) => {
+      const selected = state.translatorStyles.includes(button.dataset.style);
+      button.classList.toggle("selected", selected);
+      button.setAttribute("aria-pressed", String(selected));
+      const check = button.querySelector(".translator-style-check");
+      if (check) check.textContent = selected ? "✓" : "";
+    });
+    const count = $("#translator-style-count");
+    if (count) count.textContent = `已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}`;
   }
 
   function translatorPage() {
@@ -1387,8 +1406,8 @@
             </div>
             <textarea id="translator-input" rows="3" maxlength="600" placeholder="输入中文或英文…" spellcheck="false" aria-label="待翻译文本"></textarea>
             <div class="translator-input-foot">
-              <span id="translator-language">自动识别</span>
-              <button class="search-submit" type="submit" aria-label="生成五种说法">${icon("arrowUpRight")}</button>
+              <span class="translator-input-meta"><span id="translator-language">自动识别</span><span id="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span></span>
+              <button class="search-submit" type="submit" aria-label="生成选中的风格">${icon("arrowUpRight")}</button>
             </div>
           </div>
         </form>
@@ -1515,10 +1534,11 @@
     if (holder) holder.innerHTML = translationDetailHtml(variant, style);
   }
 
-  function normalizeTranslation(raw, sourceText, cfg, sourceLanguage) {
+  function normalizeTranslation(raw, sourceText, cfg, sourceLanguage, selectedStyles) {
     const base = raw && typeof raw === "object" ? raw : {};
     const sourceVariants = Array.isArray(base.variants) ? base.variants : [];
-    const variants = TRANSLATOR_STYLES.map((style, index) => {
+    const wanted = TRANSLATOR_STYLES.filter((style) => selectedStyles.includes(style.id));
+    const variants = wanted.map((style, index) => {
       const found = sourceVariants.find((item) => String(item?.style || "").toLowerCase() === style.id)
         || sourceVariants[index]
         || {};
@@ -1550,11 +1570,11 @@
     };
   }
 
-  async function requestTranslation(text, cfg, sourceLanguage) {
+  async function requestTranslation(text, cfg, sourceLanguage, selectedStyles) {
     const endpoint = endpointFor(cfg.baseUrl);
     const messages = [
       { role: "system", content: TRANSLATOR_SYSTEM_PROMPT },
-      { role: "user", content: JSON.stringify({ sourceLanguage, text }) }
+      { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
@@ -1573,7 +1593,7 @@
         content = json?.choices?.[0]?.message?.content || "";
       }
       if (!content) throw new Error("模型返回了空内容。");
-      return normalizeTranslation(parseJsonObject(content), text, cfg, sourceLanguage);
+      return normalizeTranslation(parseJsonObject(content), text, cfg, sourceLanguage, selectedStyles);
     } finally {
       window.clearTimeout(timer);
     }
@@ -1589,11 +1609,18 @@
       toast("请控制在 600 个字符以内");
       return;
     }
+    const selectedStyles = TRANSLATOR_STYLES
+      .filter((style) => state.translatorStyles.includes(style.id))
+      .map((style) => style.id);
+    if (!selectedStyles.length) {
+      toast("至少选择一个风格");
+      return;
+    }
     const token = ++state.translatorSeq;
     const sourceLanguage = translatorSourceLanguage();
     state.lastTranslationInput = text;
     updateTranslatorLanguage();
-    const cacheKey = `${sourceLanguage}|${text}`;
+    const cacheKey = `${sourceLanguage}|${selectedStyles.join(",")}|${text}`;
     const cached = bypassCache ? null : translationCacheGet(cacheKey);
     if (cached) {
       state.lastTranslationResult = cached;
@@ -1606,7 +1633,7 @@
     }
     renderTranslatorLoading();
     try {
-      const result = await requestTranslation(text, state.settings, sourceLanguage);
+      const result = await requestTranslation(text, state.settings, sourceLanguage, selectedStyles);
       if (token !== state.translatorSeq) return;
       state.lastTranslationResult = result;
       translationCachePut(cacheKey, result);
@@ -3402,9 +3429,13 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     { id: "elegant", name: "优雅文句", emoji: "icons/style/elegant.svg", tone: "lavender", hint: "有节奏和文学感" }
   ];
 
-  const TRANSLATOR_SYSTEM_PROMPT = `你是 Talk 的多风格英文翻译与改写器。输入可能是中文或英文；无论哪种，都输出 5 个英文版本：中文输入是英译，英文输入是英文改写。必须保留原意、信息量和语气强度，不添加原文没有的事实。
+  state.translatorStyles = TRANSLATOR_STYLES.map((style) => style.id);
 
-用户消息会提供 text 和 sourceLanguage（zh 或 en）。sourceLanguage=en 时，这是英文改写，不是翻译成中文；sourceLanguage=zh 时，才是中译英。
+  const TRANSLATOR_SYSTEM_PROMPT = `你是 Talk 的多风格英文翻译与改写器。输入可能是中文或英文；无论哪种，都输出用户选择的英文版本：中文输入是英译，英文输入是英文改写。必须保留原意、信息量和语气强度，不添加原文没有的事实。
+
+用户消息会提供 text、sourceLanguage（zh 或 en）和 styles（风格 id 数组）。
+- sourceLanguage=en 时，这是英文改写，不是翻译成中文；sourceLanguage=zh 时，才是中译英。
+- 只输出 styles 数组中列出的风格，按 styles 的顺序，每个风格一次；不要输出未选中的风格。
 
 只返回一个合法 JSON 对象，不要 Markdown、代码块或额外说明：
 {
@@ -3420,7 +3451,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
   ]
 }
 
-五个 style 必须按顺序齐全：
+五种可用 style 定义如下（只输出用户 styles 中选择的项）：
 - minimal：极简口语。短、直接、自然，像随口说的一句话。
 - idiom：地道习语。使用英语母语者常用的习语、短语动词或固定搭配。
 - formal：书面正式。适合邮件、报告、简历或正式场合，避免俚语。
@@ -4096,6 +4127,17 @@ Few-shot（只示意字段和语气，不要照抄内容）：
         event.preventDefault();
         copyCurrentPage();
         break;
+
+      case "translator-style": {
+        event.preventDefault();
+        const styleId = target.dataset.style;
+        if (!TRANSLATOR_STYLES.some((style) => style.id === styleId)) break;
+        state.translatorStyles = state.translatorStyles.includes(styleId)
+          ? state.translatorStyles.filter((id) => id !== styleId)
+          : [...state.translatorStyles, styleId];
+        updateTranslatorStyleControls();
+        break;
+      }
 
       case "translator-mode": {
         event.preventDefault();

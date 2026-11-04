@@ -5591,3 +5591,59 @@ textarea:focus-visible,
   position: absolute;
   left: 16px;
 }
+
+/* Style selection states */
+.translator-style-chip {
+  position: relative;
+  border-color: var(--line);
+  background: var(--card);
+  opacity: 0.52;
+  filter: grayscale(0.3);
+  transition:
+    opacity 0.22s ease,
+    transform 0.25s var(--ease-spring),
+    border-color 0.22s ease,
+    background 0.22s ease,
+    filter 0.22s ease;
+}
+
+.translator-style-chip.selected,
+.translator-style-chip:hover {
+  opacity: 1;
+  filter: none;
+}
+
+.translator-style-chip.selected {
+  border-color: var(--tone-border);
+  background: var(--tone-wash);
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px -10px var(--tone);
+}
+
+.translator-style-chip:active {
+  transform: scale(0.94);
+}
+
+.translator-style-check {
+  position: absolute;
+  top: 3px;
+  right: 5px;
+  color: var(--tone-ink);
+  font-family: var(--mono);
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.translator-style-chip:not(.selected) .translator-style-emoji {
+  opacity: 0.55;
+}
+
+.translator-input-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+#translator-style-count {
+  color: var(--muted-2);
+}
