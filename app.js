@@ -2932,6 +2932,7 @@
    - standard：义项 2 个；同根词 3 个；近义词 3 个；反义词 2 个；例句 2 个；搭配 4 个；词源阶段 3 个。
    - deep：义项 3 个；同根词 4 个；近义词 4 个；反义词 3 个；例句 3 个；搭配 5 个；词源阶段 4 个。
 3. 近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作补充。词源必须尽量准确；不确定时给空对象，不要编故事。
+4. 词源时间轴 origin.stages 的 when、label、text 必须使用中文。when 要写成“1754 年”“19 世纪”“古英语时期”“今天”这类中文标注；禁止写 "19th century"、"Old English"、"Modern English" 等英文时间名。专有名词（如拉丁语、希腊语、人名）可以保留原文，但时间标注必须中文。
 
 Few-shot（只示意字段和语气，不要照抄内容）：
 用户：{"task":"word","detail":"fast","query":"serendipity"}
@@ -3345,10 +3346,42 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     };
   }
 
+  function localizeTimelineWhen(value) {
+    const text = String(value || "").trim();
+    if (!text || /[\u3400-\u9fff]/.test(text)) return text;
+    const lower = text.toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
+    const map = {
+      "old english": "古英语时期",
+      "middle english": "中古英语时期",
+      "early modern english": "早期现代英语",
+      "modern english": "现代英语",
+      "ancient greek": "古希腊时期",
+      "latin": "拉丁语时期",
+      "old norse": "古诺斯语时期",
+      "proto germanic": "原始日耳曼语时期",
+      "today": "今天",
+      "present": "今天",
+      "now": "今天"
+    };
+    if (map[lower]) return map[lower];
+    let match = lower.match(/^(early|mid|late)?\s*(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+century$/);
+    if (match) {
+      const prefix = match[1] === "early" ? "早期" : match[1] === "mid" ? "中期" : match[1] === "late" ? "晚期" : "";
+      return `${match[2]} 世纪${prefix}`;
+    }
+    match = lower.match(/^(?:c\.?\s*)?(\d{3,4})$/);
+    if (match) return `${match[1]} 年`;
+    match = lower.match(/^(?:before|prior to)\s+(\d{3,4})$/);
+    if (match) return `${match[1]} 年以前`;
+    match = lower.match(/^(\d{3,4})\s*[-–—]\s*(\d{3,4})$/);
+    if (match) return `${match[1]}–${match[2]} 年`;
+    return text;
+  }
+
   function normalizeOrigin(value) {
     if (!value || typeof value !== "object") return null;
     const stages = asArray(value.stages).map((stage) => ({
-      when: String(stage.when || stage.time || stage.period || ""),
+      when: localizeTimelineWhen(stage.when || stage.time || stage.period || ""),
       label: String(stage.label || stage.title || ""),
       text: String(stage.text || stage.description || "")
     })).filter((stage) => stage.when || stage.text);
