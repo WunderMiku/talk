@@ -138,6 +138,8 @@ ships with **thinking disabled**, because Qwen3.7 Flash defaults to a thinking
 mode that can consume most of the output budget and make lookups slow. The
 profile also exposes an optional thinking budget; set it to 0 to use the model
 default, or a small value such as 256–1024 for a bounded reasoning pass.
+Thinking controls are also shown automatically for `deepseek-v4*`, `glm-5*`,
+and `kimi-k2/k3` model names.
 
 ## PWA
 
@@ -173,7 +175,10 @@ into the Pages artifact.
 Model calls use SSE streaming where the provider supports it. The loading page
 shows a live preview as soon as `word`, `phonetic`, `translation`, `short`,
 `sentence translation`, `tone`, or `structure` fields become complete; the full
-word/sentence page replaces it when the JSON object finishes. If a provider
+word/sentence page replaces it when the JSON object finishes. Streaming
+requests intentionally omit `response_format` because several OpenAI-compatible
+gateways buffer the response when stream and structured-output flags are
+combined; JSON is still enforced by the static system prompt. If a provider
 rejects streaming, the client retries once with a normal non-streaming request.
 
 ## Generation depth and cache

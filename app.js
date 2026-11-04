@@ -237,6 +237,12 @@
     return settings.profiles.find((profile) => profile.id === settings.activeProfileId) || settings.profiles[0];
   }
 
+  function profileSupportsThinking(profile) {
+    if (!profile) return false;
+    if (profile.thinkingCapable) return true;
+    return /(?:qwen3\.[5-9]|deepseek-v4|glm-5|kimi-k[2-9])/i.test(String(profile.model || ""));
+  }
+
   function applyProfileToSettings(settings, profile) {
     if (!profile) return settings;
     return {
@@ -2516,7 +2522,7 @@
           </div>
           <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。词典建议使用 deepseek-chat，deepseek-reasoner 会更慢。</p>
         </div>
-        ${activeProfile(draft)?.thinkingCapable ? `
+        ${profileSupportsThinking(activeProfile(draft)) ? `
         <div class="thinking-panel">
           <label class="check-row">
             <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
@@ -3000,7 +3006,10 @@ Few-shot（只示意字段和语气，不要照抄内容）：
     const maxTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
     let content = "";
     try {
-      content = await postChatStream(endpoint, cfg, messages, controller.signal, true, maxTokens, (partial) => {
+      // Do not combine streaming with response_format by default: some
+      // OpenAI-compatible gateways silently return one buffered JSON response
+      // when both are present. The static prompt already requires JSON.
+      content = await postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
         if (typeof options.onPreview === "function") {
           try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
         }
@@ -3094,6 +3103,11 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 
     const type = response.headers.get("content-type") || "";
     if (type.includes("application/json")) {
+      if (!window.__talkStreamWarned) {
+        window.__talkStreamWarned = true;
+        console.info("Provider returned a buffered JSON response despite stream=true.");
+        toast("当前接口未返回流式数据，已使用完整加载");
+      }
       const json = await response.json();
       const message = json?.choices?.[0]?.message;
       let content = message?.content;
@@ -3204,7 +3218,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 
   function thinkingParams(cfg) {
     const profile = activeProfile(cfg);
-    if (!profile?.thinkingCapable && !cfg.enableThinking) return {};
+    if (!profileSupportsThinking(profile) && !cfg.enableThinking) return {};
     const params = { enable_thinking: Boolean(cfg.enableThinking) };
     const budget = Number(cfg.thinkingBudget) || 0;
     if (params.enable_thinking && budget > 0) params.thinking_budget = budget;
