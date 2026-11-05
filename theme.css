@@ -925,3 +925,126 @@
   transform: rotate(-30deg);
   pointer-events: none;
 }
+
+/* Constructivist mood deck */
+[data-theme="constructivist"] .mood-section .section-head h2 {
+  font-family: var(--display);
+  font-size: 25px;
+  letter-spacing: -0.05em;
+}
+
+[data-theme="constructivist"] .mood-section .section-actions .side-note {
+  color: #d23b2f;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .mood-refresh {
+  padding: 6px 9px;
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+  box-shadow: 2px 2px 0 rgba(23, 21, 18, 0.14);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+[data-theme="constructivist"] .mood-refresh:hover {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .mood-scroll {
+  gap: 12px;
+  padding-bottom: 9px;
+}
+
+[data-theme="constructivist"] .mood-card {
+  flex-basis: 158px;
+  min-height: 148px;
+  padding: 14px 15px;
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .mood-card:nth-child(3n + 1) {
+  transform: rotate(-1.2deg);
+}
+
+[data-theme="constructivist"] .mood-card:nth-child(3n + 2) {
+  transform: rotate(1deg);
+}
+
+[data-theme="constructivist"] .mood-card:nth-child(3n) {
+  transform: rotate(-0.6deg);
+}
+
+[data-theme="constructivist"] .mood-card:hover {
+  transform: translateY(-3px) rotate(-1.2deg);
+  box-shadow: 7px 7px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .mood-card.lime {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .mood-card.lavender {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .mood-card.coral {
+  background: #e4d6b8;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .mood-card.lime .mood-kicker,
+[data-theme="constructivist"] .mood-card.lime .mood-words,
+[data-theme="constructivist"] .mood-card.lavender .mood-kicker,
+[data-theme="constructivist"] .mood-card.lavender .mood-words {
+  color: rgba(255, 246, 231, 0.66);
+}
+
+[data-theme="constructivist"] .mood-card.coral .mood-kicker,
+[data-theme="constructivist"] .mood-card.coral .mood-words {
+  color: rgba(23, 21, 18, 0.56);
+}
+
+[data-theme="constructivist"] .mood-title {
+  font-family: var(--display);
+  font-size: 21px;
+  letter-spacing: -0.05em;
+}
+
+[data-theme="constructivist"] .mood-kicker {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+[data-theme="constructivist"] .mood-kicker span:last-child {
+  font-size: 12px;
+}
+
+[data-theme="constructivist"] .mood-card::after {
+  right: -26px;
+  bottom: -36px;
+  width: 112px;
+  height: 54px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.16);
+  filter: none;
+  transform: rotate(-38deg);
+}
+
+[data-theme="constructivist"] .mood-card.lavender::after {
+  background: #d23b2f;
+  opacity: 0.4;
+}
+
+[data-theme="constructivist"] .mood-card.coral::after {
+  background: #171512;
+  opacity: 0.12;
+}

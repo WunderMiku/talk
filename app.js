@@ -1823,7 +1823,7 @@
         </button>` : ""}
       </section>
 
-      <section class="section reveal" style="--d:2.5">
+      <section class="section mood-section reveal" style="--d:2.5">
         <div class="section-head">
           <div>
             <span class="section-kicker">${esc(copy.moodSectionKicker)}</span>
