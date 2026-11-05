@@ -1463,3 +1463,7 @@
 [data-theme="constructivist"] .theme-picker-item.active .theme-picker-index {
   color: rgba(255, 246, 231, 0.72);
 }
+
+[data-theme="constructivist"] .theme-cache-setting {
+  border-top: 2px solid #171512;
+}

@@ -1767,6 +1767,7 @@
   const THEME_DB_NAME = "talk.themeDecks.v1";
   const THEME_DB_STORE = "decks";
   const THEME_LEGACY_KEY = "talk.themeDecks.v1";
+  const THEME_CACHE_LIMIT = 8;
 
   function themeDbOpen() {
     return new Promise((resolve, reject) => {
@@ -1808,7 +1809,8 @@
         const decks = (Array.isArray(request.result) ? request.result : [])
           .map(normalizeStoredTheme)
           .filter(Boolean)
-          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
+          .slice(0, THEME_CACHE_LIMIT);
         db.close();
         resolve(decks);
       };
@@ -1819,17 +1821,70 @@
     });
   }
 
+  async function themeDecksPrune() {
+    const db = await themeDbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(THEME_DB_STORE, "readwrite");
+      const store = tx.objectStore(THEME_DB_STORE);
+      const request = store.getAll();
+      request.onsuccess = () => {
+        const decks = (Array.isArray(request.result) ? request.result : [])
+          .map(normalizeStoredTheme)
+          .filter(Boolean)
+          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+        decks.slice(THEME_CACHE_LIMIT).forEach((deck) => store.delete(deck.key));
+      };
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme prune failed")); };
+    });
+  }
+
   async function themeDeckSave(deck) {
     const db = await themeDbOpen();
     const key = String(deck.title || "").trim();
     if (!key) throw new Error("主题没有标题。");
     const stored = { ...deck, key, at: Date.now() };
-    return new Promise((resolve, reject) => {
+    await new Promise((resolve, reject) => {
       const tx = db.transaction(THEME_DB_STORE, "readwrite");
       tx.objectStore(THEME_DB_STORE).put(stored);
       tx.oncomplete = () => { db.close(); resolve(stored); };
       tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme write failed")); };
     });
+    await themeDecksPrune();
+    return stored;
+  }
+
+  async function clearThemeStore() {
+    const db = await themeDbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(THEME_DB_STORE, "readwrite");
+      tx.objectStore(THEME_DB_STORE).clear();
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme clear failed")); };
+    });
+  }
+
+  async function themeCacheStats() {
+    const decks = await themeDecksRead();
+    const bytes = new Blob([JSON.stringify(decks)]).size;
+    return {
+      count: decks.length,
+      max: THEME_CACHE_LIMIT,
+      bytes,
+      words: decks.reduce((sum, deck) => sum + (deck.words?.length || 0), 0)
+    };
+  }
+
+  async function renderThemeCacheStats() {
+    const target = $("#theme-cache-stats");
+    if (!target) return;
+    try {
+      const stats = await themeCacheStats();
+      target.innerHTML = `<div class="cache-settings-summary"><span><strong>${stats.count}</strong> / ${stats.max} 个主题</span><span>${formatBytes(stats.bytes)} · IndexedDB</span></div>
+        <p class="api-note">共 ${stats.words} 个词。按标题保存，FIFO：超出 ${stats.max} 版会自动删除最早的一版。</p>`;
+    } catch (_) {
+      target.innerHTML = `<p class="api-note">主题库暂时无法读取。</p>`;
+    }
   }
 
   async function initThemeStore() {
@@ -1847,6 +1902,8 @@
           decks = await themeDecksRead();
         }
       }
+      await themeDecksPrune();
+      decks = await themeDecksRead();
       state.themeDecks = decks;
       state.themeIndex = 0;
     } catch (error) {
@@ -3461,6 +3518,11 @@
         <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
         <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
       </div>
+      <div class="theme-cache-setting">
+        <span class="settings-subhead">主题库</span>
+        <div id="theme-cache-stats"><p class="api-note">正在读取主题缓存…</p></div>
+        <button class="link-btn" type="button" data-action="clear-theme-cache">清空主题库</button>
+      </div>
       <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
       <p class="api-note">词条缓存优先从 IndexedDB 读取，未命中才请求模型。Kokoro 模型文件约 115MB，由浏览器单独缓存。</p>`;
   }
@@ -3490,6 +3552,7 @@
         </div>
       </div>`;
     if (tab === "tts") requestAnimationFrame(updateTtsBackendStatus);
+    if (tab === "data") requestAnimationFrame(renderThemeCacheStats);
   }
 
   function refreshCacheUi() {
@@ -4681,6 +4744,17 @@
         persistHistory();
         renderHistoryContent();
         toast("记录已清空");
+        break;
+
+      case "clear-theme-cache":
+        event.preventDefault();
+        await clearThemeStore();
+        state.themeDecks = [];
+        state.themeIndex = 0;
+        state.themeDeck = null;
+        renderThemeSalon();
+        renderSettingsContent();
+        toast("主题库已清空");
         break;
 
       case "clear-word-cache":

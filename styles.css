@@ -6790,3 +6790,34 @@ textarea:focus-visible,
   font-family: var(--mono);
   font-size: 7px;
 }
+
+/* Theme library cache summary in settings */
+.theme-cache-setting {
+  margin-top: 13px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.theme-cache-setting .settings-subhead {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.theme-cache-setting #theme-cache-stats .cache-settings-summary {
+  margin-top: 0;
+}
+
+.theme-cache-setting .link-btn {
+  margin-top: 5px;
+}
+
+/* The theme-library clear action is a small utility link, not a section title. */
+.theme-cache-setting .link-btn {
+  display: inline-flex;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

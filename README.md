@@ -156,8 +156,10 @@ the wrong entry.
 The home page includes an AI-curated word exhibition. It starts with a static
 fallback deck. Each press of **再印一版** generates one theme world with five
 context-bound words, displays it immediately, and stores it in IndexedDB
-(`talk.themeDecks.v1`, `decks` store, keyed by title). The poster arrows cycle
-through the cached editions, and **选一版** opens a library picker. Before a
+(`talk.themeDecks.v1`, `decks` store, keyed by title, FIFO limited to the
+latest eight editions). The poster arrows cycle through the cached editions,
+and **选一版** opens a library picker. Settings → 数据 shows the theme-library
+count, approximate bytes, word count, and a clear action. Before a
 request, all existing titles are passed as an `exclude` list at the **end** of
 the user message so the static prompt prefix remains cache-friendly. No model
 call happens on page load.
