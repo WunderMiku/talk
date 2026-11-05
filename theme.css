@@ -527,3 +527,96 @@
   font-weight: 700;
   letter-spacing: 0.13em;
 }
+
+/* Word page: synonym / antonym blocks are part of the constructivist poster system. */
+[data-theme="constructivist"] .relation-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .relation-card.syn {
+  background: #e4d6b8;
+}
+
+[data-theme="constructivist"] .relation-card.ant {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .relation-card::after {
+  right: -26px;
+  bottom: -30px;
+  width: 84px;
+  height: 84px;
+  border-radius: 0;
+  background: #d23b2f;
+  opacity: 0.16;
+  transform: rotate(45deg);
+}
+
+[data-theme="constructivist"] .relation-head h3 {
+  font-family: var(--display);
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .relation-card.ant .relation-head h3,
+[data-theme="constructivist"] .relation-card.ant .rel-word {
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-gloss {
+  color: rgba(239, 228, 208, 0.62);
+}
+
+[data-theme="constructivist"] .relation-icon {
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme="constructivist"] .rel-chip {
+  border: 1px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+  box-shadow: 2px 2px 0 rgba(23, 21, 18, 0.12);
+}
+
+[data-theme="constructivist"] .rel-chip:hover {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .rel-chip:hover .rel-gloss {
+  color: rgba(255, 246, 231, 0.72);
+}
+
+[data-theme="constructivist"] .rel-gloss {
+  color: rgba(23, 21, 18, 0.56);
+}
+
+/* On the black antonym panel, use cream chips with black text for contrast. */
+[data-theme="constructivist"] .relation-card.ant .rel-chip {
+  color: #171512;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip .rel-word {
+  color: #171512;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip .rel-gloss {
+  color: rgba(23, 21, 18, 0.56);
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip:hover {
+  color: #fff6e7;
+  background: #d23b2f;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip:hover .rel-word,
+[data-theme="constructivist"] .relation-card.ant .rel-chip:hover .rel-gloss {
+  color: #fff6e7;
+}
