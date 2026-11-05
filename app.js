@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "95";
+  const APP_VERSION = "96";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -314,7 +314,10 @@
     translatorStyles: [],
     workspaceOpen: false,
     themeDeck: null,
+    themeDecks: [],
+    themeIndex: 0,
     themeGenerating: false,
+    themeBatchProgress: 0,
     themeSeq: 0,
     lastTranslationInput: "",
     lastTranslationResult: null,
@@ -1773,11 +1776,17 @@
     }
   }
 
-  function themeCacheWrite(deck) {
+  function themeCacheWriteAll(decks) {
     try {
-      const decks = [deck, ...themeCacheRead().filter((item) => item.title !== deck.title)].slice(0, 8);
-      localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(decks));
+      localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(decks.slice(0, 8)));
     } catch (_) { /* no-op */ }
+  }
+
+  function ensureThemeDecks() {
+    if (!Array.isArray(state.themeDecks)) state.themeDecks = [];
+    if (!state.themeDecks.length) state.themeDecks = themeCacheRead();
+    if (!state.themeDecks.length) return;
+    state.themeIndex = Math.max(0, Math.min(Number(state.themeIndex) || 0, state.themeDecks.length - 1));
   }
 
   function fallbackThemeDeck() {
@@ -1791,9 +1800,10 @@
   }
 
   function currentThemeDeck() {
+    ensureThemeDecks();
+    if (state.themeDecks.length) return state.themeDecks[state.themeIndex] || state.themeDecks[0];
     if (state.themeDeck) return state.themeDeck;
-    const cached = themeCacheRead()[0];
-    return cached || fallbackThemeDeck();
+    return fallbackThemeDeck();
   }
 
   function normalizeThemeDeck(raw) {
@@ -1816,14 +1826,27 @@
     const words = Array.isArray(deck.words) ? deck.words : [];
     const lead = words[0];
     const columns = words.slice(1);
-    const issue = String((state.themeSeq % 99) + 1).padStart(2, "0");
+    ensureThemeDecks();
+    const total = state.themeDecks.length;
+    const issue = String(total ? state.themeIndex + 1 : 1).padStart(2, "0");
+    const totalLabel = total ? String(total).padStart(2, "0") : "01";
+    const canCycle = total > 1;
+    const batchLabel = state.themeGenerating
+      ? `${copy.printing} ${Math.min(state.themeBatchProgress + 1, 8)}/8…`
+      : copy.batchCta;
     return `<div class="theme-poster">
       <div class="poster-masthead">
         <div class="poster-brand">
           <span class="poster-brand-mark">${esc(copy.brand || "TALK")}</span>
           <span class="poster-brand-section">${esc(copy.masthead)}</span>
         </div>
-        <span class="poster-edition">${esc(copy.editionLabel)} · No. ${issue}</span>
+        <div class="poster-edition">
+          <span>${esc(copy.editionLabel)} · No. ${issue} / ${totalLabel}</span>
+          <div class="poster-nav" aria-label="缓存内切换">
+            <button type="button" data-action="theme-cycle" data-delta="-1" aria-label="上一版" ${canCycle ? "" : "disabled"}>‹</button>
+            <button type="button" data-action="theme-cycle" data-delta="1" aria-label="下一版" ${canCycle ? "" : "disabled"}>›</button>
+          </div>
+        </div>
       </div>
       <div class="poster-rule"></div>
       <div class="poster-head">
@@ -1832,9 +1855,6 @@
           <h2 class="poster-title">${esc(deck.title)}</h2>
           <p class="poster-subtitle">${esc(deck.subtitle || "")}</p>
         </div>
-        <button class="theme-generate poster-generate ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
-          ${state.themeGenerating ? esc(copy.loading) : `${icon("sparkle")} ${esc(copy.cta)}`}
-        </button>
       </div>
       <div class="poster-body">
         ${lead ? `<button class="poster-lead" type="button" data-action="word" data-word="${attr(lead.word)}" aria-label="查看 ${attr(lead.word)}" style="--i:0">
@@ -1855,6 +1875,12 @@
         </div>
       </div>
       ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
+      <div class="poster-bottom">
+        <span class="poster-cache-count">${total ? `${String(total).padStart(2, "0")} ${esc(copy.cacheUnit)}` : esc(copy.noCache)}</span>
+        <button class="poster-batch ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-batch" ${state.themeGenerating ? "disabled" : ""}>
+          ${state.themeGenerating ? esc(batchLabel) : `${icon("sparkle")} ${esc(copy.batchCta)}`}
+        </button>
+      </div>
       <div class="poster-footer"><span>talk. · ${esc(copy.local)}</span><span>${esc(copy.footerRight)}</span></div>
     </div>`;
   }
@@ -1865,49 +1891,88 @@
     host.innerHTML = themeSalonMarkup(currentThemeDeck());
   }
 
-  function cycleLocalTheme() {
-    const decks = Array.isArray(CONTENT.themeDecks) ? CONTENT.themeDecks : [];
-    if (!decks.length) return;
-    state.themeSeq = (state.themeSeq + 1) % decks.length;
-    state.themeDeck = decks[state.themeSeq];
+  function cycleTheme(delta) {
+    ensureThemeDecks();
+    if (state.themeDecks.length <= 1) return;
+    state.themeIndex = (state.themeIndex + Number(delta || 1) + state.themeDecks.length) % state.themeDecks.length;
+    state.themeDeck = state.themeDecks[state.themeIndex];
     renderThemeSalon();
   }
 
-  async function generateThemeDeck() {
-    if (state.themeGenerating) return;
-    if (!hasModelConfig(state.settings)) {
-      cycleLocalTheme();
-      toast("未连接模型，先切换到本地主题");
-      return;
-    }
-    state.themeGenerating = true;
-    state.themeSeq += 1;
-    renderThemeSalon();
+  async function requestThemeDeck(seed) {
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 55_000);
+    const timer = window.setTimeout(() => controller.abort(), 50_000);
     try {
       const endpoint = endpointFor(state.settings.baseUrl);
       const messages = [
         { role: "system", content: window.TALK_PROMPTS.theme },
-        { role: "user", content: JSON.stringify({ task: "theme", seed: `${Date.now()}-${state.themeSeq}` }) }
+        { role: "user", content: JSON.stringify({ task: "theme", seed }) }
       ];
       const response = await postChat(endpoint, state.settings, messages, controller.signal, false, 900);
       if (!response.ok) {
         const raw = await response.text().catch(() => "");
-        throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 180)}` : ""}`);
+        throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 160)}` : ""}`);
       }
       const json = await response.json();
       let content = json?.choices?.[0]?.message?.content;
       if (Array.isArray(content)) content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-      const deck = normalizeThemeDeck(parseJsonObject(content));
-      state.themeDeck = deck;
-      themeCacheWrite(deck);
-      toast("新主题已布展");
-    } catch (error) {
-      console.warn("Theme generation failed.", error);
-      toast(`主题生成失败：${String(error?.message || error).slice(0, 80)}`);
+      return normalizeThemeDeck(parseJsonObject(content));
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function generateThemeBatch() {
+    if (state.themeGenerating) return;
+    if (!hasModelConfig(state.settings)) {
+      toast("未连接模型，先在设置里接入模型");
+      return;
+    }
+    const previousDecks = state.themeDecks.slice();
+    state.themeGenerating = true;
+    state.themeBatchProgress = 0;
+    let collected = [];
+    let firstShown = false;
+    renderThemeSalon();
+    try {
+      for (let index = 0; index < 8; index++) {
+        state.themeBatchProgress = index;
+        const button = $(".poster-batch");
+        if (button) button.textContent = `${copyFor("themeSalon").printing} ${index + 1}/8…`;
+        try {
+          const deck = await requestThemeDeck(`${Date.now()}-${index}-${state.themeSeq++}`);
+          if (collected.some((item) => item.title === deck.title)) continue;
+          collected.push(deck);
+          if (!firstShown) {
+            firstShown = true;
+            state.themeDecks = [deck];
+            state.themeIndex = 0;
+            state.themeDeck = deck;
+            themeCacheWriteAll(state.themeDecks);
+            renderThemeSalon();
+          } else {
+            state.themeDecks = collected.slice(0, 8);
+            themeCacheWriteAll(state.themeDecks);
+            const count = $(".poster-cache-count");
+            if (count) count.textContent = `${String(state.themeDecks.length).padStart(2, "0")} ${copyFor("themeSalon").cacheUnit}`;
+          }
+        } catch (error) {
+          console.warn(`Theme ${index + 1} failed.`, error);
+        }
+      }
+      if (collected.length) {
+        state.themeDecks = collected.slice(0, 8);
+        state.themeIndex = 0;
+        state.themeDeck = state.themeDecks[0];
+        themeCacheWriteAll(state.themeDecks);
+        toast(`已印好 ${collected.length} 版`);
+      } else {
+        state.themeDecks = previousDecks;
+        toast("这一批没有印出来，请检查模型连接");
+      }
     } finally {
       state.themeGenerating = false;
+      state.themeBatchProgress = 0;
       renderThemeSalon();
     }
   }
@@ -4434,9 +4499,14 @@
         break;
       }
 
-      case "theme-generate":
+      case "theme-cycle":
         event.preventDefault();
-        generateThemeDeck();
+        cycleTheme(target.dataset.delta);
+        break;
+
+      case "theme-batch":
+        event.preventDefault();
+        generateThemeBatch();
         break;
 
       case "shuffle-moods":
@@ -5528,6 +5598,8 @@
 
   async function init() {
     setupInstallPrompt();
+    state.themeDecks = themeCacheRead();
+    state.themeIndex = 0;
     applyCacheDisplay();
     applyContentCopy();
     $$("[data-app-version]").forEach((element) => { element.textContent = `v${APP_VERSION}`; });

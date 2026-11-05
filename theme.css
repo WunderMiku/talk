@@ -1380,3 +1380,42 @@
   letter-spacing: -0.075em;
   overflow-wrap: anywhere;
 }
+
+[data-theme="constructivist"] .poster-edition {
+  align-items: flex-end;
+}
+
+[data-theme="constructivist"] .poster-nav button {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .poster-nav button:hover:not(:disabled) {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .poster-bottom {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .poster-cache-count {
+  color: #171512;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .poster-batch {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .poster-batch:hover:not(:disabled) {
+  background: #171512;
+  color: #efe4d0;
+}

@@ -6549,3 +6549,118 @@ textarea:focus-visible,
     animation: none;
   }
 }
+
+/* Poster edition controls and batch print action */
+.poster-edition {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.poster-nav {
+  display: flex;
+  gap: 3px;
+}
+
+.poster-nav button {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.poster-nav button:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.poster-nav button:disabled {
+  opacity: 0.28;
+}
+
+.poster-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.poster-cache-count {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.06em;
+}
+
+.poster-batch {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.poster-batch svg {
+  width: 11px;
+  height: 11px;
+}
+
+.poster-batch:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.poster-batch.is-loading {
+  opacity: 0.65;
+  pointer-events: none;
+}
+
+/* Letterpress-like reveal, kept quiet. */
+.poster-lead,
+.poster-col {
+  animation: poster-print 0.68s var(--ease-out) both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+@keyframes poster-print {
+  0% {
+    opacity: 0.08;
+    filter: blur(0.7px) contrast(0.88);
+    transform: translateY(3px);
+  }
+  55% {
+    opacity: 0.92;
+    filter: blur(0);
+    transform: translateY(0.5px);
+  }
+  100% {
+    opacity: 1;
+    filter: none;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .poster-lead,
+  .poster-col {
+    animation: none;
+  }
+}
