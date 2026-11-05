@@ -3003,12 +3003,17 @@
     return value;
   }
 
-  function qwenTtsEndpoint(profile) {
+  function qwenTtsEndpoint(profile, model = state.settings?.qwenTtsModel) {
     const base = String(profile?.baseUrl || "").trim();
     if (!base) return "";
     try {
       const origin = secureRemoteUrl(new URL(base).origin);
-      return `${origin}/api/v1/services/audio/tts/SpeechSynthesizer`;
+      // Qwen3-TTS uses the multimodal generation route; Qwen-Audio-TTS uses
+      // the dedicated non-realtime speech route.
+      const path = /^qwen3-tts/i.test(String(model || ""))
+        ? "/api/v1/services/aigc/multimodal-generation/generation"
+        : "/api/v1/services/audio/tts/SpeechSynthesizer";
+      return `${origin}${path}`;
     } catch (_) {
       return "";
     }
@@ -3033,7 +3038,7 @@
             <input id="qwen-tts-voice" type="text" data-setting="qwenTtsVoice" value="${attr(draft.qwenTtsVoice || "longanhuan_v3.1")}" placeholder="longanhuan_v3.1" spellcheck="false" aria-label="Qwen TTS 音色" />
             <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
           </div>
-          ${qwen ? `<p class="tts-line">使用「${esc(qwen.name)}」的 API 密钥 · ${esc(qwenTtsEndpoint(qwen))}</p>` : `<p class="tts-line tts-error">还没有可用的 Qwen 密钥。请先在「模型」里填写 Qwen 的 API 密钥。</p>`}
+          ${qwen ? `<p class="tts-line" id="qwen-tts-endpoint">使用「${esc(qwen.name)}」的 API 密钥 · ${esc(qwenTtsEndpoint(qwen, draft.qwenTtsModel))}</p>` : `<p class="tts-line tts-error">还没有可用的 Qwen 密钥。请先在「模型」里填写 Qwen 的 API 密钥。</p>`}
           <p class="tts-line">模型默认 qwen-audio-3.1-tts-plus；音色可填 longanhuan_v3.1 或其他 Qwen 音色。</p>
           <span class="tts-status" id="tts-test-status">${qwen ? "密钥已就绪" : "需要先配置 Qwen 密钥"}</span>
           <p class="tts-line tts-https-warning">密钥只保存在本机；语音请求由浏览器直接发往 Qwen。公共设备建议关闭「记住密钥」。</p>
@@ -4493,6 +4498,18 @@
     if (target.matches("[data-setting]") && state.draft) {
       const key = target.dataset.setting;
       state.draft[key] = target.type === "checkbox" ? target.checked : target.value;
+      if (key === "qwenTtsModel") {
+        if (/^qwen3-tts/i.test(target.value) && /^longanhuan/i.test(state.draft.qwenTtsVoice || "")) {
+          state.draft.qwenTtsVoice = "Cherry";
+          const voiceInput = $("#qwen-tts-voice");
+          if (voiceInput) voiceInput.value = "Cherry";
+        }
+        const endpoint = $("#qwen-tts-endpoint");
+        if (endpoint) {
+          const profile = qwenTtsProfile(state.draft);
+          if (profile) endpoint.textContent = `使用「${profile.name}」的 API 密钥 · ${qwenTtsEndpoint(profile, target.value)}`;
+        }
+      }
       if (key === "apiKey" || key === "baseUrl" || key === "model") {
         const status = $("#api-test-status");
         if (status) {
@@ -4748,10 +4765,13 @@
   async function speakQwen(text, button, cfg, { bypassCache = false } = {}) {
     const profile = qwenTtsProfile(cfg);
     if (!profile) throw new Error("还没有可用的 Qwen API 密钥，请先在模型设置里填写。");
-    const endpoint = qwenTtsEndpoint(profile);
-    if (!endpoint) throw new Error("Qwen API 地址为空，无法定位语音接口。");
     const model = String(cfg.qwenTtsModel || "qwen-audio-3.1-tts-plus").trim();
-    const voice = String(cfg.qwenTtsVoice || "longanhuan_v3.1").trim();
+    const endpoint = qwenTtsEndpoint(profile, model);
+    if (!endpoint) throw new Error("Qwen API 地址为空，无法定位语音接口。");
+    const isQwen3 = /^qwen3-tts/i.test(model);
+    let voice = String(cfg.qwenTtsVoice || "").trim();
+    if (isQwen3 && (!voice || /^longanhuan/i.test(voice))) voice = "Cherry";
+    if (!voice) voice = "longanhuan_v3.1";
     const cacheKey = `qwen|${model}|${voice}|${text}|v1`;
     if (!bypassCache) {
       const cached = await getKokoroAudio(cacheKey);
@@ -4768,12 +4788,18 @@
       },
       body: JSON.stringify({
         model,
-        input: {
-          text,
-          voice,
-          format: "mp3",
-          sample_rate: 24000
-        }
+        input: isQwen3
+          ? {
+              text,
+              voice,
+              language_type: detectSourceLanguage(text) === "zh" ? "Chinese" : "English"
+            }
+          : {
+              text,
+              voice,
+              format: "mp3",
+              sample_rate: 24000
+            }
       })
     });
     const raw = await response.text();
