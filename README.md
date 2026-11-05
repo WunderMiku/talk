@@ -151,6 +151,15 @@ corners, and full-width layout. The style emoji SVGs are from Twemoji
 source language + text, so English → English and Chinese → English do not share
 the wrong entry.
 
+## Theme and content architecture
+
+Visual tokens live in `theme.css`, theme registration/persistence in `theme.js`,
+interface copy in `content.js`, and static model prompts in `prompts.js`.
+See [THEME.md](THEME.md) for adding a theme, style, or copy system.
+
+The two current themes are **Paper** and **构成主义**, selectable from
+settings → data → appearance.
+
 ## Model profiles
 
 Settings includes independent model profiles for DeepSeek, OpenAI, Qwen,

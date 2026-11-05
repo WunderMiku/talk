@@ -1,0 +1,416 @@
+/* ============================================================
+   talk. — theme tokens
+   This file defines the visual contract. New themes should override
+   these tokens instead of editing component rules in styles.css.
+   ============================================================ */
+
+:root,
+[data-theme="paper"] {
+  /* Surfaces */
+  --surface-page: var(--paper);
+  --surface-card: var(--card);
+  --surface-raised: #fffdf8;
+  --surface-soft: rgba(251, 249, 243, 0.72);
+  --surface-veil: rgba(243, 240, 231, 0.94);
+
+  /* Text */
+  --text-primary: var(--ink);
+  --text-secondary: var(--muted);
+  --text-tertiary: var(--muted-2);
+  --text-on-accent: var(--ink);
+
+  /* Brand / actions */
+  --accent: var(--lime);
+  --accent-strong: var(--lime-deep);
+  --accent-wash: var(--lime-wash);
+  --accent-ink: #52651f;
+  --accent-secondary: var(--coral);
+  --accent-secondary-wash: var(--coral-wash);
+  --accent-tertiary: var(--lavender);
+  --accent-tertiary-wash: var(--lavender-wash);
+  --focus-ring: rgba(185, 230, 59, 0.42);
+
+  /* Lines and shadows */
+  --border-soft: var(--line);
+  --border-strong: var(--line-strong);
+  --shadow-card: 0 24px 60px -42px rgba(23, 24, 19, 0.45);
+  --shadow-float: 0 30px 80px -36px rgba(23, 24, 19, 0.38);
+
+  /* Shape */
+  --radius-xs: 8px;
+  --radius-sm: 11px;
+  --radius-md: 16px;
+  --radius-card: 22px;
+  --radius-sheet: 30px;
+  --radius-pill: 999px;
+
+  /* Rhythm */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 22px;
+  --space-6: 32px;
+  --page-gutter: 22px;
+  --sheet-gutter: 18px;
+
+  /* Type and motion */
+  --font-ui: var(--sans);
+  --font-code: var(--mono);
+  --motion-fast: 0.22s;
+  --motion-slow: 0.48s;
+  --ease-theme: var(--ease-out);
+}
+
+/* Future themes can be added as another [data-theme="..."] block that
+   overrides the core tokens above (and --paper/--ink/etc. if desired). */
+
+/* ============================================================
+   Constructivist theme
+   Red/black/cream, hard edges, offset blocks, condensed display type.
+   ============================================================ */
+
+[data-theme="constructivist"] {
+  --paper: #efe4d0;
+  --paper-deep: #e4d4bb;
+  --card: #f8eedc;
+  --ink: #171512;
+  --ink-soft: #2b2822;
+  --muted: #6e6252;
+  --muted-2: #9b8b75;
+  --line: rgba(23, 21, 18, 0.26);
+  --line-strong: #171512;
+  --lime: #d23b2f;
+  --lime-deep: #b62c21;
+  --lime-wash: #f3c6b9;
+  --coral: #d23b2f;
+  --coral-wash: #f3c6b9;
+  --lavender: #2d2a23;
+  --lavender-wash: #e4d7c0;
+  --sky: #a58e6d;
+  --sky-wash: #eee0c8;
+  --surface-raised: #fff6e7;
+  --surface-soft: rgba(248, 238, 220, 0.72);
+  --accent: #d23b2f;
+  --accent-strong: #b62c21;
+  --accent-wash: #f3c6b9;
+  --accent-ink: #711a13;
+  --focus-ring: rgba(210, 59, 47, 0.38);
+  --font: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", "PingFang SC", "Noto Sans SC", sans-serif;
+  --display: var(--font);
+  --sans: var(--font);
+  --mono: "Courier New", "SFMono-Regular", ui-monospace, monospace;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-card: 0;
+  --radius-sheet: 0;
+  --radius-pill: 0;
+  --shadow-card: 6px 6px 0 rgba(23, 21, 18, 0.15);
+  --shadow-float: 10px 10px 0 rgba(23, 21, 18, 0.2);
+}
+
+[data-theme="constructivist"] body {
+  background:
+    linear-gradient(122deg, #171512 0 9%, transparent 9%),
+    linear-gradient(302deg, #d23b2f 0 12%, transparent 12%),
+    #e9ddc7;
+}
+
+[data-theme="constructivist"] .ambient {
+  display: none;
+}
+
+[data-theme="constructivist"] .grain {
+  opacity: 0.08;
+}
+
+[data-theme="constructivist"] .stage-meta,
+[data-theme="constructivist"] .stage-hint {
+  color: #efe4d0;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .stage-mark .dot,
+[data-theme="constructivist"] .brand .dot {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .device {
+  border-radius: 0;
+  background: #171512;
+  box-shadow:
+    14px 14px 0 #d23b2f,
+    26px 26px 0 rgba(23, 21, 18, 0.12);
+}
+
+[data-theme="constructivist"] .device::after {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .app {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .module-bar {
+  background: #171512;
+  border-bottom: 3px solid #d23b2f;
+}
+
+[data-theme="constructivist"] .module-bar-label {
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .module-switch {
+  gap: 0;
+  padding: 2px;
+  border: 1px solid #efe4d0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme="constructivist"] .module-btn {
+  border-radius: 0;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .module-btn.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .topbar {
+  background: linear-gradient(180deg, #efe4d0 0%, #efe4d0 72%, rgba(239, 228, 208, 0) 100%);
+}
+
+[data-theme="constructivist"] .brand {
+  letter-spacing: -0.09em;
+}
+
+[data-theme="constructivist"] .home-title,
+[data-theme="constructivist"] .translator-title,
+[data-theme="constructivist"] .word-title {
+  font-family: var(--display);
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .home-title em,
+[data-theme="constructivist"] .translator-title em {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .eyebrow .spark,
+[data-theme="constructivist"] .translator-eyebrow .spark {
+  background: #d23b2f;
+  box-shadow: 0 0 0 4px rgba(210, 59, 47, 0.16);
+}
+
+[data-theme="constructivist"] .search-card,
+[data-theme="constructivist"] .translator-input-shell,
+[data-theme="constructivist"] .workspace-input-shell {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.14);
+}
+
+[data-theme="constructivist"] .search-submit,
+[data-theme="constructivist"] .icon-btn,
+[data-theme="constructivist"] .btn,
+[data-theme="constructivist"] .speak-btn,
+[data-theme="constructivist"] .chip,
+[data-theme="constructivist"] .mode-btn,
+[data-theme="constructivist"] .provider-btn,
+[data-theme="constructivist"] .cache-action-btn,
+[data-theme="constructivist"] .detail-btn,
+[data-theme="constructivist"] .tts-engine-btn,
+[data-theme="constructivist"] .theme-option,
+[data-theme="constructivist"] .mood-refresh {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .search-submit {
+  background: #d23b2f;
+  color: #fff6e7;
+  border: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .btn,
+[data-theme="constructivist"] .speak-btn,
+[data-theme="constructivist"] .icon-btn {
+  border: 2px solid #171512;
+  box-shadow: 3px 3px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .btn-primary {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .btn-secondary,
+[data-theme="constructivist"] .speak-btn {
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .daily {
+  border: 3px solid #d23b2f;
+  border-radius: 0;
+  background: #171512;
+  box-shadow: 8px 8px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .daily-word {
+  color: #efe4d0;
+  font-family: var(--display);
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .daily-badge {
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  border: 0;
+}
+
+[data-theme="constructivist"] .mood-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .word-layer,
+[data-theme="constructivist"] .sheet,
+[data-theme="constructivist"] .translation-workspace {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .sheet {
+  border-top: 4px solid #d23b2f;
+}
+
+[data-theme="constructivist"] .sheet-handle {
+  border-radius: 0;
+  background: #d23b2f;
+}
+
+[data-theme="constructivist"] .translation-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .translation-emoji {
+  border-radius: 0;
+  background: #171512;
+}
+
+[data-theme="constructivist"] .translation-workspace-head {
+  border-bottom: 3px solid #d23b2f;
+}
+
+[data-theme="constructivist"] .translator-style-chip {
+  border: 2px solid #171512;
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .translator-style-chip.selected {
+  border-color: #d23b2f;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .translator-style-check {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .translation-detail {
+  border: 2px solid #171512;
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .settings-tabs {
+  gap: 0;
+  padding: 0;
+  border-bottom: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .settings-tab {
+  border-radius: 0;
+  border-right: 1px solid #171512;
+}
+
+[data-theme="constructivist"] .settings-tab.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .model-profile-chip,
+[data-theme="constructivist"] .model-profile-add,
+[data-theme="constructivist"] .tts-engine-switch,
+[data-theme="constructivist"] .detail-switch,
+[data-theme="constructivist"] .theme-switch,
+[data-theme="constructivist"] .cache-display-switch,
+[data-theme="constructivist"] .cache-settings-summary,
+[data-theme="constructivist"] .notice-card,
+[data-theme="constructivist"] .toast {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .model-profile-chip.active {
+  background: #d23b2f;
+  color: #fff6e7;
+  border-color: #171512;
+}
+
+[data-theme="constructivist"] .settings-footer {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .translation-detail-copy {
+  border-radius: 0;
+}
+
+/* Constructivist translation tones */
+[data-theme="constructivist"] .tone-yellow {
+  --tone: #b9852d;
+  --tone-ink: #5f3e0e;
+  --tone-wash: #e7cf9e;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-sage {
+  --tone: #6b6b3a;
+  --tone-ink: #45451f;
+  --tone-wash: #dfd8b5;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-sky {
+  --tone: #4f6d75;
+  --tone-ink: #2f4a50;
+  --tone-wash: #d5e0dc;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-coral {
+  --tone: #c83226;
+  --tone-ink: #711a13;
+  --tone-wash: #f0c1b9;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-lavender {
+  --tone: #5a403b;
+  --tone-ink: #39241f;
+  --tone-wash: #e6d4c8;
+  --tone-border: #171512;
+}
+
+/* Keep legacy content cards sharp in the constructivist theme. */
+[data-theme="constructivist"] :where(
+  .meaning-card, .family-card, .example-card, .origin-card, .memory-card,
+  .key-card, .sentence-card, .history-item, .cache-word-item,
+  .cache-summary-card, .settings-intro, .api-note, .error-detail,
+  .recent-row .chip, .related-pill, .collocation, .word-layer .btn
+) {
+  border-radius: 0;
+}

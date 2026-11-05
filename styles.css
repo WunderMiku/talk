@@ -5975,3 +5975,38 @@ textarea:focus-visible,
 .translation-landing-hint {
   margin-top: 14px;
 }
+
+/* Theme selector */
+.theme-setting {
+  margin: 13px 0 4px;
+}
+
+.theme-setting .settings-subhead {
+  display: block;
+  margin-bottom: 7px;
+}
+
+.theme-switch {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 10px;
+  background: rgba(23, 24, 19, 0.055);
+}
+
+.theme-option {
+  flex: 1;
+  padding: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 650;
+}
+
+.theme-option.active {
+  background: var(--ink);
+  color: var(--paper);
+}
