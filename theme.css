@@ -629,3 +629,299 @@
 [data-theme="constructivist"] .translator-landing-hint {
   margin-top: 24px;
 }
+
+/* ============================================================
+   Constructivist word page: poster blocks, wedges, functional marks
+   ============================================================ */
+
+[data-theme="constructivist"] .result-page {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="constructivist"] .result-page::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  right: -58px;
+  z-index: -1;
+  width: 178px;
+  height: 46px;
+  background: #d23b2f;
+  opacity: 0.13;
+  transform: rotate(-28deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .block-head {
+  align-items: flex-end;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+
+[data-theme="constructivist"] .block-index {
+  padding: 5px 7px;
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  font-size: 9px;
+  font-weight: 700;
+  transform: rotate(-15deg);
+}
+
+[data-theme="constructivist"] .block-head h2 {
+  font-family: var(--display);
+  font-size: 21px;
+  letter-spacing: -0.045em;
+}
+
+[data-theme="constructivist"] .block-head .rule {
+  height: 4px;
+  margin-bottom: 5px;
+  background: #171512;
+  transform: rotate(-3deg);
+  transform-origin: left center;
+}
+
+[data-theme="constructivist"] .block-head .block-note {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+[data-theme="constructivist"] .meaning-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 7px 7px 0 rgba(23, 21, 18, 0.16);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 17px), calc(100% - 17px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .collocation {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 3px 3px 0 rgba(23, 21, 18, 0.14);
+  transform: rotate(-1.4deg);
+}
+
+[data-theme="constructivist"] .collocation:nth-child(even) {
+  transform: rotate(1.4deg);
+}
+
+[data-theme="constructivist"] .collocation:hover {
+  background: #d23b2f;
+  color: #fff6e7;
+  transform: rotate(-1.4deg) translate(2px, -2px);
+}
+
+[data-theme="constructivist"] .memory-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  padding: 19px 28px 20px 19px;
+  background: #171512;
+  color: #efe4d0;
+  box-shadow: 8px 8px 0 #d23b2f;
+  clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .memory-card::after {
+  right: -40px;
+  bottom: -46px;
+  width: 118px;
+  height: 118px;
+  border: 13px dashed rgba(210, 59, 47, 0.52);
+  border-radius: 50%;
+  background: none;
+  color: transparent;
+  content: "";
+  transform: rotate(18deg);
+}
+
+[data-theme="constructivist"] .memory-label {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+[data-theme="constructivist"] .memory-text {
+  color: #efe4d0;
+  font-family: var(--display);
+  font-size: 18px;
+  line-height: 1.58;
+}
+
+[data-theme="constructivist"] .origin-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  padding: 19px 20px 17px;
+  background: #e4d6b8;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.16);
+  transform: skew(1.2deg);
+}
+
+[data-theme="constructivist"] .origin-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72px;
+  height: 72px;
+  background:
+    linear-gradient(#171512, #171512) center / 100% 5px no-repeat,
+    linear-gradient(#171512, #171512) center / 5px 100% no-repeat;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .origin-root {
+  border: 1px solid #171512;
+  border-radius: 0;
+  background: #171512;
+  color: #efe4d0;
+  font-weight: 650;
+}
+
+[data-theme="constructivist"] .origin-original {
+  border-top: 2px dashed #171512;
+}
+
+[data-theme="constructivist"] .origin-timeline::before {
+  left: 4px;
+  width: 3px;
+  background: linear-gradient(180deg, #d23b2f, #171512);
+}
+
+[data-theme="constructivist"] .origin-stage {
+  grid-template-columns: 64px 1fr;
+}
+
+[data-theme="constructivist"] .origin-stage + .origin-stage {
+  border-top: 1px solid #171512;
+}
+
+[data-theme="constructivist"] .origin-stage::before {
+  top: 13px;
+  left: -21px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #171512;
+  border-radius: 50%;
+  background: #d23b2f;
+  box-shadow: none;
+}
+
+[data-theme="constructivist"] .origin-when {
+  color: #b62c21;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .origin-label {
+  font-family: var(--display);
+  font-size: 12px;
+}
+
+[data-theme="constructivist"] .family-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 4px 4px 0 rgba(23, 21, 18, 0.13);
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n) {
+  transform: rotate(1.2deg);
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n + 1) {
+  transform: rotate(-1.2deg);
+}
+
+[data-theme="constructivist"] .example-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.14);
+}
+
+[data-theme="constructivist"] .example-card::after {
+  font-size: 98px;
+  color: rgba(210, 59, 47, 0.18);
+}
+
+[data-theme="constructivist"] .example-text mark {
+  background: #e7cf9e;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .relation-icon {
+  width: 26px;
+  height: 26px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 13px;
+}
+
+[data-theme="constructivist"] .search-submit {
+  transform: rotate(-6deg);
+}
+
+[data-theme="constructivist"] .search-submit svg {
+  width: 22px;
+  height: 22px;
+}
+
+[data-theme="constructivist"] .icon-btn svg {
+  width: 19px;
+  height: 19px;
+}
+
+[data-theme="constructivist"] .daily-arrow svg {
+  width: 22px;
+  height: 22px;
+}
+
+[data-theme="constructivist"] .eyebrow .spark,
+[data-theme="constructivist"] .translator-eyebrow .spark {
+  width: 9px;
+  height: 9px;
+}
+
+[data-theme="constructivist"] .block-head .block-note,
+[data-theme="constructivist"] .side-note {
+  font-weight: 700;
+}
+
+/* A little forward lean and offset depth for the clipped poster blocks. */
+[data-theme="constructivist"] .memory-card {
+  transform: rotate(-1.2deg);
+  filter: drop-shadow(6px 6px 0 #d23b2f);
+}
+
+[data-theme="constructivist"] .origin-card {
+  transform: skew(1.2deg) rotate(0.6deg);
+}
+
+[data-theme="constructivist"] .meaning-card {
+  filter: drop-shadow(6px 6px 0 rgba(23, 21, 18, 0.16));
+}
+
+/* A Lissitzky-style red wedge cuts into the word hero from the right. */
+[data-theme="constructivist"] .result-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="constructivist"] .result-hero::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -40px;
+  z-index: -1;
+  width: 170px;
+  height: 38px;
+  background: #d23b2f;
+  opacity: 0.12;
+  transform: rotate(-30deg);
+  pointer-events: none;
+}
