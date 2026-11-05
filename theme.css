@@ -1054,3 +1054,74 @@
   border-radius: 0;
   background: #f8eedc;
 }
+
+/* Square segmented controls (search modes, cache display, etc.) */
+[data-theme="constructivist"] .mode-switch,
+[data-theme="constructivist"] .translator-mode-switch,
+[data-theme="constructivist"] .cache-display-switch {
+  border-radius: 0;
+  background: transparent;
+  border: 2px solid #171512;
+  padding: 2px;
+}
+
+[data-theme="constructivist"] .mode-btn,
+[data-theme="constructivist"] .translator-mode-btn,
+[data-theme="constructivist"] .cache-display-btn {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .mode-btn.active,
+[data-theme="constructivist"] .translator-mode-btn.active,
+[data-theme="constructivist"] .cache-display-btn.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+/* Do not fade or rotate the family deck; square corners must stay visible. */
+[data-theme="constructivist"] .h-scroll {
+  mask-image: none;
+  -webkit-mask-image: none;
+  padding-right: 26px;
+  gap: 11px;
+}
+
+[data-theme="constructivist"] .family-card,
+[data-theme="constructivist"] .family-card:nth-child(2n),
+[data-theme="constructivist"] .family-card:nth-child(2n + 1) {
+  transform: none;
+}
+
+[data-theme="constructivist"] .family-card:hover {
+  transform: translateY(-3px);
+}
+
+/* Cache state remains legible in the poster theme: thick dashed = not cached,
+   thick solid = cached. */
+[data-theme="constructivist"] .cache-display-borders .family-card,
+[data-theme="constructivist"] .cache-display-borders .rel-chip,
+[data-theme="constructivist"] .cache-display-borders .related-pill,
+[data-theme="constructivist"] .cache-display-borders .mini-rel {
+  border: 2px dashed rgba(23, 21, 18, 0.46);
+}
+
+[data-theme="constructivist"] .cache-display-borders .family-card.is-cache-ready,
+[data-theme="constructivist"] .cache-display-borders .rel-chip.is-cache-ready,
+[data-theme="constructivist"] .cache-display-borders .related-pill.is-cache-ready,
+[data-theme="constructivist"] .cache-display-borders .mini-rel.is-cache-ready {
+  border: 2px solid #171512;
+}
+
+/* Keep the angular cards, but let their full silhouette breathe inside the scroller. */
+[data-theme="constructivist"] .family-card:nth-child(2n) {
+  transform: rotate(1.4deg);
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n + 1) {
+  transform: rotate(-1.4deg);
+}
+
+[data-theme="constructivist"] .h-scroll {
+  padding-top: 5px;
+  padding-bottom: 10px;
+}
