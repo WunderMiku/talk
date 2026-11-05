@@ -151,6 +151,14 @@ corners, and full-width layout. The style emoji SVGs are from Twemoji
 source language + text, so English → English and Chinese → English do not share
 the wrong entry.
 
+## Theme salon
+
+The home page includes an AI-curated word exhibition. It starts with a static
+fallback deck, and **生成新主题** uses the active model to create a new
+mini-world with five context-bound words. Results are cached in
+`talk.themeDecks.v1` (up to eight decks) and the static prompt lives in
+`prompts.js`; no model call happens on page load.
+
 ## Theme and content architecture
 
 Visual tokens live in `theme.css`, theme registration/persistence in `theme.js`,

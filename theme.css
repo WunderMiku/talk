@@ -1125,3 +1125,74 @@
   padding-top: 5px;
   padding-bottom: 10px;
 }
+
+
+/* Constructivist theme salon */
+[data-theme="constructivist"] .theme-salon {
+  padding-top: 7px;
+}
+
+[data-theme="constructivist"] .theme-salon-kicker .spark {
+  background: #d23b2f;
+  box-shadow: 0 0 0 4px rgba(210, 59, 47, 0.16);
+}
+
+[data-theme="constructivist"] .theme-salon-title {
+  text-transform: uppercase;
+  letter-spacing: -0.065em;
+}
+
+[data-theme="constructivist"] .theme-generate {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .theme-word-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #e4d6b8;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(1) {
+  background: #171512;
+  color: #efe4d0;
+  box-shadow: 7px 7px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(2) {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(3) {
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .theme-word-index,
+[data-theme="constructivist"] .theme-word-pos {
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(1) .theme-word-index,
+[data-theme="constructivist"] .theme-word-card:nth-child(1) .theme-word-pos {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-index,
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-pos,
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-gloss,
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-why {
+  color: rgba(255, 246, 231, 0.72);
+}
+
+[data-theme="constructivist"] .theme-scene {
+  border-left: 7px solid #d23b2f;
+  background: #e4d6b8;
+  color: #171512;
+  box-shadow: 4px 4px 0 rgba(23, 21, 18, 0.12);
+}

@@ -100,6 +100,13 @@ window.TALK_CONTENT.themeCopy = {
       workspaceKicker: "语言前线",
       workspaceTitle: "译场"
     },
+    themeSalon: {
+      kicker: "主题展 · 语言前线",
+      cta: "换一个展",
+      loading: "正在布展…",
+      local: "常设展",
+      sceneLabel: "现场"
+    },
     settings: {
       kicker: "指挥台",
       title: "指挥台",
@@ -111,3 +118,54 @@ window.TALK_CONTENT.themeCopy = {
     }
   }
 };
+
+/* Curated fallback decks for the theme salon. The model can generate more. */
+window.TALK_CONTENT.themeSalon = {
+  kicker: "主题策展",
+  cta: "生成新主题",
+  loading: "正在布展…",
+  local: "本地主题",
+  sceneLabel: "场景"
+};
+
+window.TALK_CONTENT.themeDecks = [
+  {
+    id: "midnight-observatory",
+    title: "雨夜的天文台",
+    subtitle: "云层很低，望远镜仍然睁着眼。",
+    scene: "山顶只剩雨声、齿轮和一小圈暖光。有人守着穹顶，等一颗不该出现的星。",
+    words: [
+      { word: "observatory", pos: "noun", gloss: "天文台；观测站", why: "整座建筑和它的职责，都在这一个词里。" },
+      { word: "nebula", pos: "noun", gloss: "星云", why: "不是星星，是星星诞生与消散的雾。" },
+      { word: "luminous", pos: "adj.", gloss: "发光的；明亮的", why: "比 bright 更安静，像光从内部透出来。" },
+      { word: "solitude", pos: "noun", gloss: "独处；孤寂", why: "不是 loneliness，它更像主动留下的空间。" },
+      { word: "orbit", pos: "verb / noun", gloss: "环绕；轨道", why: "雨夜里的等待也有自己的轨道。" }
+    ]
+  },
+  {
+    id: "last-letter-bookshop",
+    title: "旧书店的最后一封信",
+    subtitle: "纸页发黄，句子还热。",
+    scene: "书店要关门了。柜台下压着一封没有寄出的信，收信人只在页边留下过一个铅笔问号。",
+    words: [
+      { word: "ephemeral", pos: "adj.", gloss: "短暂的；转瞬即逝的", why: "纸会旧，句子却想多活一会儿。" },
+      { word: "marginalia", pos: "noun", gloss: "页边批注", why: "读书人留在空白处的第二本书。" },
+      { word: "inkling", pos: "noun", gloss: "隐约的念头；暗示", why: "还没有说出口，但已经开始发光。" },
+      { word: "brittle", pos: "adj.", gloss: "脆的；易碎的", why: "形容纸，也形容一句撑太久的话。" },
+      { word: "postscript", pos: "noun", gloss: "附言；后记", why: "信写完了，真正想说的才刚开始。" }
+    ]
+  },
+  {
+    id: "steam-train-wasteland",
+    title: "蒸汽列车穿过荒原",
+    subtitle: "铁轨把地平线缝起来。",
+    scene: "车窗上全是煤灰，远处没有站台。列车不停，荒原也不肯结束，只有汽笛替所有人报时。",
+    words: [
+      { word: "locomotive", pos: "noun", gloss: "机车；火车头", why: "工业时代最有力量感的名词之一。" },
+      { word: "soot", pos: "noun", gloss: "煤烟；烟灰", why: "落在衣领上，也落在整段旅程里。" },
+      { word: "horizon", pos: "noun", gloss: "地平线；视野", why: "看得见却到不了的边界。" },
+      { word: "transient", pos: "adj.", gloss: "短暂的；路过的", why: "车窗外的风景和乘客都算。" },
+      { word: "whistle", pos: "noun / verb", gloss: "汽笛；呼啸", why: "一声就把空旷填满。" }
+    ]
+  }
+];

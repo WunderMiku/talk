@@ -65,6 +65,13 @@ voice in `content.js`; do not put it in component templates.
   `emoji`, `tone`, and `hint`. The prompt's style list should be updated in
   `prompts.js` at the same time.
 
+## Theme salon copy
+
+The AI-curated home section uses `TALK_CONTENT.themeSalon` for its label,
+button, and scene label, and the fallback decks in `TALK_CONTENT.themeDecks`.
+Its static model prompt is `TALK_PROMPTS.theme`; generated decks are cached in
+localStorage and rendered through the shared theme tokens.
+
 ## Current themes
 
 - **Paper** — default warm paper/lime editorial look.

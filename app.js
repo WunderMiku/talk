@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "92";
+  const APP_VERSION = "93";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -313,6 +313,9 @@
     translatorMode: "auto",
     translatorStyles: [],
     workspaceOpen: false,
+    themeDeck: null,
+    themeGenerating: false,
+    themeSeq: 0,
     lastTranslationInput: "",
     lastTranslationResult: null,
     lastAttempt: null,
@@ -1759,6 +1762,135 @@
     }
   }
 
+  const THEME_CACHE_KEY = "talk.themeDecks.v1";
+
+  function themeCacheRead() {
+    try {
+      const value = JSON.parse(localStorage.getItem(THEME_CACHE_KEY) || "[]");
+      return Array.isArray(value) ? value.filter((deck) => deck && deck.title && Array.isArray(deck.words)) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function themeCacheWrite(deck) {
+    try {
+      const decks = [deck, ...themeCacheRead().filter((item) => item.title !== deck.title)].slice(0, 8);
+      localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(decks));
+    } catch (_) { /* no-op */ }
+  }
+
+  function fallbackThemeDeck() {
+    const decks = Array.isArray(CONTENT.themeDecks) ? CONTENT.themeDecks : [];
+    return decks[state.themeSeq % Math.max(1, decks.length)] || {
+      title: "主题展",
+      subtitle: "给词语一个可以站立的地方。",
+      scene: "先把一组词放进同一个世界，再让它们彼此照亮。",
+      words: []
+    };
+  }
+
+  function currentThemeDeck() {
+    if (state.themeDeck) return state.themeDeck;
+    const cached = themeCacheRead()[0];
+    return cached || fallbackThemeDeck();
+  }
+
+  function normalizeThemeDeck(raw) {
+    const base = raw && typeof raw === "object" ? raw : {};
+    const title = String(base.title || "").trim();
+    const subtitle = String(base.subtitle || "").trim();
+    const scene = String(base.scene || "").trim();
+    const words = (Array.isArray(base.words) ? base.words : []).map((item) => ({
+      word: String(item?.word || "").trim().toLowerCase(),
+      pos: String(item?.pos || "").trim(),
+      gloss: String(item?.gloss || "").trim(),
+      why: String(item?.why || "").trim()
+    })).filter((item) => item.word && item.gloss).slice(0, 5);
+    if (!title || words.length < 3) throw new Error("主题内容不完整。");
+    return { title, subtitle, scene, words, generated: true, at: Date.now() };
+  }
+
+  function themeSalonMarkup(deck) {
+    const copy = copyFor("themeSalon");
+    const words = Array.isArray(deck.words) ? deck.words : [];
+    return `<div class="theme-salon-head">
+      <div>
+        <div class="eyebrow theme-salon-kicker"><span class="spark"></span>${esc(copy.kicker)}</div>
+        <h2 class="theme-salon-title">${esc(deck.title)}</h2>
+        <p class="theme-salon-subtitle">${esc(deck.subtitle || "")}</p>
+      </div>
+      <button class="theme-generate ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
+        ${state.themeGenerating ? copy.loading : `${icon("sparkle")} ${copy.cta}`}
+      </button>
+    </div>
+    <div class="theme-exhibit" aria-live="polite">
+      ${words.map((item, index) => `<button class="theme-word-card" style="--i:${index}" type="button" data-action="word" data-word="${attr(item.word)}" aria-label="查看 ${attr(item.word)}">
+        <span class="theme-word-index">${String(index + 1).padStart(2, "0")}</span>
+        <span class="theme-word-main">
+          <strong>${esc(item.word)}</strong>
+          <span class="theme-word-pos">${esc(item.pos || "word")}</span>
+        </span>
+        <span class="theme-word-gloss">${esc(item.gloss)}</span>
+        <span class="theme-word-why">${esc(item.why || "")}</span>
+      </button>`).join("")}
+    </div>
+    ${deck.scene ? `<p class="theme-scene"><span>${esc(copy.sceneLabel)}</span>${esc(deck.scene)}</p>` : ""}`;
+  }
+
+  function renderThemeSalon() {
+    const host = $("#theme-salon");
+    if (!host) return;
+    host.innerHTML = themeSalonMarkup(currentThemeDeck());
+  }
+
+  function cycleLocalTheme() {
+    const decks = Array.isArray(CONTENT.themeDecks) ? CONTENT.themeDecks : [];
+    if (!decks.length) return;
+    state.themeSeq = (state.themeSeq + 1) % decks.length;
+    state.themeDeck = decks[state.themeSeq];
+    renderThemeSalon();
+  }
+
+  async function generateThemeDeck() {
+    if (state.themeGenerating) return;
+    if (!hasModelConfig(state.settings)) {
+      cycleLocalTheme();
+      toast("未连接模型，先切换到本地主题");
+      return;
+    }
+    state.themeGenerating = true;
+    state.themeSeq += 1;
+    renderThemeSalon();
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 55_000);
+    try {
+      const endpoint = endpointFor(state.settings.baseUrl);
+      const messages = [
+        { role: "system", content: window.TALK_PROMPTS.theme },
+        { role: "user", content: JSON.stringify({ task: "theme", seed: `${Date.now()}-${state.themeSeq}` }) }
+      ];
+      const response = await postChat(endpoint, state.settings, messages, controller.signal, false, 900);
+      if (!response.ok) {
+        const raw = await response.text().catch(() => "");
+        throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 180)}` : ""}`);
+      }
+      const json = await response.json();
+      let content = json?.choices?.[0]?.message?.content;
+      if (Array.isArray(content)) content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+      const deck = normalizeThemeDeck(parseJsonObject(content));
+      state.themeDeck = deck;
+      themeCacheWrite(deck);
+      toast("新主题已布展");
+    } catch (error) {
+      console.warn("Theme generation failed.", error);
+      toast(`主题生成失败：${String(error?.message || error).slice(0, 80)}`);
+    } finally {
+      state.themeGenerating = false;
+      renderThemeSalon();
+    }
+  }
+
   function homePage() {
     const recent = state.history.length ? state.history.slice(0, 3) : sanitizeHistory(DATA.recent);
     const daily = dailyEntry();
@@ -1828,20 +1960,8 @@
         </button>` : ""}
       </section>
 
-      <section class="section mood-section reveal" style="--d:2.5">
-        <div class="section-head">
-          <div>
-            <span class="section-kicker">${esc(copy.moodSectionKicker)}</span>
-            <h2>${esc(copy.moodSectionTitle)}</h2>
-          </div>
-          <div class="section-actions">
-            <span class="side-note" id="mood-count">${String(moods.length).padStart(2, "0")} 组词单</span>
-            <button class="mood-refresh" type="button" data-action="shuffle-moods">换一组</button>
-          </div>
-        </div>
-        <div class="mood-scroll" id="mood-scroll">
-          ${moodCardsMarkup(moods)}
-        </div>
+      <section class="section theme-salon reveal" id="theme-salon" style="--d:2.5">
+        ${themeSalonMarkup(currentThemeDeck())}
       </section>
 
       <footer class="home-footer">
@@ -4292,6 +4412,11 @@
         renderSettingsContent();
         break;
       }
+
+      case "theme-generate":
+        event.preventDefault();
+        generateThemeDeck();
+        break;
 
       case "shuffle-moods":
         event.preventDefault();
