@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "98";
+  const APP_VERSION = "99";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -1877,7 +1877,7 @@
         </div>
       </div>
       ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
-      ${state.themeBatchMessage ? `<p class="poster-batch-status">${esc(state.themeBatchMessage)}</p>` : ""}
+      ${state.themeBatchMessage ? `<p class="poster-batch-status" id="poster-batch-status">${esc(state.themeBatchMessage)}</p>` : ""}
       <div class="poster-bottom">
         <span class="poster-cache-count">${total ? `${String(total).padStart(2, "0")} ${esc(copy.cacheUnit)}` : esc(copy.noCache)}</span>
         <button class="poster-batch ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-batch" ${state.themeGenerating ? "disabled" : ""}>
