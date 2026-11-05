@@ -414,3 +414,116 @@
 ) {
   border-radius: 0;
 }
+
+/* Constructivist poster language: monumental type, diagonals, slogans. */
+[data-theme="constructivist"] .home-hero,
+[data-theme="constructivist"] .translator-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="constructivist"] .home-hero::before {
+  content: "СЛОВО";
+  position: absolute;
+  top: -30px;
+  right: -16px;
+  z-index: -1;
+  color: rgba(210, 59, 47, 0.14);
+  font-family: var(--display);
+  font-size: clamp(68px, 20vw, 96px);
+  font-weight: 900;
+  letter-spacing: -0.09em;
+  line-height: 1;
+  transform: rotate(-7deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .home-hero::after {
+  content: "";
+  position: absolute;
+  top: -28px;
+  right: -38px;
+  z-index: -2;
+  width: 220px;
+  height: 220px;
+  background: repeating-conic-gradient(
+    from -12deg,
+    rgba(210, 59, 47, 0.13) 0 7deg,
+    transparent 7deg 15deg
+  );
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .home-title em,
+[data-theme="constructivist"] .translator-title em {
+  display: inline-block;
+  padding: 0 0.08em 0.02em;
+  background: #d23b2f;
+  color: #efe4d0;
+  box-shadow: 8px 8px 0 #171512;
+  transform: skew(-4deg) rotate(-1deg);
+}
+
+[data-theme="constructivist"] .theme-manifesto {
+  position: relative;
+  margin: 18px 0 2px;
+  padding: 12px 16px 10px;
+  border-left: 8px solid #d23b2f;
+  background: #171512;
+  color: #efe4d0;
+  box-shadow: 8px 8px 0 #d23b2f;
+  transform: skew(-4deg);
+}
+
+[data-theme="constructivist"] .manifesto-ru {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(19px, 5.8vw, 25px);
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .manifesto-zh {
+  display: block;
+  margin-top: 5px;
+  color: #d23b2f;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+}
+
+[data-theme="constructivist"] .translator-hero::before {
+  content: "ПЕРЕВОД";
+  position: absolute;
+  top: -26px;
+  right: -8px;
+  z-index: -1;
+  color: rgba(210, 59, 47, 0.13);
+  font-family: var(--display);
+  font-size: clamp(48px, 15vw, 72px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 1;
+  transform: rotate(-5deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .translator-title {
+  letter-spacing: -0.055em;
+}
+
+[data-theme="constructivist"] .translator-lede {
+  max-width: 30ch;
+  color: #171512;
+  font-weight: 550;
+}
+
+[data-theme="constructivist"] .section-kicker {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}

@@ -44,6 +44,17 @@ Only add component overrides for geometry that cannot be expressed through
 tokens. Prefer `.tone-*` variables and the shared `.translation-card` /
 `.translation-detail` structures for translation themes.
 
+## Theme voice
+
+The base interface copy lives in `TALK_CONTENT`; theme-specific writing lives
+under `TALK_CONTENT.themeCopy[themeId]`. `copyFor(section)` merges a theme's
+override over the base copy, so a theme can change its voice without forking
+rendering logic.
+
+The constructivist theme uses this for module names (`词库 / 译场`), home copy,
+translator copy, settings labels, and the slogan banner. Keep sentence-level
+voice in `content.js`; do not put it in component templates.
+
 ## Copy rules
 
 - Chinese-first, concise, no meta commentary about being an AI.

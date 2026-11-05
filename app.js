@@ -8,6 +8,13 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
+
+  function copyFor(section) {
+    const themeId = window.TALK_THEME?.current?.().id || "paper";
+    const base = CONTENT[section] || {};
+    const override = CONTENT.themeCopy?.[themeId]?.[section];
+    return override ? { ...base, ...override } : base;
+  }
   const app = document.getElementById("app");
   const screen = document.getElementById("screen");
   const layerRoot = document.getElementById("layer-root");
@@ -1106,6 +1113,17 @@
     renderRoute(route, direction, { instant });
   }
 
+  function refreshThemedPage() {
+    if (!screen || !state.route || state.route.name === "loading") return;
+    const html = pageHtml(state.route);
+    if (!html) return;
+    screen.innerHTML = html;
+    applyCacheDisplay();
+    refreshCacheBorders();
+    updateModuleBar();
+    applyContentCopy();
+  }
+
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
     const apply = () => {
       state.route = route;
@@ -1223,7 +1241,9 @@
      ============================================================ */
 
   function contentValue(path) {
-    return String(path || "").split(".").reduce((value, key) => value?.[key], CONTENT);
+    const parts = String(path || "").split(".");
+    const section = parts.shift();
+    return parts.reduce((value, key) => value?.[key], copyFor(section));
   }
 
   function applyContentCopy(root = document) {
@@ -1366,11 +1386,12 @@
   }
 
   function translatorEmptyHtml() {
+    const copy = copyFor("translator");
     return `<div class="translator-empty">
       <span class="translator-empty-mark">Aa</span>
-      <p>${esc(CONTENT.translator.empty)}</p>
+      <p>${esc(copy.empty)}</p>
       <div class="translator-examples">
-        ${CONTENT.translator.samples.map(([text, label]) => `<button class="translator-example" type="button" data-action="translator-sample" data-text="${attr(text)}">${esc(label)} <span>↗</span></button>`).join("")}
+        ${copy.samples.map(([text, label]) => `<button class="translator-example" type="button" data-action="translator-sample" data-text="${attr(text)}">${esc(label)} <span>↗</span></button>`).join("")}
       </div>
     </div>`;
   }
@@ -1391,7 +1412,7 @@
   }
 
   function translatorModeHtml() {
-    return CONTENT.translator.modes.map(([mode, label]) => `<button class="translator-mode-btn ${state.translatorMode === mode ? "active" : ""}" type="button" data-action="translator-mode" data-mode="${mode}" aria-pressed="${state.translatorMode === mode}">${esc(label)}</button>`).join("");
+    return copyFor("translator").modes.map(([mode, label]) => `<button class="translator-mode-btn ${state.translatorMode === mode ? "active" : ""}" type="button" data-action="translator-mode" data-mode="${mode}" aria-pressed="${state.translatorMode === mode}">${esc(label)}</button>`).join("");
   }
 
   function updateTranslatorStyleControls() {
@@ -1408,15 +1429,16 @@
   }
 
   function translatorPage() {
+    const copy = copyFor("translator");
     return `
       ${homeTopbar()}
       <main class="result-page translator-page">
         <section class="translator-hero reveal" style="--d:0">
           <div class="eyebrow translator-eyebrow">
-            <span class="spark"></span>${esc(CONTENT.translator.kicker)}
+            <span class="spark"></span>${esc(copy.kicker)}
           </div>
-          <h1 class="translator-title">${esc(CONTENT.translator.titleLead)}<em>${esc(CONTENT.translator.titleAccent)}</em></h1>
-          <p class="translator-lede">${esc(CONTENT.translator.lede)}</p>
+          <h1 class="translator-title">${esc(copy.titleLead)}<em>${esc(copy.titleAccent)}</em></h1>
+          <p class="translator-lede">${esc(copy.lede)}</p>
         </section>
         <form class="translator-form reveal" id="translator-form" style="--d:0.4" novalidate>
           <div class="translator-input-shell">
@@ -1424,7 +1446,7 @@
               <span class="mono">原文</span>
               <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
             </div>
-            <textarea id="translator-input" rows="3" maxlength="600" placeholder="${attr(CONTENT.translator.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
+            <textarea id="translator-input" rows="3" maxlength="600" placeholder="${attr(copy.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
             <div class="translator-input-foot">
               <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span></span>
               <button class="search-submit" type="submit" aria-label="生成选中的风格">${icon("arrowUpRight")}</button>
@@ -1453,8 +1475,8 @@
     workspaceRoot.innerHTML = `<section class="translation-workspace" aria-label="翻译结果">
       <header class="translation-workspace-head">
         <div>
-          <span class="mono">MULTI-STYLE</span>
-          <h2>翻译结果</h2>
+          <span class="mono">${esc(copyFor("translator").workspaceKicker || "MULTI-STYLE")}</span>
+          <h2>${esc(copyFor("translator").workspaceTitle || "翻译结果")}</h2>
         </div>
         <button class="icon-btn" type="button" data-action="close-workspace" aria-label="关闭翻译结果">${icon("close")}</button>
       </header>
@@ -1736,28 +1758,30 @@
     const recent = state.history.length ? state.history.slice(0, 3) : sanitizeHistory(DATA.recent);
     const daily = dailyEntry();
     const moods = visibleMoods();
+    const copy = copyFor("home");
     const registerLabels = { common: "日常", formal: "正式", literary: "文学", informal: "口语", technical: "技术" };
     const dailyKicker = daily ? `${String(dayNumber()).padStart(3, "0")} · ${registerLabels[daily.register] || "每日"}` : "每日";
     return `
       ${homeTopbar()}
       <section class="home-hero">
-        <div class="eyebrow reveal" style="--d:0"><span class="spark"></span>英语 · 在语境中理解</div>
-        <h1 class="home-title reveal" style="--d:0.5">把词，<em>看透。</em></h1>
-        <p class="home-lede reveal" style="--d:1">不只告诉你词义，更让你看见一个词<strong>怎么活</strong>。查一个单词，或读懂一整句话。</p>
+        <div class="eyebrow reveal" style="--d:0"><span class="spark"></span>${esc(copy.eyebrow)}</div>
+        <h1 class="home-title reveal" style="--d:0.5">${esc(copy.titleLead)}<em>${esc(copy.titleAccent)}</em></h1>
+        <p class="home-lede reveal" style="--d:1">${copy.lede}</p>
       </section>
+      ${copy.manifesto ? `<div class="theme-manifesto reveal" style="--d:1.2"><span class="manifesto-ru">${esc(copy.manifesto.ru)}</span><span class="manifesto-zh">${esc(copy.manifesto.zh)}</span></div>` : ""}
 
       <div class="search-wrap reveal" style="--d:1.5">
         <form class="search-card" id="search-form" novalidate>
           <div class="search-top">
-            <span class="mono">查一查</span>
+            <span class="mono">${esc(copy.searchKicker)}</span>
             <div class="mode-switch" role="group" aria-label="查询模式">
-              <button class="mode-btn ${state.mode === "auto" ? "active" : ""}" type="button" data-action="mode" data-mode="auto" aria-pressed="${state.mode === "auto"}">自动</button>
-              <button class="mode-btn ${state.mode === "word" ? "active" : ""}" type="button" data-action="mode" data-mode="word" aria-pressed="${state.mode === "word"}">单词</button>
-              <button class="mode-btn ${state.mode === "sentence" ? "active" : ""}" type="button" data-action="mode" data-mode="sentence" aria-pressed="${state.mode === "sentence"}">句子</button>
+              <button class="mode-btn ${state.mode === "auto" ? "active" : ""}" type="button" data-action="mode" data-mode="auto" aria-pressed="${state.mode === "auto"}">${esc(copy.modes.auto)}</button>
+              <button class="mode-btn ${state.mode === "word" ? "active" : ""}" type="button" data-action="mode" data-mode="word" aria-pressed="${state.mode === "word"}">${esc(copy.modes.word)}</button>
+              <button class="mode-btn ${state.mode === "sentence" ? "active" : ""}" type="button" data-action="mode" data-mode="sentence" aria-pressed="${state.mode === "sentence"}">${esc(copy.modes.sentence)}</button>
             </div>
           </div>
           <div class="search-row">
-            <textarea class="search-input" id="search-input" rows="1" maxlength="320" placeholder="输入一个单词，或一整句话…" aria-label="单词或句子" spellcheck="false"></textarea>
+            <textarea class="search-input" id="search-input" rows="1" maxlength="320" placeholder="${attr(copy.searchPlaceholder)}" aria-label="单词或句子" spellcheck="false"></textarea>
             <button class="search-submit" type="submit" aria-label="查询">${icon("arrowUpRight")}</button>
           </div>
           <div class="search-bottom">
@@ -1766,7 +1790,7 @@
           </div>
         </form>
         <div class="recent-row" aria-label="最近查询">
-          <span class="recent-label">最近</span>
+          <span class="recent-label">${esc(copy.recentLabel)}</span>
           ${recent.map((item) => `
             <button class="chip" type="button" data-action="lookup" data-query="${attr(item.query)}" data-type="${attr(item.type)}">
               ${item.type === "sentence" ? `<span class="quote-dot"></span>` : ""}
@@ -1778,8 +1802,8 @@
       <section class="section reveal" style="--d:2">
         <div class="section-head">
           <div>
-            <span class="section-kicker">每天一个小仪式</span>
-            <h2>今日一词</h2>
+            <span class="section-kicker">${esc(copy.dailySectionKicker)}</span>
+            <h2>${esc(copy.dailySectionTitle)}</h2>
           </div>
           <span class="side-note">N° ${String(dayNumber()).padStart(3, "0")}</span>
         </div>
@@ -1802,8 +1826,8 @@
       <section class="section reveal" style="--d:2.5">
         <div class="section-head">
           <div>
-            <span class="section-kicker">跟着感觉走</span>
-            <h2>按心情漫游</h2>
+            <span class="section-kicker">${esc(copy.moodSectionKicker)}</span>
+            <h2>${esc(copy.moodSectionTitle)}</h2>
           </div>
           <div class="section-actions">
             <span class="side-note" id="mood-count">${String(moods.length).padStart(2, "0")} 组词单</span>
@@ -1816,7 +1840,7 @@
       </section>
 
       <footer class="home-footer">
-        <span>为好奇的人而做</span><i></i><span>随时接入模型</span>
+        <span>${esc(copy.footerLeft)}</span><i></i><span>${esc(copy.footerRight)}</span>
       </footer>`;
   }
 
@@ -2901,7 +2925,8 @@
       ...state.settings,
       profiles: (state.settings.profiles || []).map((profile) => ({ ...profile }))
     };
-    openSheetShell({ kicker: "偏好与连接", title: "设置" });
+    const copy = copyFor("settings");
+    openSheetShell({ kicker: copy.kicker, title: copy.title });
     renderSettingsContent();
   }
 
@@ -3103,7 +3128,12 @@
     if (!holder || !state.draft) return;
     const draft = state.draft;
     const tab = state.settingsTab || "model";
-    const tabs = CONTENT.settings.tabs;
+    const settingsCopy = copyFor("settings");
+    const tabs = settingsCopy.tabs;
+    const sheetTitle = $(".sheet-title", overlayRoot);
+    if (sheetTitle) sheetTitle.textContent = settingsCopy.title;
+    const sheetKicker = $(".sheet-head .mono", overlayRoot);
+    if (sheetKicker) sheetKicker.textContent = settingsCopy.kicker;
     holder.innerHTML = `
       <div class="sheet-content settings-sheet">
         <div class="settings-tabs" role="tablist" aria-label="设置分类">
@@ -4101,6 +4131,8 @@
       case "theme":
         event.preventDefault();
         window.TALK_THEME.apply(target.dataset.theme);
+        applyContentCopy();
+        refreshThemedPage();
         renderSettingsContent();
         break;
 
