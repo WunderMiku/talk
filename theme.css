@@ -1419,3 +1419,10 @@
   background: #171512;
   color: #efe4d0;
 }
+
+[data-theme="constructivist"] .poster-batch-status {
+  color: #171512;
+  font-weight: 700;
+  border-left: 4px solid #d23b2f;
+  padding-left: 7px;
+}

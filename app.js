@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "97";
+  const APP_VERSION = "98";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -318,6 +318,8 @@
     themeIndex: 0,
     themeGenerating: false,
     themeBatchProgress: 0,
+    themeBatchMessage: "",
+    themeBatchFailures: [],
     themeSeq: 0,
     lastTranslationInput: "",
     lastTranslationResult: null,
@@ -1875,6 +1877,7 @@
         </div>
       </div>
       ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
+      ${state.themeBatchMessage ? `<p class="poster-batch-status">${esc(state.themeBatchMessage)}</p>` : ""}
       <div class="poster-bottom">
         <span class="poster-cache-count">${total ? `${String(total).padStart(2, "0")} ${esc(copy.cacheUnit)}` : esc(copy.noCache)}</span>
         <button class="poster-batch ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-batch" ${state.themeGenerating ? "disabled" : ""}>
@@ -1905,16 +1908,16 @@
     renderThemeSalon({ animate: true });
   }
 
-  async function requestThemeDeck(seed) {
+  async function requestThemeDeck(seed, exclude = []) {
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 50_000);
     try {
       const endpoint = endpointFor(state.settings.baseUrl);
       const messages = [
         { role: "system", content: window.TALK_PROMPTS.theme },
-        { role: "user", content: JSON.stringify({ task: "theme", seed }) }
+        { role: "user", content: JSON.stringify({ task: "theme", seed, exclude }) }
       ];
-      const response = await postChat(endpoint, state.settings, messages, controller.signal, false, 900);
+      const response = await postChat(endpoint, state.settings, messages, controller.signal, false, 1200);
       if (!response.ok) {
         const raw = await response.text().catch(() => "");
         throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 160)}` : ""}`);
@@ -1928,6 +1931,22 @@
     }
   }
 
+  function updateThemeBatchStatus(message) {
+    state.themeBatchMessage = message;
+    const node = $("#poster-batch-status");
+    if (node) node.textContent = message;
+    else {
+      const bottom = $(".poster-bottom");
+      if (bottom && message) {
+        const p = document.createElement("p");
+        p.className = "poster-batch-status";
+        p.id = "poster-batch-status";
+        p.textContent = message;
+        bottom.before(p);
+      }
+    }
+  }
+
   async function generateThemeBatch() {
     if (state.themeGenerating) return;
     if (!hasModelConfig(state.settings)) {
@@ -1937,6 +1956,8 @@
     const previousDecks = state.themeDecks.slice();
     state.themeGenerating = true;
     state.themeBatchProgress = 0;
+    state.themeBatchFailures = [];
+    state.themeBatchMessage = "";
     let collected = [];
     let firstShown = false;
     renderThemeSalon();
@@ -1945,34 +1966,58 @@
         state.themeBatchProgress = index;
         const button = $(".poster-batch");
         if (button) button.textContent = `${copyFor("themeSalon").printing} ${index + 1}/8…`;
-        try {
-          const deck = await requestThemeDeck(`${Date.now()}-${index}-${state.themeSeq++}`);
-          if (collected.some((item) => item.title === deck.title)) continue;
-          collected.push(deck);
-          if (!firstShown) {
-            firstShown = true;
-            state.themeDecks = [deck];
-            state.themeIndex = 0;
-            state.themeDeck = deck;
-            themeCacheWriteAll(state.themeDecks);
-            renderThemeSalon();
-          } else {
-            state.themeDecks = collected.slice(0, 8);
-            themeCacheWriteAll(state.themeDecks);
-            renderThemeSalon();
+        updateThemeBatchStatus(`已成功 ${collected.length} 版 · 正在印第 ${index + 1} 版`);
+        let deck = null;
+        let lastError = "";
+        for (let attempt = 0; attempt < 2; attempt++) {
+          try {
+            const candidate = await requestThemeDeck(
+              `${Date.now()}-${index}-${attempt}-${state.themeSeq++}`,
+              collected.map((item) => item.title)
+            );
+            if (collected.some((item) => item.title === candidate.title)) {
+              lastError = "主题重复";
+              continue;
+            }
+            deck = candidate;
+            break;
+          } catch (error) {
+            lastError = String(error?.message || error || "未知错误").slice(0, 100);
+            if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 450));
           }
-        } catch (error) {
-          console.warn(`Theme ${index + 1} failed.`, error);
         }
+        if (!deck) {
+          state.themeBatchFailures.push(lastError || "生成失败");
+          continue;
+        }
+        collected.push(deck);
+        if (!firstShown) {
+          firstShown = true;
+          state.themeDecks = [deck];
+          state.themeIndex = 0;
+          state.themeDeck = deck;
+          themeCacheWriteAll(state.themeDecks);
+          renderThemeSalon();
+        } else {
+          state.themeDecks = collected.slice(0, 8);
+          themeCacheWriteAll(state.themeDecks);
+          renderThemeSalon();
+        }
+        updateThemeBatchStatus(`已成功 ${collected.length} 版 · 第 ${index + 1} 版已入缓存`);
       }
       if (collected.length) {
         state.themeDecks = collected.slice(0, 8);
         state.themeIndex = 0;
         state.themeDeck = state.themeDecks[0];
         themeCacheWriteAll(state.themeDecks);
-        toast(`已印好 ${collected.length} 版${collected.length < 8 ? ` · ${8 - collected.length} 版失败` : ""}`);
+        const failed = state.themeBatchFailures.length;
+        updateThemeBatchStatus(failed
+          ? `${collected.length} 版成功 · ${failed} 版失败${state.themeBatchFailures[0] ? ` · ${state.themeBatchFailures[0]}` : ""}`
+          : `${collected.length} 版已全部入缓存`);
+        toast(`已印好 ${collected.length} 版${failed ? ` · ${failed} 版失败` : ""}`);
       } else {
         state.themeDecks = previousDecks;
+        updateThemeBatchStatus("这一批没有印出来，请检查模型连接");
         toast("这一批没有印出来，请检查模型连接");
       }
     } finally {
