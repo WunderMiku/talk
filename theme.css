@@ -1048,3 +1048,9 @@
   background: #171512;
   opacity: 0.12;
 }
+
+[data-theme="constructivist"] .qwen-tts-panel input[type="text"] {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+}

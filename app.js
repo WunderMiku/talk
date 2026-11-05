@@ -28,7 +28,7 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "kokoroBackendMode", "detailLevel", "cacheMax", "cacheTtlDays"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "kokoroBackendMode", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   const WORD_CACHE_KEY = "talk.wordcache.v1";
@@ -54,7 +54,9 @@
     detailLevel: "standard",
     ttsEngine: "kokoro",
     kokoroVoice: "af_heart",
-    kokoroBackendMode: "wasm"
+    kokoroBackendMode: "wasm",
+    qwenTtsModel: "qwen-audio-3.1-tts-plus",
+    qwenTtsVoice: "longanhuan_v3.1"
   };
 
   const KOKORO_CDN = "./vendor/kokoro.web.js";
@@ -546,6 +548,8 @@
       cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
       cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
       kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart",
+      qwenTtsModel: preferences.qwenTtsModel || parsed.qwenTtsModel || "qwen-audio-3.1-tts-plus",
+      qwenTtsVoice: preferences.qwenTtsVoice || parsed.qwenTtsVoice || "longanhuan_v3.1",
       enableThinking: Boolean(selected.enableThinking),
       thinkingBudget: Number(selected.thinkingBudget) || 0,
       profiles: normalized.profiles,
@@ -2978,6 +2982,29 @@
     commitSettingsDraft();
   }
 
+  function isQwenProfile(profile = {}) {
+    return profile.id === "qwen" || /qianwenaiapi|dashscope|qwencloudapi/i.test(profile.baseUrl || "");
+  }
+
+  function qwenTtsProfile(cfg = state.settings) {
+    const profiles = (cfg.profiles || []).filter((profile) => profile.apiKey && isQwenProfile(profile));
+    if (!profiles.length) return null;
+    return profiles.find((profile) => profile.id === cfg.activeProfileId)
+      || profiles.find((profile) => profile.id === "qwen")
+      || profiles[0];
+  }
+
+  function qwenTtsEndpoint(profile) {
+    const base = String(profile?.baseUrl || "").trim();
+    if (!base) return "";
+    try {
+      const origin = new URL(base).origin;
+      return `${origin}/api/v1/services/audio/tts/SpeechSynthesizer`;
+    } catch (_) {
+      return "";
+    }
+  }
+
   function ttsSettingsHtml(draft) {
     const engine = draft.ttsEngine || "kokoro";
     return `
@@ -2985,10 +3012,24 @@
         <span class="settings-subhead">发音</span>
         <div class="tts-engine-switch" role="group" aria-label="发音引擎">
           <button class="tts-engine-btn ${engine === "kokoro" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="kokoro" aria-pressed="${engine === "kokoro"}">Kokoro</button>
+          <button class="tts-engine-btn ${engine === "qwen" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="qwen" aria-pressed="${engine === "qwen"}">Qwen 语音</button>
           <button class="tts-engine-btn ${engine === "native" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="native" aria-pressed="${engine === "native"}">系统原生</button>
         </div>
       </div>
-      ${engine === "native" ? `
+      ${engine === "qwen" ? (() => {
+        const qwen = qwenTtsProfile(draft);
+        return `<div class="qwen-tts-panel">
+          <div class="tts-row">
+            <input id="qwen-tts-model" type="text" data-setting="qwenTtsModel" value="${attr(draft.qwenTtsModel || "qwen-audio-3.1-tts-plus")}" placeholder="qwen-audio-3.1-tts-plus" spellcheck="false" aria-label="Qwen TTS 模型" />
+            <input id="qwen-tts-voice" type="text" data-setting="qwenTtsVoice" value="${attr(draft.qwenTtsVoice || "longanhuan_v3.1")}" placeholder="longanhuan_v3.1" spellcheck="false" aria-label="Qwen TTS 音色" />
+            <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
+          </div>
+          ${qwen ? `<p class="tts-line">使用「${esc(qwen.name)}」的 API 密钥 · ${esc(qwenTtsEndpoint(qwen))}</p>` : `<p class="tts-line tts-error">还没有可用的 Qwen 密钥。请先在「模型」里填写 Qwen 的 API 密钥。</p>`}
+          <p class="tts-line">模型默认 qwen-audio-3.1-tts-plus；音色可填 longanhuan_v3.1 或其他 Qwen 音色。</p>
+          <span class="tts-status" id="tts-test-status">${qwen ? "密钥已就绪" : "需要先配置 Qwen 密钥"}</span>
+          <p class="tts-line tts-https-warning">密钥只保存在本机；语音请求由浏览器直接发往 Qwen。公共设备建议关闭「记住密钥」。</p>
+        </div>`;
+      })() : engine === "native" ? `
         <div class="tts-row">
           <span class="tts-line">设备原生语音 · 点击即读，无需加载模型</span>
           <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
@@ -4256,7 +4297,7 @@
       case "tts-engine":
         event.preventDefault();
         if (!state.draft) break;
-        state.draft.ttsEngine = target.dataset.engine === "native" ? "native" : "kokoro";
+        state.draft.ttsEngine = ["native", "qwen"].includes(target.dataset.engine) ? target.dataset.engine : "kokoro";
         scheduleSettingsCommit();
         renderSettingsContent();
         break;
@@ -4634,7 +4675,7 @@
   }
 
   async function playAudioBlob(blob, button) {
-    if (!blob.size) throw new Error("Kokoro returned empty audio.");
+    if (!blob.size) throw new Error("语音接口返回了空音频。");
     const url = URL.createObjectURL(blob);
     const audio = ttsAudio || new Audio();
     ttsAudio = audio;
@@ -4657,6 +4698,105 @@
       cleanup();
       throw error;
     }
+  }
+
+  async function playAudioUrl(url, button) {
+    if (!url) throw new Error("语音接口没有返回音频地址。");
+    const audio = ttsAudio || new Audio();
+    ttsAudio = audio;
+    try { audio.pause(); } catch (_) { /* no-op */ }
+    if (audio.dataset.url) {
+      URL.revokeObjectURL(audio.dataset.url);
+      delete audio.dataset.url;
+    }
+    audio.src = url;
+    currentAudio = audio;
+    if (button) button.classList.add("is-speaking");
+    const cleanup = () => {
+      if (button) button.classList.remove("is-speaking");
+      if (currentAudio === audio) currentAudio = null;
+    };
+    audio.onended = cleanup;
+    audio.onerror = cleanup;
+    try {
+      await audio.play();
+    } catch (error) {
+      cleanup();
+      throw error;
+    }
+    return "qwen-url";
+  }
+
+  function base64ToBlob(data, type = "audio/mpeg") {
+    const raw = String(data || "").includes(",") ? String(data).split(",").pop() : String(data || "");
+    const binary = atob(raw);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Blob([bytes], { type });
+  }
+
+  async function speakQwen(text, button, cfg, { bypassCache = false } = {}) {
+    const profile = qwenTtsProfile(cfg);
+    if (!profile) throw new Error("还没有可用的 Qwen API 密钥，请先在模型设置里填写。");
+    const endpoint = qwenTtsEndpoint(profile);
+    if (!endpoint) throw new Error("Qwen API 地址为空，无法定位语音接口。");
+    const model = String(cfg.qwenTtsModel || "qwen-audio-3.1-tts-plus").trim();
+    const voice = String(cfg.qwenTtsVoice || "longanhuan_v3.1").trim();
+    const cacheKey = `qwen|${model}|${voice}|${text}|v1`;
+    if (!bypassCache) {
+      const cached = await getKokoroAudio(cacheKey);
+      if (cached) {
+        await playAudioBlob(cached, button);
+        return "qwen-cache";
+      }
+    }
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${String(profile.apiKey || "").trim()}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        input: {
+          text,
+          voice,
+          format: "mp3",
+          sample_rate: 24000
+        }
+      })
+    });
+    const raw = await response.text();
+    let payload = null;
+    try { payload = raw ? JSON.parse(raw) : null; } catch (_) { /* handled below */ }
+    if (!response.ok || !payload) {
+      const message = payload?.message || payload?.code || raw.slice(0, 180) || `HTTP ${response.status}`;
+      throw new Error(`Qwen 语音失败：${message}`);
+    }
+    const audio = payload.output?.audio || payload.audio || payload.output || {};
+    if (audio.data) {
+      const blob = base64ToBlob(audio.data, "audio/mpeg");
+      await putKokoroAudio(cacheKey, blob);
+      await playAudioBlob(blob, button);
+      return "qwen";
+    }
+    if (audio.url) {
+      try {
+        const file = await fetch(audio.url);
+        if (file.ok) {
+          const blob = await file.blob();
+          if (blob.size) {
+            await putKokoroAudio(cacheKey, blob);
+            await playAudioBlob(blob, button);
+            return "qwen";
+          }
+        }
+      } catch (_) {
+        // The signed OSS URL can still be played directly even when fetch is blocked.
+      }
+      return playAudioUrl(audio.url, button);
+    }
+    throw new Error("Qwen 语音返回里没有 audio.url 或 audio.data。");
   }
 
   /* ---------- Kokoro: local browser TTS ---------- */
@@ -5006,6 +5146,19 @@
     primeAudio();
     stopSpeech();
     setTtsLoading(button, true);
+    if ((cfg.ttsEngine || "kokoro") === "qwen") {
+      try {
+        return await speakQwen(clean, button, cfg, options);
+      } catch (error) {
+        const message = String(error?.message || error || "未知错误");
+        lastKokoroError = message;
+        toast(message);
+        console.warn("Qwen TTS failed; falling back to system speech.", error);
+        return speakSystem(clean, button);
+      } finally {
+        setTtsLoading(button, false);
+      }
+    }
     try {
       return await speakKokoro(clean, button, cfg, options);
     } catch (error) {
@@ -5039,11 +5192,12 @@
 
   async function testTts(button) {
     const status = $("#tts-test-status");
-    if (status) status.textContent = "正在加载 Kokoro 模型…";
+    const selectedEngine = (state.draft || state.settings)?.ttsEngine || "kokoro";
+    if (status) status.textContent = selectedEngine === "qwen" ? "正在请求 Qwen 语音…" : "正在加载 Kokoro 模型…";
     lastKokoroError = "";
     const selected = state.draft || state.settings;
     const engine = await speakText(
-      "Kokoro is ready.",
+      "Talk is ready.",
       button,
       selected,
       { bypassCache: true }
@@ -5051,6 +5205,10 @@
     if (status) {
       if ((selected.ttsEngine || "kokoro") === "native") {
         status.textContent = "正在使用设备系统语音";
+      } else if ((selected.ttsEngine || "kokoro") === "qwen") {
+        status.textContent = engine.startsWith("qwen")
+          ? "Qwen 语音已就绪"
+          : `Qwen 语音失败，已回退系统语音：${lastKokoroError || "未知错误"}`;
       } else {
         const timing = kokoroGenerateMs ? ` · 合成 ${(kokoroGenerateMs / 1000).toFixed(1)}s` : "";
         const backend = kokoroBackend === "webgpu" ? "WebGPU" : "WASM";

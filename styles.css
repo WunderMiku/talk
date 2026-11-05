@@ -6010,3 +6010,25 @@ textarea:focus-visible,
   background: var(--ink);
   color: var(--paper);
 }
+
+/* Qwen TTS settings */
+.qwen-tts-panel .tts-row {
+  align-items: stretch;
+}
+
+.qwen-tts-panel input[type="text"] {
+  flex: 1;
+  min-width: 0;
+  height: 35px;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.qwen-tts-panel .tts-test-btn {
+  flex: 0 0 auto;
+}

@@ -265,7 +265,20 @@ Because this is a pure frontend app, the key is visible to the browser. Use a
 limited-scope/limited-quota key. DeepSeek currently permits browser CORS from
 the preview origin; some other providers may not.
 
-## TTS options
+## TTS
+
+Kokoro runs locally in the browser. **Qwen 语音** uses the active Qwen API
+profile's key and calls the regional `POST /api/v1/services/audio/tts/
+SpeechSynthesizer` endpoint directly from the browser (CORS is supported by
+the China endpoints). It defaults to `qwen-audio-3.1-tts-plus` and
+`longanhuan_v3.1`; the model and voice are editable in 设置 → 发音.
+
+Because this is a static GitHub Pages app, there is no backend that can hide a
+key. Keys are held in `sessionStorage` (or `localStorage` when "记住密钥" is
+checked) and are visible to anything running in that browser. Never commit a
+key; use "记住密钥" off on shared devices, and use a limited quota/key. A
+serverless proxy is required if the key must be hidden from the browser.
+ options
 
 The app now exposes a **发音** selector in settings:
 
