@@ -102,10 +102,15 @@ window.TALK_CONTENT.themeCopy = {
     },
     themeSalon: {
       kicker: "主题展 · 语言前线",
-      cta: "换一个展",
-      loading: "正在布展…",
+      brand: "СЛОВО",
+      masthead: "ТЕМАТИЧЕСКИЙ ВЫПУСК",
+      editionLabel: "主题词展",
+      leadLabel: "ПЕРЕДОВАЯ",
+      cta: "再印一版",
+      loading: "正在排版…",
       local: "常设展",
-      sceneLabel: "现场"
+      sceneLabel: "现场",
+      footerRight: "点击词语，继续读"
     },
     settings: {
       kicker: "指挥台",
@@ -122,10 +127,15 @@ window.TALK_CONTENT.themeCopy = {
 /* Curated fallback decks for the theme salon. The model can generate more. */
 window.TALK_CONTENT.themeSalon = {
   kicker: "主题策展",
-  cta: "生成新主题",
+  brand: "TALK",
+  masthead: "THEME SALON",
+  editionLabel: "主题词展",
+  leadLabel: "LEAD",
+  cta: "换一张海报",
   loading: "正在布展…",
   local: "本地主题",
-  sceneLabel: "场景"
+  sceneLabel: "场景",
+  footerRight: "点击词，继续展开"
 };
 
 window.TALK_CONTENT.themeDecks = [

@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "93";
+  const APP_VERSION = "95";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -1814,28 +1814,49 @@
   function themeSalonMarkup(deck) {
     const copy = copyFor("themeSalon");
     const words = Array.isArray(deck.words) ? deck.words : [];
-    return `<div class="theme-salon-head">
-      <div>
-        <div class="eyebrow theme-salon-kicker"><span class="spark"></span>${esc(copy.kicker)}</div>
-        <h2 class="theme-salon-title">${esc(deck.title)}</h2>
-        <p class="theme-salon-subtitle">${esc(deck.subtitle || "")}</p>
+    const lead = words[0];
+    const columns = words.slice(1);
+    const issue = String((state.themeSeq % 99) + 1).padStart(2, "0");
+    return `<div class="theme-poster">
+      <div class="poster-masthead">
+        <div class="poster-brand">
+          <span class="poster-brand-mark">${esc(copy.brand || "TALK")}</span>
+          <span class="poster-brand-section">${esc(copy.masthead)}</span>
+        </div>
+        <span class="poster-edition">${esc(copy.editionLabel)} · No. ${issue}</span>
       </div>
-      <button class="theme-generate ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
-        ${state.themeGenerating ? copy.loading : `${icon("sparkle")} ${copy.cta}`}
-      </button>
-    </div>
-    <div class="theme-exhibit" aria-live="polite">
-      ${words.map((item, index) => `<button class="theme-word-card" style="--i:${index}" type="button" data-action="word" data-word="${attr(item.word)}" aria-label="查看 ${attr(item.word)}">
-        <span class="theme-word-index">${String(index + 1).padStart(2, "0")}</span>
-        <span class="theme-word-main">
-          <strong>${esc(item.word)}</strong>
-          <span class="theme-word-pos">${esc(item.pos || "word")}</span>
-        </span>
-        <span class="theme-word-gloss">${esc(item.gloss)}</span>
-        <span class="theme-word-why">${esc(item.why || "")}</span>
-      </button>`).join("")}
-    </div>
-    ${deck.scene ? `<p class="theme-scene"><span>${esc(copy.sceneLabel)}</span>${esc(deck.scene)}</p>` : ""}`;
+      <div class="poster-rule"></div>
+      <div class="poster-head">
+        <div>
+          <div class="eyebrow poster-kicker"><span class="spark"></span>${esc(copy.kicker)}</div>
+          <h2 class="poster-title">${esc(deck.title)}</h2>
+          <p class="poster-subtitle">${esc(deck.subtitle || "")}</p>
+        </div>
+        <button class="theme-generate poster-generate ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
+          ${state.themeGenerating ? esc(copy.loading) : `${icon("sparkle")} ${esc(copy.cta)}`}
+        </button>
+      </div>
+      <div class="poster-body">
+        ${lead ? `<button class="poster-lead" type="button" data-action="word" data-word="${attr(lead.word)}" aria-label="查看 ${attr(lead.word)}" style="--i:0">
+          <span class="poster-lead-label">01 / ${esc(copy.leadLabel)}</span>
+          <span class="poster-lead-word">${esc(lead.word)}</span>
+          <span class="poster-lead-pos">${esc(lead.pos || "word")}</span>
+          <span class="poster-lead-gloss">${esc(lead.gloss)}</span>
+          <span class="poster-lead-why">${esc(lead.why || "")}</span>
+        </button>` : ""}
+        <div class="poster-columns">
+          ${columns.map((item, index) => `<button class="poster-col" type="button" data-action="word" data-word="${attr(item.word)}" aria-label="查看 ${attr(item.word)}" style="--i:${index + 1}">
+            <span class="poster-col-index">${String(index + 2).padStart(2, "0")}</span>
+            <span class="poster-col-word">${esc(item.word)}</span>
+            <span class="poster-col-pos">${esc(item.pos || "word")}</span>
+            <span class="poster-col-gloss">${esc(item.gloss)}</span>
+            <span class="poster-col-why">${esc(item.why || "")}</span>
+          </button>`).join("")}
+        </div>
+      </div>
+      ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
+      <div class="poster-footer"><span>talk. · ${esc(copy.local)}</span><span>${esc(copy.footerRight)}</span></div>
+    </div>`;
   }
 
   function renderThemeSalon() {
