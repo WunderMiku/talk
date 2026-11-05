@@ -6636,6 +6636,11 @@ textarea:focus-visible,
 /* Letterpress-like reveal, kept quiet. */
 .poster-lead,
 .poster-col {
+  animation: none;
+}
+
+.theme-salon.is-printing .poster-lead,
+.theme-salon.is-printing .poster-col {
   animation: poster-print 0.68s var(--ease-out) both;
   animation-delay: calc(var(--i) * 70ms);
 }

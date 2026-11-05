@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "96";
+  const APP_VERSION = "97";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -1885,10 +1885,16 @@
     </div>`;
   }
 
-  function renderThemeSalon() {
+  function renderThemeSalon({ animate = false } = {}) {
     const host = $("#theme-salon");
     if (!host) return;
+    host.classList.remove("is-printing");
     host.innerHTML = themeSalonMarkup(currentThemeDeck());
+    if (animate) {
+      void host.offsetWidth;
+      host.classList.add("is-printing");
+      window.setTimeout(() => host.classList.remove("is-printing"), 1100);
+    }
   }
 
   function cycleTheme(delta) {
@@ -1896,7 +1902,7 @@
     if (state.themeDecks.length <= 1) return;
     state.themeIndex = (state.themeIndex + Number(delta || 1) + state.themeDecks.length) % state.themeDecks.length;
     state.themeDeck = state.themeDecks[state.themeIndex];
-    renderThemeSalon();
+    renderThemeSalon({ animate: true });
   }
 
   async function requestThemeDeck(seed) {
@@ -1953,8 +1959,7 @@
           } else {
             state.themeDecks = collected.slice(0, 8);
             themeCacheWriteAll(state.themeDecks);
-            const count = $(".poster-cache-count");
-            if (count) count.textContent = `${String(state.themeDecks.length).padStart(2, "0")} ${copyFor("themeSalon").cacheUnit}`;
+            renderThemeSalon();
           }
         } catch (error) {
           console.warn(`Theme ${index + 1} failed.`, error);
@@ -1965,7 +1970,7 @@
         state.themeIndex = 0;
         state.themeDeck = state.themeDecks[0];
         themeCacheWriteAll(state.themeDecks);
-        toast(`已印好 ${collected.length} 版`);
+        toast(`已印好 ${collected.length} 版${collected.length < 8 ? ` · ${8 - collected.length} 版失败` : ""}`);
       } else {
         state.themeDecks = previousDecks;
         toast("这一批没有印出来，请检查模型连接");
