@@ -69,10 +69,11 @@ voice in `content.js`; do not put it in component templates.
 
 The AI-curated home section uses `TALK_CONTENT.themeSalon` for its label,
 button, and scene label, and the fallback decks in `TALK_CONTENT.themeDecks`.
-Its static model prompt is `TALK_PROMPTS.theme`; generated decks are cached in
-localStorage, and the poster edition arrows cycle through that cache. A batch
-print generates up to eight decks sequentially so the first one can be shown
-before the rest finish.
+Its static model prompt is `TALK_PROMPTS.theme`; generated decks are stored in
+IndexedDB keyed by their title, and the poster edition arrows cycle through the
+cached editions. `选一版` opens the theme library. Each request contains the
+existing titles as the final `exclude` field in the user message, keeping the
+static prompt prefix stable for provider prompt caching.
 
 ## Current themes
 

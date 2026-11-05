@@ -154,12 +154,13 @@ the wrong entry.
 ## Theme salon
 
 The home page includes an AI-curated word exhibition. It starts with a static
-fallback deck. The poster's edition arrows cycle through the cached decks, and
-**再印八版** generates a fresh batch of up to eight mini-worlds with five
-context-bound words each. The first finished deck replaces the poster
-immediately; the remaining decks keep filling the cache in the background.
-Results are cached in `talk.themeDecks.v1` (up to eight decks) and the static
-prompt lives in `prompts.js`; no model call happens on page load.
+fallback deck. Each press of **再印一版** generates one theme world with five
+context-bound words, displays it immediately, and stores it in IndexedDB
+(`talk.themeDecks.v1`, `decks` store, keyed by title). The poster arrows cycle
+through the cached editions, and **选一版** opens a library picker. Before a
+request, all existing titles are passed as an `exclude` list at the **end** of
+the user message so the static prompt prefix remains cache-friendly. No model
+call happens on page load.
 
 ## Theme and content architecture
 

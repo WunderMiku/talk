@@ -6677,3 +6677,116 @@ textarea:focus-visible,
   font-size: 7.5px;
   line-height: 1.55;
 }
+
+.poster-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.poster-picker,
+.poster-single {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.poster-picker:hover {
+  background: var(--card);
+  border-color: var(--line-strong);
+}
+
+.poster-single {
+  border-color: var(--ink);
+}
+
+.poster-single:hover:not(:disabled) {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.poster-single svg {
+  width: 11px;
+  height: 11px;
+}
+
+.poster-single.is-loading {
+  opacity: 0.62;
+  pointer-events: none;
+}
+
+/* Theme library picker */
+.theme-picker {
+  padding-bottom: 18px;
+}
+
+.theme-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.theme-picker-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  color: var(--ink);
+  text-align: left;
+}
+
+.theme-picker-item.active {
+  border-color: var(--ink);
+  background: var(--lime-wash);
+}
+
+.theme-picker-index {
+  grid-row: 1 / 3;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 8px;
+}
+
+.theme-picker-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.theme-picker-copy strong {
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 15px;
+  letter-spacing: -0.035em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-picker-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 9px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.theme-picker-count {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+}

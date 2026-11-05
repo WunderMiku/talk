@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "99";
+  const APP_VERSION = "100";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -317,9 +317,6 @@
     themeDecks: [],
     themeIndex: 0,
     themeGenerating: false,
-    themeBatchProgress: 0,
-    themeBatchMessage: "",
-    themeBatchFailures: [],
     themeSeq: 0,
     lastTranslationInput: "",
     lastTranslationResult: null,
@@ -1767,26 +1764,99 @@
     }
   }
 
-  const THEME_CACHE_KEY = "talk.themeDecks.v1";
+  const THEME_DB_NAME = "talk.themeDecks.v1";
+  const THEME_DB_STORE = "decks";
+  const THEME_LEGACY_KEY = "talk.themeDecks.v1";
 
-  function themeCacheRead() {
-    try {
-      const value = JSON.parse(localStorage.getItem(THEME_CACHE_KEY) || "[]");
-      return Array.isArray(value) ? value.filter((deck) => deck && deck.title && Array.isArray(deck.words)) : [];
-    } catch (_) {
-      return [];
-    }
+  function themeDbOpen() {
+    return new Promise((resolve, reject) => {
+      if (!("indexedDB" in window)) {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
+      const request = indexedDB.open(THEME_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(THEME_DB_STORE)) {
+          const store = db.createObjectStore(THEME_DB_STORE, { keyPath: "key" });
+          store.createIndex("at", "at");
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error("Theme DB error"));
+    });
   }
 
-  function themeCacheWriteAll(decks) {
+  function normalizeStoredTheme(deck) {
+    if (!deck || typeof deck !== "object" || !deck.title || !Array.isArray(deck.words)) return null;
+    return {
+      key: String(deck.key || deck.title).trim(),
+      title: String(deck.title),
+      subtitle: String(deck.subtitle || ""),
+      scene: String(deck.scene || ""),
+      words: deck.words,
+      at: Number(deck.at) || 0
+    };
+  }
+
+  async function themeDecksRead() {
+    const db = await themeDbOpen();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(THEME_DB_STORE, "readonly");
+      const request = tx.objectStore(THEME_DB_STORE).getAll();
+      request.onsuccess = () => {
+        const decks = (Array.isArray(request.result) ? request.result : [])
+          .map(normalizeStoredTheme)
+          .filter(Boolean)
+          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+        db.close();
+        resolve(decks);
+      };
+      request.onerror = () => {
+        db.close();
+        reject(request.error || new Error("Theme read failed"));
+      };
+    });
+  }
+
+  async function themeDeckSave(deck) {
+    const db = await themeDbOpen();
+    const key = String(deck.title || "").trim();
+    if (!key) throw new Error("主题没有标题。");
+    const stored = { ...deck, key, at: Date.now() };
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(THEME_DB_STORE, "readwrite");
+      tx.objectStore(THEME_DB_STORE).put(stored);
+      tx.oncomplete = () => { db.close(); resolve(stored); };
+      tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme write failed")); };
+    });
+  }
+
+  async function initThemeStore() {
     try {
-      localStorage.setItem(THEME_CACHE_KEY, JSON.stringify(decks.slice(0, 8)));
-    } catch (_) { /* no-op */ }
+      let decks = await themeDecksRead();
+      if (!decks.length) {
+        // One-time migration from the old localStorage cache.
+        let legacy = [];
+        try { legacy = JSON.parse(localStorage.getItem(THEME_LEGACY_KEY) || "[]"); } catch (_) { legacy = []; }
+        if (Array.isArray(legacy) && legacy.length) {
+          for (const deck of legacy.slice(0, 30)) {
+            try { await themeDeckSave(deck); } catch (_) { /* skip malformed */ }
+          }
+          try { localStorage.removeItem(THEME_LEGACY_KEY); } catch (_) { /* no-op */ }
+          decks = await themeDecksRead();
+        }
+      }
+      state.themeDecks = decks;
+      state.themeIndex = 0;
+    } catch (error) {
+      console.warn("Theme database unavailable.", error);
+      state.themeDecks = [];
+    }
   }
 
   function ensureThemeDecks() {
     if (!Array.isArray(state.themeDecks)) state.themeDecks = [];
-    if (!state.themeDecks.length) state.themeDecks = themeCacheRead();
     if (!state.themeDecks.length) return;
     state.themeIndex = Math.max(0, Math.min(Number(state.themeIndex) || 0, state.themeDecks.length - 1));
   }
@@ -1833,9 +1903,6 @@
     const issue = String(total ? state.themeIndex + 1 : 1).padStart(2, "0");
     const totalLabel = total ? String(total).padStart(2, "0") : "01";
     const canCycle = total > 1;
-    const batchLabel = state.themeGenerating
-      ? `${copy.printing} ${Math.min(state.themeBatchProgress + 1, 8)}/8…`
-      : copy.batchCta;
     return `<div class="theme-poster">
       <div class="poster-masthead">
         <div class="poster-brand">
@@ -1877,12 +1944,14 @@
         </div>
       </div>
       ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
-      ${state.themeBatchMessage ? `<p class="poster-batch-status" id="poster-batch-status">${esc(state.themeBatchMessage)}</p>` : ""}
       <div class="poster-bottom">
-        <span class="poster-cache-count">${total ? `${String(total).padStart(2, "0")} ${esc(copy.cacheUnit)}` : esc(copy.noCache)}</span>
-        <button class="poster-batch ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-batch" ${state.themeGenerating ? "disabled" : ""}>
-          ${state.themeGenerating ? esc(batchLabel) : `${icon("sparkle")} ${esc(copy.batchCta)}`}
-        </button>
+        <span class="poster-cache-count">${total ? `${totalLabel} ${esc(copy.cacheUnit)}` : esc(copy.noCache)}</span>
+        <div class="poster-actions">
+          <button class="poster-picker" type="button" data-action="theme-picker">${esc(copy.pickerCta)}</button>
+          <button class="poster-single ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
+            ${state.themeGenerating ? esc(copy.printing) : `${icon("sparkle")} ${esc(copy.singleCta)}`}
+          </button>
+        </div>
       </div>
       <div class="poster-footer"><span>talk. · ${esc(copy.local)}</span><span>${esc(copy.footerRight)}</span></div>
     </div>`;
@@ -1915,6 +1984,8 @@
       const endpoint = endpointFor(state.settings.baseUrl);
       const messages = [
         { role: "system", content: window.TALK_PROMPTS.theme },
+        // Keep the (potentially long) exclusion list last: the static prompt
+        // and task prefix stay stable for provider prompt caching.
         { role: "user", content: JSON.stringify({ task: "theme", seed, exclude }) }
       ];
       const response = await postChat(endpoint, state.settings, messages, controller.signal, false, 1200);
@@ -1931,100 +2002,60 @@
     }
   }
 
-  function updateThemeBatchStatus(message) {
-    state.themeBatchMessage = message;
-    const node = $("#poster-batch-status");
-    if (node) node.textContent = message;
-    else {
-      const bottom = $(".poster-bottom");
-      if (bottom && message) {
-        const p = document.createElement("p");
-        p.className = "poster-batch-status";
-        p.id = "poster-batch-status";
-        p.textContent = message;
-        bottom.before(p);
-      }
-    }
-  }
-
-  async function generateThemeBatch() {
+  async function generateThemeDeck() {
     if (state.themeGenerating) return;
     if (!hasModelConfig(state.settings)) {
       toast("未连接模型，先在设置里接入模型");
       return;
     }
-    const previousDecks = state.themeDecks.slice();
     state.themeGenerating = true;
-    state.themeBatchProgress = 0;
-    state.themeBatchFailures = [];
-    state.themeBatchMessage = "";
-    let collected = [];
-    let firstShown = false;
     renderThemeSalon();
     try {
-      for (let index = 0; index < 8; index++) {
-        state.themeBatchProgress = index;
-        const button = $(".poster-batch");
-        if (button) button.textContent = `${copyFor("themeSalon").printing} ${index + 1}/8…`;
-        updateThemeBatchStatus(`已成功 ${collected.length} 版 · 正在印第 ${index + 1} 版`);
-        let deck = null;
-        let lastError = "";
-        for (let attempt = 0; attempt < 2; attempt++) {
-          try {
-            const candidate = await requestThemeDeck(
-              `${Date.now()}-${index}-${attempt}-${state.themeSeq++}`,
-              collected.map((item) => item.title)
-            );
-            if (collected.some((item) => item.title === candidate.title)) {
-              lastError = "主题重复";
-              continue;
-            }
-            deck = candidate;
-            break;
-          } catch (error) {
-            lastError = String(error?.message || error || "未知错误").slice(0, 100);
-            if (attempt === 0) await new Promise((resolve) => window.setTimeout(resolve, 450));
-          }
-        }
-        if (!deck) {
-          state.themeBatchFailures.push(lastError || "生成失败");
-          continue;
-        }
-        collected.push(deck);
-        if (!firstShown) {
-          firstShown = true;
-          state.themeDecks = [deck];
-          state.themeIndex = 0;
-          state.themeDeck = deck;
-          themeCacheWriteAll(state.themeDecks);
-          renderThemeSalon();
-        } else {
-          state.themeDecks = collected.slice(0, 8);
-          themeCacheWriteAll(state.themeDecks);
-          renderThemeSalon();
-        }
-        updateThemeBatchStatus(`已成功 ${collected.length} 版 · 第 ${index + 1} 版已入缓存`);
-      }
-      if (collected.length) {
-        state.themeDecks = collected.slice(0, 8);
-        state.themeIndex = 0;
-        state.themeDeck = state.themeDecks[0];
-        themeCacheWriteAll(state.themeDecks);
-        const failed = state.themeBatchFailures.length;
-        updateThemeBatchStatus(failed
-          ? `${collected.length} 版成功 · ${failed} 版失败${state.themeBatchFailures[0] ? ` · ${state.themeBatchFailures[0]}` : ""}`
-          : `${collected.length} 版已全部入缓存`);
-        toast(`已印好 ${collected.length} 版${failed ? ` · ${failed} 版失败` : ""}`);
-      } else {
-        state.themeDecks = previousDecks;
-        updateThemeBatchStatus("这一批没有印出来，请检查模型连接");
-        toast("这一批没有印出来，请检查模型连接");
-      }
+      const exclude = state.themeDecks.map((deck) => deck.title);
+      const deck = await requestThemeDeck(`${Date.now()}-${state.themeSeq++}`, exclude);
+      await themeDeckSave(deck);
+      state.themeDecks = await themeDecksRead();
+      state.themeIndex = 0;
+      state.themeDeck = state.themeDecks[0] || deck;
+      renderThemeSalon();
+      toast("已印好一版，存入主题库");
+    } catch (error) {
+      console.warn("Theme generation failed.", error);
+      toast(`主题生成失败：${String(error?.message || error).slice(0, 100)}`);
     } finally {
       state.themeGenerating = false;
-      state.themeBatchProgress = 0;
       renderThemeSalon();
     }
+  }
+
+  function openThemePicker() {
+    const copy = copyFor("themeSalon");
+    if (!state.themeDecks.length) {
+      toast("主题库里还没有缓存");
+      return;
+    }
+    openSheetShell({ kicker: copy.pickerKicker, title: copy.pickerTitle });
+    const holder = $("#sheet-scroll");
+    if (!holder) return;
+    holder.innerHTML = `<div class="sheet-content theme-picker">
+      <p class="settings-intro">按主题名存入 IndexedDB，选中后回到报纸版面。</p>
+      <div class="theme-picker-list">
+        ${state.themeDecks.map((deck, index) => `<button class="theme-picker-item ${index === state.themeIndex ? "active" : ""}" type="button" data-action="theme-pick" data-index="${index}">
+          <span class="theme-picker-index">No. ${String(index + 1).padStart(2, "0")}</span>
+          <span class="theme-picker-copy"><strong>${esc(deck.title)}</strong><small>${esc(deck.subtitle || "无副标题")}</small></span>
+          <span class="theme-picker-count">${deck.words?.length || 0} 词</span>
+        </button>`).join("")}
+      </div>
+    </div>`;
+  }
+
+  function pickTheme(index) {
+    const deck = state.themeDecks[Number(index)];
+    if (!deck) return;
+    state.themeIndex = Number(index);
+    state.themeDeck = deck;
+    closeSheet();
+    renderThemeSalon({ animate: true });
   }
 
   function homePage() {
@@ -4554,9 +4585,19 @@
         cycleTheme(target.dataset.delta);
         break;
 
-      case "theme-batch":
+      case "theme-generate":
         event.preventDefault();
-        generateThemeBatch();
+        generateThemeDeck();
+        break;
+
+      case "theme-picker":
+        event.preventDefault();
+        openThemePicker();
+        break;
+
+      case "theme-pick":
+        event.preventDefault();
+        pickTheme(target.dataset.index);
         break;
 
       case "shuffle-moods":
@@ -5648,8 +5689,7 @@
 
   async function init() {
     setupInstallPrompt();
-    state.themeDecks = themeCacheRead();
-    state.themeIndex = 0;
+    await initThemeStore();
     applyCacheDisplay();
     applyContentCopy();
     $$("[data-app-version]").forEach((element) => { element.textContent = `v${APP_VERSION}`; });

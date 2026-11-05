@@ -1426,3 +1426,40 @@
   border-left: 4px solid #d23b2f;
   padding-left: 7px;
 }
+
+[data-theme="constructivist"] .poster-picker,
+[data-theme="constructivist"] .poster-single {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .poster-single {
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .poster-picker:hover,
+[data-theme="constructivist"] .poster-single:hover:not(:disabled) {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .theme-picker-item {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .theme-picker-item.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .theme-picker-item.active .theme-picker-copy small,
+[data-theme="constructivist"] .theme-picker-item.active .theme-picker-count,
+[data-theme="constructivist"] .theme-picker-item.active .theme-picker-index {
+  color: rgba(255, 246, 231, 0.72);
+}
