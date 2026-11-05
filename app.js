@@ -315,6 +315,7 @@
     workspaceOpen: false,
     themeDeck: null,
     themeDecks: [],
+    themeDisplay: [],
     themeIndex: 0,
     themeGenerating: false,
     themeSeq: 0,
@@ -1767,7 +1768,8 @@
   const THEME_DB_NAME = "talk.themeDecks.v1";
   const THEME_DB_STORE = "decks";
   const THEME_LEGACY_KEY = "talk.themeDecks.v1";
-  const THEME_CACHE_LIMIT = 8;
+  const THEME_DISPLAY_LIMIT = 8;
+  const THEME_DISPLAY_KEY = "talk.themeDisplay.v1";
 
   function themeDbOpen() {
     return new Promise((resolve, reject) => {
@@ -1809,8 +1811,7 @@
         const decks = (Array.isArray(request.result) ? request.result : [])
           .map(normalizeStoredTheme)
           .filter(Boolean)
-          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
-          .slice(0, THEME_CACHE_LIMIT);
+          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
         db.close();
         resolve(decks);
       };
@@ -1821,37 +1822,17 @@
     });
   }
 
-  async function themeDecksPrune() {
-    const db = await themeDbOpen();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(THEME_DB_STORE, "readwrite");
-      const store = tx.objectStore(THEME_DB_STORE);
-      const request = store.getAll();
-      request.onsuccess = () => {
-        const decks = (Array.isArray(request.result) ? request.result : [])
-          .map(normalizeStoredTheme)
-          .filter(Boolean)
-          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
-        decks.slice(THEME_CACHE_LIMIT).forEach((deck) => store.delete(deck.key));
-      };
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme prune failed")); };
-    });
-  }
-
   async function themeDeckSave(deck) {
     const db = await themeDbOpen();
     const key = String(deck.title || "").trim();
     if (!key) throw new Error("主题没有标题。");
     const stored = { ...deck, key, at: Date.now() };
-    await new Promise((resolve, reject) => {
+    return new Promise((resolve, reject) => {
       const tx = db.transaction(THEME_DB_STORE, "readwrite");
       tx.objectStore(THEME_DB_STORE).put(stored);
       tx.oncomplete = () => { db.close(); resolve(stored); };
       tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme write failed")); };
     });
-    await themeDecksPrune();
-    return stored;
   }
 
   async function clearThemeStore() {
@@ -1869,7 +1850,8 @@
     const bytes = new Blob([JSON.stringify(decks)]).size;
     return {
       count: decks.length,
-      max: THEME_CACHE_LIMIT,
+      displayCount: state.themeDisplay.length,
+      max: THEME_DISPLAY_LIMIT,
       bytes,
       words: decks.reduce((sum, deck) => sum + (deck.words?.length || 0), 0)
     };
@@ -1880,11 +1862,24 @@
     if (!target) return;
     try {
       const stats = await themeCacheStats();
-      target.innerHTML = `<div class="cache-settings-summary"><span><strong>${stats.count}</strong> / ${stats.max} 个主题</span><span>${formatBytes(stats.bytes)} · IndexedDB</span></div>
-        <p class="api-note">共 ${stats.words} 个词。按标题保存，FIFO：超出 ${stats.max} 版会自动删除最早的一版。</p>`;
+      target.innerHTML = `<div class="cache-settings-summary"><span><strong>${stats.count}</strong> 个主题 · 展览 ${stats.displayCount} / ${stats.max}</span><span>${formatBytes(stats.bytes)} · IndexedDB</span></div>
+        <p class="api-note">共 ${stats.words} 个词。数据库保留全部主题；首页展览队列最多 ${stats.max} 版，换入新版只会移出最早一版，不删除数据库。</p>`;
     } catch (_) {
       target.innerHTML = `<p class="api-note">主题库暂时无法读取。</p>`;
     }
+  }
+
+  function themeDisplayLoad() {
+    try {
+      const value = JSON.parse(localStorage.getItem(THEME_DISPLAY_KEY) || "[]");
+      return Array.isArray(value) ? value.map(String) : [];
+    } catch (_) {
+      return [];
+    }
+  }
+
+  function themeDisplaySave() {
+    try { localStorage.setItem(THEME_DISPLAY_KEY, JSON.stringify(state.themeDisplay)); } catch (_) { /* no-op */ }
   }
 
   async function initThemeStore() {
@@ -1895,27 +1890,59 @@
         let legacy = [];
         try { legacy = JSON.parse(localStorage.getItem(THEME_LEGACY_KEY) || "[]"); } catch (_) { legacy = []; }
         if (Array.isArray(legacy) && legacy.length) {
-          for (const deck of legacy.slice(0, 30)) {
+          for (const deck of legacy) {
             try { await themeDeckSave(deck); } catch (_) { /* skip malformed */ }
           }
           try { localStorage.removeItem(THEME_LEGACY_KEY); } catch (_) { /* no-op */ }
           decks = await themeDecksRead();
         }
       }
-      await themeDecksPrune();
-      decks = await themeDecksRead();
       state.themeDecks = decks;
+      const titles = new Set(decks.map((deck) => deck.title));
+      let display = themeDisplayLoad().filter((title) => titles.has(title));
+      for (const deck of decks) {
+        if (display.length >= THEME_DISPLAY_LIMIT) break;
+        if (!display.includes(deck.title)) display.push(deck.title);
+      }
+      state.themeDisplay = display.slice(0, THEME_DISPLAY_LIMIT);
       state.themeIndex = 0;
+      themeDisplaySave();
     } catch (error) {
       console.warn("Theme database unavailable.", error);
       state.themeDecks = [];
+      state.themeDisplay = [];
     }
   }
 
   function ensureThemeDecks() {
     if (!Array.isArray(state.themeDecks)) state.themeDecks = [];
-    if (!state.themeDecks.length) return;
-    state.themeIndex = Math.max(0, Math.min(Number(state.themeIndex) || 0, state.themeDecks.length - 1));
+    if (!Array.isArray(state.themeDisplay)) state.themeDisplay = [];
+    if (!state.themeDisplay.length && state.themeDecks.length) {
+      state.themeDisplay = state.themeDecks.slice(0, THEME_DISPLAY_LIMIT).map((deck) => deck.title);
+    }
+    if (!state.themeDisplay.length) return;
+    state.themeIndex = Math.max(0, Math.min(Number(state.themeIndex) || 0, state.themeDisplay.length - 1));
+  }
+
+  function themeDeckByTitle(title) {
+    return state.themeDecks.find((deck) => deck.title === title) || null;
+  }
+
+  function showThemeDeck(deck, { animate = false } = {}) {
+    if (!deck) return;
+    ensureThemeDecks();
+    let index = state.themeDisplay.indexOf(deck.title);
+    if (index === -1) {
+      state.themeDisplay.unshift(deck.title);
+      if (state.themeDisplay.length > THEME_DISPLAY_LIMIT) {
+        state.themeDisplay = state.themeDisplay.slice(0, THEME_DISPLAY_LIMIT);
+      }
+      themeDisplaySave();
+      index = 0;
+    }
+    state.themeIndex = index;
+    state.themeDeck = deck;
+    renderThemeSalon({ animate });
   }
 
   function fallbackThemeDeck() {
@@ -1930,7 +1957,10 @@
 
   function currentThemeDeck() {
     ensureThemeDecks();
-    if (state.themeDecks.length) return state.themeDecks[state.themeIndex] || state.themeDecks[0];
+    const title = state.themeDisplay[state.themeIndex];
+    const deck = title ? themeDeckByTitle(title) : null;
+    if (deck) return deck;
+    if (state.themeDecks.length) return themeDeckByTitle(state.themeDisplay[0]) || state.themeDecks[0];
     if (state.themeDeck) return state.themeDeck;
     return fallbackThemeDeck();
   }
@@ -1956,9 +1986,11 @@
     const lead = words[0];
     const columns = words.slice(1);
     ensureThemeDecks();
-    const total = state.themeDecks.length;
+    const total = state.themeDisplay.length;
+    const libraryTotal = state.themeDecks.length;
     const issue = String(total ? state.themeIndex + 1 : 1).padStart(2, "0");
     const totalLabel = total ? String(total).padStart(2, "0") : "01";
+    const libraryLabel = libraryTotal ? String(libraryTotal).padStart(2, "0") : "00";
     const canCycle = total > 1;
     return `<div class="theme-poster">
       <div class="poster-masthead">
@@ -2002,7 +2034,7 @@
       </div>
       ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
       <div class="poster-bottom">
-        <span class="poster-cache-count">${total ? `${totalLabel} ${esc(copy.cacheUnit)}` : esc(copy.noCache)}</span>
+        <span class="poster-cache-count">${total ? `${totalLabel} ${esc(copy.cacheUnit)} · ${esc(copy.libraryLabel)} ${libraryLabel} ${esc(copy.libraryUnit)}` : esc(copy.noCache)}</span>
         <div class="poster-actions">
           <button class="poster-picker" type="button" data-action="theme-picker">${esc(copy.pickerCta)}</button>
           <button class="poster-single ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
@@ -2028,9 +2060,9 @@
 
   function cycleTheme(delta) {
     ensureThemeDecks();
-    if (state.themeDecks.length <= 1) return;
-    state.themeIndex = (state.themeIndex + Number(delta || 1) + state.themeDecks.length) % state.themeDecks.length;
-    state.themeDeck = state.themeDecks[state.themeIndex];
+    if (state.themeDisplay.length <= 1) return;
+    state.themeIndex = (state.themeIndex + Number(delta || 1) + state.themeDisplay.length) % state.themeDisplay.length;
+    state.themeDeck = themeDeckByTitle(state.themeDisplay[state.themeIndex]) || state.themeDeck;
     renderThemeSalon({ animate: true });
   }
 
@@ -2072,9 +2104,7 @@
       const deck = await requestThemeDeck(`${Date.now()}-${state.themeSeq++}`, exclude);
       await themeDeckSave(deck);
       state.themeDecks = await themeDecksRead();
-      state.themeIndex = 0;
-      state.themeDeck = state.themeDecks[0] || deck;
-      renderThemeSalon();
+      showThemeDeck(deck);
       toast("已印好一版，存入主题库");
     } catch (error) {
       console.warn("Theme generation failed.", error);
@@ -2094,25 +2124,24 @@
     openSheetShell({ kicker: copy.pickerKicker, title: copy.pickerTitle });
     const holder = $("#sheet-scroll");
     if (!holder) return;
+    const currentTitle = currentThemeDeck()?.title || "";
     holder.innerHTML = `<div class="sheet-content theme-picker">
-      <p class="settings-intro">按主题名存入 IndexedDB，选中后回到报纸版面。</p>
+      <p class="settings-intro">数据库共 ${state.themeDecks.length} 版。选一个不在展览队列里的主题，会替换掉队列里最早的一版，但不会删除数据库。</p>
       <div class="theme-picker-list">
-        ${state.themeDecks.map((deck, index) => `<button class="theme-picker-item ${index === state.themeIndex ? "active" : ""}" type="button" data-action="theme-pick" data-index="${index}">
+        ${state.themeDecks.map((deck, index) => `<button class="theme-picker-item ${deck.title === currentTitle ? "active" : ""}" type="button" data-action="theme-pick" data-title="${attr(deck.title)}">
           <span class="theme-picker-index">No. ${String(index + 1).padStart(2, "0")}</span>
           <span class="theme-picker-copy"><strong>${esc(deck.title)}</strong><small>${esc(deck.subtitle || "无副标题")}</small></span>
-          <span class="theme-picker-count">${deck.words?.length || 0} 词</span>
+          <span class="theme-picker-count">${deck.words?.length || 0} 词${state.themeDisplay.includes(deck.title) ? " · 展览中" : ""}</span>
         </button>`).join("")}
       </div>
     </div>`;
   }
 
-  function pickTheme(index) {
-    const deck = state.themeDecks[Number(index)];
+  function pickTheme(title) {
+    const deck = themeDeckByTitle(String(title || ""));
     if (!deck) return;
-    state.themeIndex = Number(index);
-    state.themeDeck = deck;
     closeSheet();
-    renderThemeSalon({ animate: true });
+    showThemeDeck(deck, { animate: true });
   }
 
   function homePage() {
@@ -4660,7 +4689,7 @@
 
       case "theme-pick":
         event.preventDefault();
-        pickTheme(target.dataset.index);
+        pickTheme(target.dataset.title);
         break;
 
       case "shuffle-moods":
@@ -4750,8 +4779,10 @@
         event.preventDefault();
         await clearThemeStore();
         state.themeDecks = [];
+        state.themeDisplay = [];
         state.themeIndex = 0;
         state.themeDeck = null;
+        themeDisplaySave();
         renderThemeSalon();
         renderSettingsContent();
         toast("主题库已清空");

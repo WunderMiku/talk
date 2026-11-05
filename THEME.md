@@ -70,8 +70,10 @@ voice in `content.js`; do not put it in component templates.
 The AI-curated home section uses `TALK_CONTENT.themeSalon` for its label,
 button, and scene label, and the fallback decks in `TALK_CONTENT.themeDecks`.
 Its static model prompt is `TALK_PROMPTS.theme`; generated decks are stored in
-IndexedDB keyed by their title (FIFO limited to the latest eight editions), and
-the poster edition arrows cycle through the cached editions. `选一版` opens the theme library. Each request contains the
+IndexedDB keyed by their title and the database keeps every edition. The home
+exhibition queue is a separate eight-entry FIFO: new or newly selected editions
+enter it, and the oldest displayed entry leaves it without deleting the
+database copy. The poster edition arrows cycle that display queue. `选一版` opens the theme library. Each request contains the
 existing titles as the final `exclude` field in the user message, keeping the
 static prompt prefix stable for provider prompt caching.
 
