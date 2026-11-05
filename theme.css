@@ -620,3 +620,12 @@
 [data-theme="constructivist"] .relation-card.ant .rel-chip:hover .rel-gloss {
   color: #fff6e7;
 }
+
+/* Constructivist hard shadows need a little more air between stacked blocks. */
+[data-theme="constructivist"] .translator-styles {
+  padding-bottom: 9px;
+}
+
+[data-theme="constructivist"] .translator-landing-hint {
+  margin-top: 24px;
+}
