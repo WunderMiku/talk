@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
   <meta name="theme-color" content="#F3F0E7" />
   <meta name="description" content="Talk — 一个把词放回语境里理解的双语英语词典原型。" />
   <meta name="mobile-web-app-capable" content="yes" />
@@ -13,8 +14,8 @@
   <link rel="icon" href="favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=88" />
-  <link rel="stylesheet" href="theme.css?v=88" />
+  <link rel="stylesheet" href="styles.css?v=89" />
+  <link rel="stylesheet" href="theme.css?v=89" />
 </head>
 <body>
   <div class="stage">
@@ -45,6 +46,7 @@
             <button class="module-btn active" type="button" data-action="module" data-module="dictionary" data-copy="modules.dictionary" aria-pressed="true">词典</button>
             <button class="module-btn" type="button" data-action="module" data-module="translator" data-copy="modules.translator" aria-pressed="false">翻译</button>
           </div>
+          <span class="module-version" data-app-version>v89</span>
         </nav>
         <main class="screen" id="screen" aria-live="polite"></main>
         <div id="layer-root"></div>
@@ -63,11 +65,11 @@
     </footer>
   </div>
 
-  <script src="data.js?v=88"></script>
-  <script src="theme.js?v=88"></script>
-  <script src="content.js?v=88"></script>
-  <script src="prompts.js?v=88"></script>
+  <script src="data.js?v=89"></script>
+  <script src="theme.js?v=89"></script>
+  <script src="content.js?v=89"></script>
+  <script src="prompts.js?v=89"></script>
   <script src="vendor/idb.js"></script>
-  <script src="app.js?v=88"></script>
+  <script src="app.js?v=89"></script>
 </body>
 </html>

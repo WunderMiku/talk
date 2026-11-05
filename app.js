@@ -8,6 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
+  const APP_VERSION = "89";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -3192,7 +3193,7 @@
           ${tab === "tts" ? ttsSettingsHtml(draft) : tab === "data" ? dataSettingsHtml(draft) : modelSettingsHtml(draft)}
         </div>
         <div class="settings-footer">
-          <span id="settings-save-status">${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
+          <span id="settings-save-status"><span data-app-version>v${APP_VERSION}</span> · ${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
           <button class="btn btn-primary" type="button" data-action="save-settings">完成</button>
         </div>
       </div>`;
@@ -5357,6 +5358,7 @@
     setupInstallPrompt();
     applyCacheDisplay();
     applyContentCopy();
+    $$("[data-app-version]").forEach((element) => { element.textContent = `v${APP_VERSION}`; });
     await initWordStore();
     app.addEventListener("click", handleClick);
     app.addEventListener("input", handleInput);

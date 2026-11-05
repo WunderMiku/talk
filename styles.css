@@ -6032,3 +6032,31 @@ textarea:focus-visible,
 .qwen-tts-panel .tts-test-btn {
   flex: 0 0 auto;
 }
+
+/* Keep settings confirmation in normal flow, not sliding over the pane. */
+.settings-footer {
+  position: static;
+  bottom: auto;
+}
+
+.module-version {
+  position: absolute;
+  right: 16px;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
+
+[data-theme="constructivist"] .module-version {
+  color: #efe4d0;
+  font-weight: 700;
+}
+
+/* Version inside the settings footer */
+.settings-footer [data-app-version] {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.04em;
+}
