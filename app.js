@@ -2994,11 +2994,19 @@
       || profiles[0];
   }
 
+  function secureRemoteUrl(url) {
+    const value = String(url || "");
+    if (location.protocol === "https:" && /^http:\/\//i.test(value)) {
+      return value.replace(/^http:\/\//i, "https://");
+    }
+    return value;
+  }
+
   function qwenTtsEndpoint(profile) {
     const base = String(profile?.baseUrl || "").trim();
     if (!base) return "";
     try {
-      const origin = new URL(base).origin;
+      const origin = secureRemoteUrl(new URL(base).origin);
       return `${origin}/api/v1/services/audio/tts/SpeechSynthesizer`;
     } catch (_) {
       return "";
@@ -4702,6 +4710,7 @@
 
   async function playAudioUrl(url, button) {
     if (!url) throw new Error("语音接口没有返回音频地址。");
+    url = secureRemoteUrl(url);
     const audio = ttsAudio || new Audio();
     ttsAudio = audio;
     try { audio.pause(); } catch (_) { /* no-op */ }
@@ -4781,8 +4790,9 @@
       return "qwen";
     }
     if (audio.url) {
+      const audioUrl = secureRemoteUrl(audio.url);
       try {
-        const file = await fetch(audio.url);
+        const file = await fetch(audioUrl);
         if (file.ok) {
           const blob = await file.blob();
           if (blob.size) {
@@ -4794,7 +4804,7 @@
       } catch (_) {
         // The signed OSS URL can still be played directly even when fetch is blocked.
       }
-      return playAudioUrl(audio.url, button);
+      return playAudioUrl(audioUrl, button);
     }
     throw new Error("Qwen 语音返回里没有 audio.url 或 audio.data。");
   }
