@@ -9,7 +9,7 @@
     },
     constructivist: {
       id: "constructivist",
-      label: "Constructivist",
+      label: "USSR",
       themeColor: "#d23b2f"
     },
     rhine: {

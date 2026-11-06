@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "112";
+  const APP_VERSION = "113";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
