@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "101";
+  const APP_VERSION = "102";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -2293,14 +2293,9 @@
 
   function wordSensesPagerHtml(groups) {
     const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
-    const mainLabel = `${posLabel(groups[0]?.pos)} · 1 / ${groups.length}`;
     return `<div class="meaning-card meaning-pager" data-word-pos-index="0" data-pos-count="${groups.length}">
       <div class="meaning-track">
         ${groups.map((group, index) => `<section class="meaning-slide" data-pos="${attr(group.pos)}" data-pos-label="${attr(posLabel(group.pos))}" data-sense-count="${group.senses.length}" aria-hidden="${index === 0 ? "false" : "true"}">
-          <div class="meaning-slide-head">
-            <span class="meaning-slide-pos">${esc(posLabel(group.pos))}</span>
-            <span class="meaning-slide-count">${group.senses.length} 个义项</span>
-          </div>
           ${group.senses.map((sense, senseIndex) => `
             <div class="sense">
               <span class="sense-num">${String(senseIndex + 1).padStart(2, "0")}</span>
@@ -2313,10 +2308,10 @@
         </section>`).join("")}
       </div>
       ${groups.length > 1 ? `<div class="meaning-pager-foot">
-        <button class="meaning-pager-arrow" type="button" data-action="word-pos-prev" aria-label="上一个词性">‹</button>
-        <span class="meaning-pager-label" data-word-pos-label>${esc(mainLabel)}</span>
-        <span class="meaning-pager-hint">左右滑动</span>
-        <button class="meaning-pager-arrow" type="button" data-action="word-pos-next" aria-label="下一个词性">›</button>
+        <button class="meaning-pager-arrow" type="button" data-action="word-pos-prev" aria-label="上一组词义">‹</button>
+        <span class="meaning-pager-dots" aria-hidden="true">${groups.map((_, index) => `<i class="${index === 0 ? "active" : ""}"></i>`).join("")}</span>
+        <span class="meaning-pager-count" data-word-pos-label>1 / ${groups.length}</span>
+        <button class="meaning-pager-arrow" type="button" data-action="word-pos-next" aria-label="下一组词义">›</button>
       </div>` : ""}
     </div>`;
   }
@@ -2341,10 +2336,11 @@
         tab.setAttribute("aria-selected", String(active));
       });
     }
+    $$(".meaning-pager-dots i", pager).forEach((dot, dotIndex) => {
+      dot.classList.toggle("active", dotIndex === next);
+    });
     const label = $("[data-word-pos-label]", pager);
-    if (label && slides[next]) {
-      label.textContent = `${slides[next].dataset.posLabel || ""} · ${next + 1} / ${count}`;
-    }
+    if (label) label.textContent = `${next + 1} / ${count}`;
   }
 
   function moveWordPos(pager, delta) {
@@ -2408,7 +2404,7 @@
           ${(() => {
             const groups = wordPosGroups(word);
             const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
-            return `${blockHead("01", "词义", `${groups.length} 个词性 · ${totalSenses} 个义项`)}${wordSensesPagerHtml(groups)}`;
+            return `${blockHead("01", "词义", `${totalSenses} 个义项`)}${wordSensesPagerHtml(groups)}`;
           })()}
         </section>
 

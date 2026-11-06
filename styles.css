@@ -6935,3 +6935,37 @@ textarea:focus-visible,
   font-size: 7px;
   text-align: right;
 }
+
+.meaning-pager-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.meaning-pager-dots i {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  opacity: 0.35;
+}
+
+.meaning-pager-dots i.active {
+  background: var(--ink);
+  opacity: 1;
+}
+
+.meaning-pager-count {
+  margin-left: auto;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7.5px;
+}
+
+.meaning-pager-foot {
+  gap: 7px;
+}
+
+[data-theme="constructivist"] .meaning-pager-dots i {
+  border-radius: 0;
+}
