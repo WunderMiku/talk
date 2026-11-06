@@ -11,6 +11,11 @@
       id: "constructivist",
       label: "构成主义",
       themeColor: "#d23b2f"
+    },
+    rhine: {
+      id: "rhine",
+      label: "Rhine Lab",
+      themeColor: "#e7e3da"
     }
   };
 

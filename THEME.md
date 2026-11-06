@@ -82,6 +82,9 @@ static prompt prefix stable for provider prompt caching.
 - **Paper** — default warm paper/lime editorial look.
 - **构成主义** — red/black/cream, hard edges, offset blocks, condensed display
   type, and a local geometric palette.
+- **Rhine Lab** — technical light interface: thin rules, crosshairs, monochrome
+  type, restrained orange accents, an index-sheet poster, and observational
+  copy.
 
 The constructivist theme is intentionally more opinionated; the Paper theme is
 the baseline visual language.

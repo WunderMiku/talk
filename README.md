@@ -180,8 +180,8 @@ Visual tokens live in `theme.css`, theme registration/persistence in `theme.js`,
 interface copy in `content.js`, and static model prompts in `prompts.js`.
 See [THEME.md](THEME.md) for adding a theme, style, or copy system.
 
-The two current themes are **Paper** and **构成主义**, selectable from
-settings → data → appearance.
+The current themes are **Paper**, **构成主义**, and **Rhine Lab**, selectable
+from settings → data → appearance.
 
 ## Model profiles
 

@@ -197,3 +197,75 @@ window.TALK_CONTENT.themeDecks = [
     ]
   }
 ];
+
+/* Rhine Lab voice: technical, quiet, observational. */
+window.TALK_CONTENT.themeCopy.rhine = {
+  modules: {
+    dictionary: "索引",
+    translator: "转译"
+  },
+  home: {
+    eyebrow: "RHINE LAB · 语言观察站",
+    titleLead: "把词，",
+    titleAccent: "校准。",
+    lede: "语言是信息。拆开它的结构，记录它的温度，再把它放回<strong>真实语境</strong>里。",
+    manifesto: {
+      ru: "OBSERVE / RECORD / UNDERSTAND",
+      zh: "观察 / 记录 / 理解"
+    },
+    searchKicker: "输入样本",
+    searchPlaceholder: "输入一个词，或一句话…",
+    recentLabel: "近次记录",
+    modes: {
+      auto: "自动",
+      word: "词",
+      sentence: "句"
+    },
+    dailySectionKicker: "每日样本",
+    dailySectionTitle: "今日记录",
+    moodSectionKicker: "主题档案",
+    moodSectionTitle: "主题索引",
+    footerLeft: "为观察语言的人而做",
+    footerRight: "记录每一次理解"
+  },
+  translator: {
+    kicker: "RHINE LAB · 语言转译站",
+    titleLead: "一句，",
+    titleAccent: "多种输出。",
+    lede: "保留原意，只改变语气、场合与力度。让同一句话在不同语境里成立。",
+    inputPlaceholder: "把要转译的句子放进来…",
+    empty: "写下样本。系统会给出几种可用的英文输出。",
+    workspaceKicker: "RHINE LAB / OUTPUT",
+    workspaceTitle: "转译结果"
+  },
+  themeSalon: {
+    kicker: "主题档案 · 语言观察",
+    brand: "RHINE",
+    masthead: "LANGUAGE INDEX",
+    editionLabel: "主题索引",
+    leadLabel: "SAMPLE",
+    cta: "换一张",
+    singleCta: "再采样一版",
+    pickerCta: "档案",
+    pickerKicker: "语言档案",
+    pickerTitle: "从主题索引里挑一版",
+    printing: "正在采样",
+    cacheUnit: "版在索引",
+    libraryLabel: "档案",
+    libraryUnit: "版",
+    noCache: "本地样本",
+    loading: "正在采样…",
+    local: "常设样本",
+    sceneLabel: "记录",
+    footerRight: "点击词语，继续分析"
+  },
+  settings: {
+    kicker: "RHINE LAB / TERMINAL",
+    title: "控制台",
+    tabs: [
+      ["model", "接口"],
+      ["tts", "声音"],
+      ["data", "数据"]
+    ]
+  }
+};
