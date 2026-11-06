@@ -6973,3 +6973,7 @@ textarea:focus-visible,
 .pos-tab:active {
   transform: scale(0.96);
 }
+
+.word-delete {
+  color: var(--muted);
+}

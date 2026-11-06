@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "104";
+  const APP_VERSION = "105";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -741,6 +741,18 @@
     } else if (wordStoreFallback) {
       persistFallbackWordCache();
     }
+  }
+
+  async function deleteWordCacheFor(word) {
+    const target = normalizeWord(word);
+    if (!target) return 0;
+    const keys = [...wordCache.entries()]
+      .filter(([key, record]) => key === target || normalizeWord(record?.data?.word) === target)
+      .map(([key]) => key);
+    for (const key of keys) await removeWordRecord(key);
+    refreshCacheBorders();
+    if ($("#cache-dashboard")) void renderCacheContent();
+    return keys.length;
   }
 
   async function pruneWordCache() {
@@ -2516,6 +2528,7 @@
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
+          ${word.source !== "demo" ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-word-cache" data-word="${attr(word.word)}">${icon("trash")} 删除缓存</button>` : ""}
         </div>
       </main>`;
   }
@@ -4809,6 +4822,17 @@
         state.draft = applyProfileToSettings(state.draft, profile);
         scheduleSettingsCommit();
         renderSettingsContent();
+        break;
+      }
+
+      case "delete-word-cache": {
+        event.preventDefault();
+        const targetWord = target.dataset.word || "";
+        if (!targetWord) break;
+        if (!window.confirm("删除这个词的本地缓存？相关拼写也会一起删除。")) break;
+        const removed = await deleteWordCacheFor(targetWord);
+        toast(removed ? "已删除这条缓存" : "没有找到对应缓存");
+        goBack();
         break;
       }
 
