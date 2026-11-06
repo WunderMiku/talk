@@ -2,3 +2,11 @@ dist/
 models/
 vendor/
 .DS_Store
+
+# Local AI/tool configuration — may contain API keys or tokens.
+opencode.json
+opencode.jsonc
+.env
+.env.*
+*.local
+secrets/
