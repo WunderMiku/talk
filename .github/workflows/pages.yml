@@ -27,7 +27,7 @@ jobs:
       - name: Assemble static site
         run: |
           mkdir -p dist
-          cp index.html styles.css theme.css theme.js content.js prompts.js data.js app.js favicon.svg manifest.webmanifest sw.js .nojekyll dist/
+          cp index.html styles.css theme.css theme.js content.js prompts.js data.js app.js favicon.svg manifest.webmanifest sw.js .nojekyll LICENSE dist/
           cp -r icons dist/
           bash scripts/fetch-assets.sh dist
 

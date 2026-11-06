@@ -367,3 +367,11 @@ A repeated playback from IndexedDB took about 0.1 seconds.
 - On the test machine, first model load was ~13–17s and repeated playback was
   ~1s; a new word on WASM took ~5s. WebGPU-capable devices are faster. The
   remaining per-word cost is Kokoro inference, not a network request.
+
+## License
+
+Talk is released under the [MIT License](LICENSE).
+
+Third-party assets keep their own licenses; see
+[`icons/style/LICENSE.txt`](icons/style/LICENSE.txt) for the Twemoji SVG icons
+and the model/runtime notices referenced above.
