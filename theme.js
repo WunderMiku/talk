@@ -9,7 +9,7 @@
     },
     constructivist: {
       id: "constructivist",
-      label: "构成主义",
+      label: "Constructivist",
       themeColor: "#d23b2f"
     },
     rhine: {
