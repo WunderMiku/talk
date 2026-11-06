@@ -6977,3 +6977,29 @@ textarea:focus-visible,
 .word-delete {
   color: var(--muted);
 }
+
+.word-gloss-row {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.word-gloss-row .word-gloss {
+  margin: 0;
+}
+
+.word-gloss-tag {
+  flex: 0 0 auto;
+  padding: 4px 8px;
+  border: 1px solid var(--lime-deep);
+  border-radius: 999px;
+  background: var(--lime-wash);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}

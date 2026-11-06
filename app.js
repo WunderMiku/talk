@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "106";
+  const APP_VERSION = "108";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -2408,7 +2408,10 @@
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
           </div>
-          <p class="word-gloss reveal" style="--d:1.1">${esc(word.translation || word.short)}</p>
+          <div class="word-gloss-row reveal" style="--d:1.1">
+            <p class="word-gloss">${esc(word.translation || word.short)}</p>
+            <span class="word-gloss-tag">核心义 · ${esc(posLabel(word.pos))}</span>
+          </div>
           ${word.translation && word.short ? `<p class="word-short reveal" style="--d:1.2">${esc(word.short)}</p>` : ""}
           ${heroNote ? `<div class="hero-note reveal" style="--d:1.5">
             ${icon("sparkle")}

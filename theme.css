@@ -1494,3 +1494,11 @@
   background: #171512;
   color: #efe4d0;
 }
+
+[data-theme="constructivist"] .word-gloss-tag {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #b62c21;
+  font-weight: 700;
+}
