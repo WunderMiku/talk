@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "102";
+  const APP_VERSION = "103";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -4576,7 +4576,10 @@
       case "word-pos": {
         event.preventDefault();
         const pager = wordPagerForTarget(target);
-        if (pager) setWordPos(pager, Number(target.dataset.index) || 0);
+        if (pager) {
+          setWordPos(pager, Number(target.dataset.index) || 0);
+          pager.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
+        }
         break;
       }
 

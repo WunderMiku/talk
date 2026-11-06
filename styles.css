@@ -6969,3 +6969,7 @@ textarea:focus-visible,
 [data-theme="constructivist"] .meaning-pager-dots i {
   border-radius: 0;
 }
+
+.pos-tab:active {
+  transform: scale(0.96);
+}
