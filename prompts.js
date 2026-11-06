@@ -9,7 +9,6 @@ window.TALK_PROMPTS = {
   "kind": "word",
   "word": "词头，小写",
   "phonetic": "/IPA/",
-  "pos": "noun | verb | adjective | adverb | phrase",
   "level": "A1-C2",
   "register": "common | formal | literary | informal | technical",
   "spelling": {
@@ -19,10 +18,15 @@ window.TALK_PROMPTS = {
     "confidence": 0.0,
     "note": "中文，一句话说明为什么判断为拼写错误"
   },
-  "short": "一句简洁、自然的英文释义",
-  "translation": "简体中文释义，放在最显眼的位置",
+  "short": "一句简洁、自然的英文释义（主词性）",
+  "translation": "简体中文释义（主词性），放在最显眼的位置",
   "note": "一条中文使用提示",
-  "senses": [{"en": "英文定义", "zh": "中文解释", "tag": "中文标签"}],
+  "posGroups": [
+    {
+      "pos": "noun | verb | adjective | adverb | preposition | conjunction | pronoun | phrase",
+      "senses": [{"en": "英文定义", "zh": "中文解释", "tag": "中文标签"}]
+    }
+  ],
   "family": [{"word": "派生词", "pos": "adj.", "gloss": "简短英文释义"}],
   "synonyms": [{"word": "近义词", "gloss": "英文细微差别"}],
   "antonyms": [{"word": "反义词", "gloss": "英文细微差别"}],
@@ -40,10 +44,11 @@ window.TALK_PROMPTS = {
 
 规则：
 1. 拼写过滤优先于词义解释。先判断输入是否是有效英文词或常见短语；如果它明显是常见词的拼写错误（漏字母、多字母、相邻键位、重复字母、形近/音近，或 recieve、definately、enviroment、accomodate 这类常见错拼），即使不是绝对确定，也要把 spelling.changed 设为 true，把 spelling.corrected 设为最可能的正确词，confidence 不低于 0.7，并在 note 中用中文说明；随后整条词条必须针对 corrected 生成。不要因为“怕改错”而把明显的拼写错误当成生僻词放过。只有本身真实存在的生僻词、人名、地名、品牌名、外来词、缩写，或确实无法判断时才不纠正。拼写正确时 changed=false，corrected 重复原词。
-2. 用户消息的 detail 字段决定输出深度，必须严格执行：
-   - fast：义项 1 个；同根词 2 个；近义词 2 个；反义词 1 个；例句 1 个；搭配 2 个；词源阶段 2 个。
-   - standard：义项 2 个；同根词 3 个；近义词 3 个；反义词 2 个；例句 2 个；搭配 4 个；词源阶段 3 个。
-   - deep：义项 3 个；同根词 4 个；近义词 4 个；反义词 3 个；例句 3 个；搭配 5 个；词源阶段 4 个。
+2. 必须覆盖该词在当代英语里的常见词性，不能只给一个词性。每个词性单独放进 posGroups 的一项；主词性放在第一项。若该词确实只有一个常见词性，只返回一项。
+   - fast：最多 2 个词性；主词性 1 个义项，其他词性各 1 个义项；同根词 2 个；近义词 2 个；反义词 1 个；例句 1 个；搭配 2 个；词源阶段 2 个。
+   - standard：最多 3 个词性；主词性 2 个义项，其他词性各 1–2 个义项；同根词 3 个；近义词 3 个；反义词 2 个；例句 2 个；搭配 4 个；词源阶段 3 个。
+   - deep：最多 4 个词性；主词性 3 个义项，其他词性各 1–2 个义项；同根词 4 个；近义词 4 个；反义词 3 个；例句 3 个；搭配 5 个；词源阶段 4 个。
+   - 不要为了凑词性把生僻或过时词性也列出来；只列常见的、会改变释义的。
 3. 近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作补充。词源必须尽量准确；不确定时给空对象，不要编故事。
 4. 词源字段的 when、label、text 必须使用中文。when 要写成“1754 年”“19 世纪”“古英语时期”“今天”这类中文标注；禁止写 "19th century"、"Old English"、"Modern English" 等英文时间名。origin.original、origin.story 也必须用简体中文叙述，不能直接写英文段落。专有名词（如拉丁语、希腊语、人名）可以保留原文，但必须用中文解释；不要输出 "From Old English..." 这类英文句子。
 
@@ -53,7 +58,7 @@ window.TALK_PROMPTS = {
 
 Few-shot（只示意字段和语气，不要照抄内容）：
 用户：{"task":"word","detail":"fast","query":"serendipity"}
-助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","pos":"noun","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"常用于描述计划之外的好结果。","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","related":[],"origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`,
+助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"常用于描述计划之外的好结果。","posGroups":[{"pos":"noun","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}]}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","related":[],"origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`,
   sentence: `你是 Talk，一位面向中文母语者的双语英语阅读教练。用户主要看中文，所以语气、结构说明和解释都用自然、简洁的简体中文；英文只保留词汇和例句本身。只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。挑选真正支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。中文负责解释，英文负责呈现词汇。
 
 输出结构（字段名和嵌套结构必须保持不变）：

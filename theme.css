@@ -1467,3 +1467,30 @@
 [data-theme="constructivist"] .theme-cache-setting {
   border-top: 2px solid #171512;
 }
+
+[data-theme="constructivist"] .pos-tab {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .pos-tab.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .meaning-pager-foot {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .meaning-pager-arrow {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .meaning-pager-arrow:hover {
+  background: #171512;
+  color: #efe4d0;
+}

@@ -6821,3 +6821,117 @@ textarea:focus-visible,
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* Multi-POS word meanings */
+.pos-switch {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.pos-tab {
+  appearance: none;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+}
+
+.pos-tab:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.pos-tab.active {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.meaning-card.meaning-pager {
+  padding: 0;
+  touch-action: pan-y;
+}
+
+.meaning-track {
+  display: flex;
+  width: 100%;
+  transition: transform 0.42s var(--ease-out);
+  will-change: transform;
+}
+
+.meaning-slide {
+  display: block;
+  flex: 0 0 100%;
+  min-width: 100%;
+  padding: 17px 17px 14px 20px;
+}
+
+.meaning-slide-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--line);
+}
+
+.meaning-slide-pos {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.meaning-slide-count {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7.5px;
+}
+
+.meaning-pager-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px calc(8px + env(safe-area-inset-bottom) * 0.2);
+  border-top: 1px solid var(--line);
+}
+
+.meaning-pager-arrow {
+  display: grid;
+  flex: 0 0 25px;
+  width: 25px;
+  height: 25px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 14px;
+  line-height: 1;
+}
+
+.meaning-pager-arrow:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.meaning-pager-label {
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.meaning-pager-hint {
+  flex: 1;
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 7px;
+  text-align: right;
+}

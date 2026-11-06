@@ -151,6 +151,13 @@ corners, and full-width layout. The style emoji SVGs are from Twemoji
 source language + text, so English → English and Chinese → English do not share
 the wrong entry.
 
+## Multi-POS word entries
+
+Words can now store multiple parts of speech, each with its own senses in
+`posGroups`. The main POS stays first and is shown by default; POS pills in the
+word header and a horizontal meaning pager switch between groups. Older cached
+entries without `posGroups` are treated as one POS with their existing senses.
+
 ## Theme salon
 
 The home page includes an AI-curated word exhibition. It starts with a static

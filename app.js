@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "100";
+  const APP_VERSION = "101";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -2240,18 +2240,22 @@
           tag: String(sense.tag || "")
         }))
       : [{ en: String(raw.short || raw.definition || ""), zh: String(raw.translation || ""), tag: "" }];
+    const posGroups = normalizePosGroups(raw.posGroups, raw.pos || raw.partOfSpeech, senses);
+    const mainGroup = posGroups[0] || { pos: "", senses };
+    const mainSenses = mainGroup.senses.length ? mainGroup.senses : senses;
 
     return {
       ...raw,
       word: String(raw.word || ""),
       phonetic: String(raw.phonetic || raw.ipa || ""),
-      pos: String(raw.pos || raw.partOfSpeech || ""),
+      pos: String(raw.pos || raw.partOfSpeech || mainGroup.pos || ""),
       level: String(raw.level || "—"),
       register: String(raw.register || "common"),
-      short: String(raw.short || senses[0]?.en || ""),
-      translation: String(raw.translation || senses[0]?.zh || ""),
+      short: String(raw.short || mainSenses[0]?.en || ""),
+      translation: String(raw.translation || mainSenses[0]?.zh || ""),
       note: String(raw.note || ""),
-      senses,
+      senses: mainSenses,
+      posGroups,
       family: normalizeRelations(raw.family || raw.derivatives),
       synonyms: normalizeRelations(raw.synonyms),
       antonyms: normalizeRelations(raw.antonyms),
@@ -2274,6 +2278,84 @@
         <span class="spelling-arrow" aria-hidden="true">→</span>
         <span class="spelling-right">${esc(spelling.corrected)}</span>
       </aside>`;
+  }
+
+  function wordPosGroups(word) {
+    const groups = Array.isArray(word.posGroups) ? word.posGroups.filter((group) => group && group.senses?.length) : [];
+    return groups.length ? groups : [{ pos: word.pos || "", senses: word.senses || [] }];
+  }
+
+  function wordPosSwitchHtml(groups) {
+    return `<div class="pos-switch" role="tablist" aria-label="词性">
+      ${groups.map((group, index) => `<button class="pos-tab pos-pill ${index === 0 ? "active" : ""}" type="button" role="tab" aria-selected="${index === 0}" data-action="word-pos" data-index="${index}" title="${attr(posLabel(group.pos))}">${esc(posLabel(group.pos))}</button>`).join("")}
+    </div>`;
+  }
+
+  function wordSensesPagerHtml(groups) {
+    const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
+    const mainLabel = `${posLabel(groups[0]?.pos)} · 1 / ${groups.length}`;
+    return `<div class="meaning-card meaning-pager" data-word-pos-index="0" data-pos-count="${groups.length}">
+      <div class="meaning-track">
+        ${groups.map((group, index) => `<section class="meaning-slide" data-pos="${attr(group.pos)}" data-pos-label="${attr(posLabel(group.pos))}" data-sense-count="${group.senses.length}" aria-hidden="${index === 0 ? "false" : "true"}">
+          <div class="meaning-slide-head">
+            <span class="meaning-slide-pos">${esc(posLabel(group.pos))}</span>
+            <span class="meaning-slide-count">${group.senses.length} 个义项</span>
+          </div>
+          ${group.senses.map((sense, senseIndex) => `
+            <div class="sense">
+              <span class="sense-num">${String(senseIndex + 1).padStart(2, "0")}</span>
+              <div>
+                <p class="sense-zh">${esc(sense.zh || sense.en)}</p>
+                ${sense.zh && sense.en ? `<p class="sense-en">${esc(sense.en)}</p>` : ""}
+                ${sense.tag ? `<span class="micro-tag">${esc(tagLabel(sense.tag))}</span>` : ""}
+              </div>
+            </div>`).join("")}
+        </section>`).join("")}
+      </div>
+      ${groups.length > 1 ? `<div class="meaning-pager-foot">
+        <button class="meaning-pager-arrow" type="button" data-action="word-pos-prev" aria-label="上一个词性">‹</button>
+        <span class="meaning-pager-label" data-word-pos-label>${esc(mainLabel)}</span>
+        <span class="meaning-pager-hint">左右滑动</span>
+        <button class="meaning-pager-arrow" type="button" data-action="word-pos-next" aria-label="下一个词性">›</button>
+      </div>` : ""}
+    </div>`;
+  }
+
+  function setWordPos(pager, index) {
+    if (!pager) return;
+    const slides = $$(".meaning-slide", pager);
+    const count = slides.length;
+    if (!count) return;
+    const next = Math.max(0, Math.min(count - 1, Number(index) || 0));
+    pager.dataset.wordPosIndex = String(next);
+    const track = $(".meaning-track", pager);
+    if (track) track.style.transform = `translateX(-${next * 100}%)`;
+    slides.forEach((slide, slideIndex) => {
+      slide.setAttribute("aria-hidden", slideIndex === next ? "false" : "true");
+    });
+    const page = pager.closest(".result-page");
+    if (page) {
+      $$(".pos-tab", page).forEach((tab) => {
+        const active = Number(tab.dataset.index) === next;
+        tab.classList.toggle("active", active);
+        tab.setAttribute("aria-selected", String(active));
+      });
+    }
+    const label = $("[data-word-pos-label]", pager);
+    if (label && slides[next]) {
+      label.textContent = `${slides[next].dataset.posLabel || ""} · ${next + 1} / ${count}`;
+    }
+  }
+
+  function moveWordPos(pager, delta) {
+    if (!pager) return;
+    const current = Number(pager.dataset.wordPosIndex) || 0;
+    setWordPos(pager, current + Number(delta || 0));
+  }
+
+  function wordPagerForTarget(target) {
+    const page = target?.closest?.('.result-page');
+    return page ? $('.meaning-pager', page) : null;
   }
 
   function wordPage(word, layer = null) {
@@ -2304,7 +2386,7 @@
           <div class="word-subrow reveal" style="--d:1">
             <span class="ipa">${esc(word.phonetic || "—")}</span>
             <span class="dot-sep"></span>
-            <span class="pos-pill">${esc(posLabel(word.pos))}</span>
+            ${wordPosSwitchHtml(wordPosGroups(word))}
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
           </div>
@@ -2323,18 +2405,11 @@
         </section>
 
         <section class="block reveal" style="--d:1.8">
-          ${blockHead("01", "词义", `${word.senses.length} 个义项`)}
-          <div class="meaning-card">
-            ${word.senses.map((sense, index) => `
-              <div class="sense">
-                <span class="sense-num">${String(index + 1).padStart(2, "0")}</span>
-                <div>
-                  <p class="sense-zh">${esc(sense.zh || sense.en)}</p>
-                  ${sense.zh && sense.en ? `<p class="sense-en">${esc(sense.en)}</p>` : ""}
-                  ${sense.tag ? `<span class="micro-tag">${esc(tagLabel(sense.tag))}</span>` : ""}
-                </div>
-              </div>`).join("")}
-          </div>
+          ${(() => {
+            const groups = wordPosGroups(word);
+            const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
+            return `${blockHead("01", "词义", `${groups.length} 个词性 · ${totalSenses} 个义项`)}${wordSensesPagerHtml(groups)}`;
+          })()}
         </section>
 
         ${word.family.length ? `
@@ -4195,19 +4270,23 @@
   function normalizeModelWord(raw, fallbackWord) {
     const base = unwrapModel(raw);
     const senses = normalizeSenses(base.senses);
-    const first = senses[0] || {};
+    const posGroups = normalizePosGroups(base.posGroups, base.pos || base.partOfSpeech, senses);
+    const mainGroup = posGroups[0] || { pos: "", senses };
+    const mainSenses = mainGroup.senses.length ? mainGroup.senses : senses;
+    const first = mainSenses[0] || {};
     const word = String(base.word || base.headword || fallbackWord || "").trim().toLowerCase();
     if (!word) throw new Error("模型返回的内容里没有词头。");
     const result = {
       word,
       phonetic: String(base.phonetic || base.ipa || ""),
-      pos: String(base.pos || base.partOfSpeech || ""),
+      pos: String(base.pos || base.partOfSpeech || mainGroup.pos || ""),
       level: String(base.level || "—"),
       register: String(base.register || "common"),
       short: String(base.short || base.definition || first.en || ""),
       translation: String(base.translation || first.zh || ""),
       note: String(base.note || base.usageNote || ""),
-      senses: senses.length ? senses : [{ en: String(base.definition || ""), zh: String(base.translation || ""), tag: "" }],
+      senses: mainSenses.length ? mainSenses : [{ en: String(base.definition || ""), zh: String(base.translation || ""), tag: "" }],
+      posGroups,
       family: normalizeRelations(base.family || base.derivatives),
       synonyms: normalizeRelations(base.synonyms),
       antonyms: normalizeRelations(base.antonyms),
@@ -4315,6 +4394,28 @@
         tag: String(item.tag || item.label || "")
       };
     }).filter((item) => item.en || item.zh);
+  }
+
+  function normalizePosGroups(value, fallbackPos, fallbackSenses) {
+    const groups = asArray(value).map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const senses = normalizeSenses(item.senses || item.meanings || item.definitions);
+      if (!senses.length) return null;
+      return {
+        pos: String(item.pos || item.partOfSpeech || "").trim().toLowerCase(),
+        senses
+      };
+    }).filter(Boolean);
+    if (!groups.length) {
+      groups.push({ pos: String(fallbackPos || "").trim().toLowerCase(), senses: fallbackSenses });
+    }
+    const wanted = String(fallbackPos || "").trim().toLowerCase();
+    const mainIndex = groups.findIndex((group) => group.pos === wanted);
+    if (mainIndex > 0) {
+      const [main] = groups.splice(mainIndex, 1);
+      groups.unshift(main);
+    }
+    return groups;
   }
 
   function normalizeKeyWords(value) {
@@ -4474,6 +4575,23 @@
         event.preventDefault();
         tapFeedback();
         openWordRoute(target.dataset.word || "");
+        break;
+
+      case "word-pos": {
+        event.preventDefault();
+        const pager = wordPagerForTarget(target);
+        if (pager) setWordPos(pager, Number(target.dataset.index) || 0);
+        break;
+      }
+
+      case "word-pos-prev":
+        event.preventDefault();
+        moveWordPos(wordPagerForTarget(target), -1);
+        break;
+
+      case "word-pos-next":
+        event.preventDefault();
+        moveWordPos(wordPagerForTarget(target), 1);
         break;
 
       case "open-key":
@@ -5799,6 +5917,24 @@
     applyContentCopy();
     $$("[data-app-version]").forEach((element) => { element.textContent = `v${APP_VERSION}`; });
     await initWordStore();
+    let wordSwipe = null;
+    app.addEventListener("pointerdown", (event) => {
+      const pager = event.target.closest?.(".meaning-pager");
+      if (!pager) return;
+      wordSwipe = { pager, x: event.clientX, y: event.clientY };
+    }, { passive: true });
+    app.addEventListener("pointerup", (event) => {
+      if (!wordSwipe) return;
+      const swipe = wordSwipe;
+      wordSwipe = null;
+      const dx = event.clientX - swipe.x;
+      const dy = event.clientY - swipe.y;
+      if (Math.abs(dx) > 38 && Math.abs(dx) > Math.abs(dy) * 1.15) {
+        moveWordPos(swipe.pager, dx < 0 ? 1 : -1);
+      }
+    }, { passive: true });
+    app.addEventListener("pointercancel", () => { wordSwipe = null; }, { passive: true });
+
     app.addEventListener("click", handleClick);
     app.addEventListener("input", handleInput);
     app.addEventListener("change", handleInput);
