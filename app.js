@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "103";
+  const APP_VERSION = "104";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -4293,6 +4293,11 @@
       origin: normalizeOrigin(base.origin || base.etymology),
       spelling: normalizeSpelling(base.spelling || base.correction, base.word || fallbackWord)
     };
+    const queryKey = normalizeWord(fallbackWord || "");
+    const resultKey = normalizeWord(result.word || "");
+    if (queryKey && resultKey && queryKey !== resultKey && !result.spelling) {
+      throw new Error("模型给出的拼写替换差异过大，已拒绝这次结果，请重试。");
+    }
     if (result.spelling?.corrected) result.word = normalizeWord(result.spelling.corrected);
     if (!result.short) result.short = "";
     return result;
@@ -4316,6 +4321,32 @@
     };
   }
 
+  function spellingDistance(a, b) {
+    const left = String(a || "").toLowerCase();
+    const right = String(b || "").toLowerCase();
+    if (left === right) return 0;
+    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+    for (let i = 1; i <= left.length; i++) {
+      let diagonal = previous[0];
+      previous[0] = i;
+      for (let j = 1; j <= right.length; j++) {
+        const above = previous[j];
+        previous[j] = Math.min(
+          previous[j] + 1,
+          previous[j - 1] + 1,
+          diagonal + (left[i - 1] === right[j - 1] ? 0 : 1)
+        );
+        diagonal = above;
+      }
+    }
+    return previous[right.length];
+  }
+
+  const PROTECTED_SPELLING = new Set([
+    "google", "standard", "apple", "amazon", "microsoft", "openai", "qwen",
+    "deepseek", "github", "android", "iphone", "chatgpt", "twitter", "youtube"
+  ]);
+
   function normalizeSpelling(value, fallbackWord = "") {
     if (!value || typeof value !== "object") return null;
     const input = String(value.input || value.query || "").trim();
@@ -4324,11 +4355,17 @@
     const changed = value.changed !== undefined
       ? Boolean(value.changed)
       : normalizeWord(input) !== normalizeWord(corrected);
-    if (!changed || normalizeWord(input) === normalizeWord(corrected)) return null;
+    const inputKey = normalizeWord(input);
+    if (!changed || inputKey === normalizeWord(corrected)) return null;
+    const confidence = Number(value.confidence || 0);
+    const maxDistance = input.length <= 4 ? 1 : 2;
+    if (PROTECTED_SPELLING.has(inputKey)) return null;
+    if (confidence && confidence < 0.75) return null;
+    if (spellingDistance(input, corrected) > maxDistance) return null;
     return {
       input,
       corrected,
-      confidence: Number(value.confidence || 0),
+      confidence,
       note: String(value.note || value.reason || "").trim()
     };
   }
