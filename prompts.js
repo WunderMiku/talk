@@ -27,9 +27,9 @@ window.TALK_PROMPTS = {
       "senses": [{"en": "英文定义", "zh": "中文解释", "tag": "中文标签"}]
     }
   ],
-  "family": [{"word": "派生词", "pos": "adj.", "gloss": "简短英文释义"}],
-  "synonyms": [{"word": "近义词", "gloss": "英文细微差别"}],
-  "antonyms": [{"word": "反义词", "gloss": "英文细微差别"}],
+  "family": [{"word": "派生词", "pos": "adj.", "gloss": "简短中文释义"}],
+  "synonyms": [{"word": "近义词", "gloss": "中文说明它与主词的细微差别"}],
+  "antonyms": [{"word": "反义词", "gloss": "中文说明它与主词的细微差别"}],
   "examples": [{"en": "自然英文例句", "zh": "中文翻译"}],
   "collocations": ["常见搭配"],
   "memory": "一句中文记忆钩子，可含少量英文和 <em>强调</em>",
@@ -53,7 +53,7 @@ window.TALK_PROMPTS = {
    - standard：最多 3 个词性；主词性 2 个义项，其他词性各 1–2 个义项；同根词 3 个；近义词 3 个；反义词 2 个；例句 2 个；搭配 4 个；词源阶段 3 个。
    - deep：最多 4 个词性；主词性 3 个义项，其他词性各 1–2 个义项；同根词 4 个；近义词 4 个；反义词 3 个；例句 3 个；搭配 5 个；词源阶段 4 个。
    - 不要为了凑词性把生僻或过时词性也列出来；只列常见的、会改变释义的。
-3. 近义词和反义词的 gloss 要具体说明差别，不要写空泛标签。中文解释优先，英文只作补充。词源必须尽量准确；不确定时给空对象，不要编故事。
+3. family、synonyms、antonyms 的 gloss 必须全部是简体中文，说明中文含义或与主词的差别；不要用英文释义、英文短语或“English definition”。词条本身、词性缩写和搭配可以保留英文。词源必须尽量准确；不确定时给空对象，不要编故事。
 4. 词源字段的 when、label、text 必须使用中文。when 要写成“1754 年”“19 世纪”“古英语时期”“今天”这类中文标注；禁止写 "19th century"、"Old English"、"Modern English" 等英文时间名。origin.original、origin.story 也必须用简体中文叙述，不能直接写英文段落。专有名词（如拉丁语、希腊语、人名）可以保留原文，但必须用中文解释；不要输出 "From Old English..." 这类英文句子。
 
 拼写纠错示例（只有这些明显错拼才改）：recieve → receive；definately → definitely；enviroment → environment；accomodate → accommodate；seperate → separate。反例（必须保持原词）：google、standard、quokka、Qwen、OpenAI、品牌名、人名。不要把有效词改成另一个语义无关的词。

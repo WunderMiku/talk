@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "105";
+  const APP_VERSION = "106";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -2292,6 +2292,16 @@
       </aside>`;
   }
 
+  function relationGloss(item) {
+    const zh = String(item?.zh || "").trim();
+    if (zh && /[\u3400-\u9fff]/.test(zh)) return zh;
+    const gloss = String(item?.gloss || "").trim();
+    if (/[\u3400-\u9fff]/.test(gloss)) return gloss;
+    const stub = DATA.lexicon[normalizeWord(item?.word || "")];
+    if (stub?.zh) return stub.zh;
+    return gloss;
+  }
+
   function wordPosGroups(word) {
     const groups = Array.isArray(word.posGroups) ? word.posGroups.filter((group) => group && group.senses?.length) : [];
     return groups.length ? groups : [{ pos: word.pos || "", senses: word.senses || [] }];
@@ -2425,13 +2435,13 @@
           ${blockHead("02", "同根词", "派生词")}
           <div class="h-scroll">
             ${word.family.map((item) => `
-              <button class="family-card" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(item.gloss)}" data-pos="${attr(item.pos)}" data-relation="同根词">
+              <button class="family-card" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="同根词">
                 <span class="family-top">
                   <span class="family-pos">${esc(item.pos || "—")}</span>
                   ${icon("arrowUpRight", "family-arrow")}
                 </span>
                 <strong class="family-word">${esc(item.word)}</strong>
-                <span class="family-gloss">${esc(item.gloss)}</span>
+                <span class="family-gloss">${esc(relationGloss(item))}</span>
               </button>`).join("")}
           </div>
         </section>` : ""}
@@ -2444,9 +2454,9 @@
               <div class="relation-head"><h3>近义词</h3><span class="relation-icon">+</span></div>
               <div class="rel-list">
                 ${word.synonyms.map((item) => `
-                  <button class="rel-chip" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(item.gloss)}" data-pos="${attr(item.pos)}" data-relation="近义词">
+                  <button class="rel-chip" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="近义词">
                     <span class="rel-word">${esc(item.word)}</span>
-                    <span class="rel-gloss">${esc(item.gloss)}</span>
+                    <span class="rel-gloss">${esc(relationGloss(item))}</span>
                   </button>`).join("")}
               </div>
             </div>
@@ -2454,9 +2464,9 @@
               <div class="relation-head"><h3>反义词</h3><span class="relation-icon">−</span></div>
               <div class="rel-list">
                 ${word.antonyms.map((item) => `
-                  <button class="rel-chip" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(item.gloss)}" data-pos="${attr(item.pos)}" data-relation="反义词">
+                  <button class="rel-chip" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="反义词">
                     <span class="rel-word">${esc(item.word)}</span>
-                    <span class="rel-gloss">${esc(item.gloss)}</span>
+                    <span class="rel-gloss">${esc(relationGloss(item))}</span>
                   </button>`).join("")}
               </div>
             </div>
@@ -4505,7 +4515,8 @@
       return {
         word: String(item.word || item.term || item.text || ""),
         pos: String(item.pos || item.partOfSpeech || ""),
-        gloss: String(item.gloss || item.meaning || item.definition || item.nuance || "")
+        gloss: String(item.gloss || item.meaning || item.definition || item.nuance || ""),
+        zh: String(item.zh || item.glossZh || item.meaningZh || item.translation || "")
       };
     }).filter((item) => item.word);
   }
