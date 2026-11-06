@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "108";
+  const APP_VERSION = "109";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -2410,7 +2410,7 @@
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(word.translation || word.short)}</p>
-            <span class="word-gloss-tag">核心义 · ${esc(posLabel(word.pos))}</span>
+            <span class="word-gloss-tag">核心义</span>
           </div>
           ${word.translation && word.short ? `<p class="word-short reveal" style="--d:1.2">${esc(word.short)}</p>` : ""}
           ${heroNote ? `<div class="hero-note reveal" style="--d:1.5">
