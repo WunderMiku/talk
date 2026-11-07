@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "113";
+  const APP_VERSION = "114";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -1150,6 +1150,7 @@
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
     const apply = () => {
       state.route = route;
+      screen.dataset.page = route.name;
       state.module = route.name === "translator" ? "translator" : "dictionary";
       updateModuleBar();
       closeTranslationWorkspace({ immediate: true });
@@ -2201,7 +2202,7 @@
         </div>
       </div>
 
-      <section class="section reveal" style="--d:2">
+      <section class="section daily-section reveal" style="--d:2">
         <div class="section-head">
           <div>
             <span class="section-kicker">${esc(copy.dailySectionKicker)}</span>
@@ -4378,6 +4379,8 @@
     const input = String(value.input || value.query || "").trim();
     const corrected = String(value.corrected || value.correction || value.word || fallbackWord || "").trim();
     if (!input || !corrected) return null;
+    // Multi-word input is a phrase/idiom, never a spelling mistake.
+    if (/\s/.test(input.trim())) return null;
     const changed = value.changed !== undefined
       ? Boolean(value.changed)
       : normalizeWord(input) !== normalizeWord(corrected);

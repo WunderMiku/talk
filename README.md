@@ -151,6 +151,13 @@ corners, and full-width layout. The style emoji SVGs are from Twemoji
 source language + text, so English → English and Chinese → English do not share
 the wrong entry.
 
+## Wide-screen layout
+
+In landscape above 720px the phone frame expands to the viewport, the home
+hero/search use two columns, word entries put the hero beside the meaning
+block, translator input/results use two columns, and sheets are centered at a
+readable width. Portrait layout is unchanged.
+
 ## Multi-POS word entries
 
 Words can now store multiple parts of speech, each with its own senses in
@@ -357,6 +364,9 @@ A repeated playback from IndexedDB took about 0.1 seconds.
 
 - GitHub Pages serves over HTTPS, required for WebGPU and reliable browser
   storage.
+- Multi-word lookups are treated as phrases; spelling correction only runs for
+  single-token input. Prompts also require factual restraint: omit uncertain
+  IPA/etymology/relations rather than inventing them.
 - First visit downloads about 115 MB. Later visits reuse browser caches.
 - The LAN HTTP preview (`http://<ip>:8080`) is **not a secure context**, so the
   Cache API is unavailable there. The app includes an IndexedDB/HTTP-cache
