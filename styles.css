@@ -7255,13 +7255,6 @@ textarea:focus-visible,
     margin-bottom: 24px;
   }
 
-  /* USSR uses independent newspaper columns: each side stacks on its own. */
-  [data-theme="constructivist"] .screen[data-page="word"] .word-columns,
-  [data-theme="constructivist"] .word-layer .word-columns {
-    display: block;
-    columns: 2;
-    column-gap: 30px;
-  }
 
   [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
   [data-theme="constructivist"] .word-layer .word-columns > .block {
@@ -7341,5 +7334,99 @@ textarea:focus-visible,
   [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
   [data-theme="constructivist"] .word-layer .word-columns > .block {
     margin-bottom: 34px;
+  }
+}
+
+/* Give the landscape word rows more breathing room. */
+@media (orientation: landscape) and (min-width: 720px) {
+  .screen[data-page="word"] .word-columns,
+  .word-layer .word-columns {
+    row-gap: 56px;
+  }
+
+  .screen[data-page="word"] .result-page > .word-family-block,
+  .word-layer .result-page > .word-family-block {
+    margin-top: 42px;
+  }
+
+  .screen[data-page="word"] .result-page > .word-origin-block,
+  .word-layer .result-page > .word-origin-block,
+  .screen[data-page="word"] .result-page > .word-related-block,
+  .word-layer .result-page > .word-related-block {
+    margin-top: 56px;
+  }
+
+  [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
+  [data-theme="constructivist"] .word-layer .word-columns > .block {
+    margin-bottom: 56px;
+  }
+
+  .screen[data-page="word"] .page-actions,
+  .word-layer .page-actions {
+    margin-top: 56px;
+  }
+}
+
+/* Landscape word rows: larger separation and row-paired columns for every theme. */
+@media (orientation: landscape) and (min-width: 720px) {
+  .screen[data-page="word"] .word-columns,
+  .word-layer .word-columns {
+    margin-top: 64px;
+    row-gap: 64px;
+  }
+
+  .screen[data-page="word"] .result-page > .word-origin-block,
+  .word-layer .result-page > .word-origin-block,
+  .screen[data-page="word"] .result-page > .word-related-block,
+  .word-layer .result-page > .word-related-block {
+    margin-top: 64px;
+  }
+
+  .screen[data-page="word"] .page-actions,
+  .word-layer .page-actions {
+    margin-top: 64px;
+  }
+
+}
+
+
+/* All three themes share the same landscape word-page rhythm. */
+@media (orientation: landscape) and (min-width: 720px) {
+  .screen[data-page="word"] .word-columns,
+  .word-layer .word-columns {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    columns: auto !important;
+    column-gap: 30px;
+    row-gap: 64px !important;
+    margin-top: 144px !important;
+  }
+
+  [data-theme] .screen[data-page="word"] .word-columns > .block,
+  [data-theme] .word-layer .word-columns > .block {
+    display: block !important;
+    width: auto !important;
+    break-inside: auto !important;
+    margin: 0 !important;
+    vertical-align: top;
+  }
+
+  .screen[data-page="word"] .result-page > .word-family-block,
+  .word-layer .result-page > .word-family-block {
+    grid-column: 1 / -1 !important;
+    margin-top: 42px !important;
+  }
+
+  .screen[data-page="word"] .result-page > .word-origin-block,
+  .word-layer .result-page > .word-origin-block,
+  .screen[data-page="word"] .result-page > .word-related-block,
+  .word-layer .result-page > .word-related-block {
+    grid-column: 1 / -1 !important;
+    margin-top: 64px !important;
+  }
+
+  .screen[data-page="word"] .page-actions,
+  .word-layer .page-actions {
+    margin-top: 64px !important;
   }
 }

@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "117";
+  const APP_VERSION = "120";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -2481,7 +2481,7 @@
         </section>` : ""}
 
         ${(word.synonyms.length || word.antonyms.length) ? `
-        <section class="block reveal" style="--d:2.2">
+        <section class="block word-relation-block reveal" style="--d:2.2">
           ${blockHead("03", "近义与反义", "点击继续查")}
           <div class="relation-grid">
             <div class="relation-card syn">
@@ -2508,7 +2508,7 @@
         </section>` : ""}
 
         ${word.examples.length ? `
-        <section class="block reveal" style="--d:2.4">
+        <section class="block word-example-block reveal" style="--d:2.4">
           ${blockHead("04", "例句", `${word.examples.length} 个例句`)}
           ${word.examples.map((example) => `
             <div class="example-card">
@@ -2520,7 +2520,7 @@
         </section>` : ""}
 
         ${word.collocations.length ? `
-        <section class="block reveal" style="--d:2.6">
+        <section class="block word-collocation-block reveal" style="--d:2.6">
           ${blockHead("05", "常见搭配", "固定说法")}
           <div class="collocation-row">
             ${word.collocations.map((item) => `<button class="collocation" type="button" data-action="lookup" data-query="${attr(item)}" data-type="word">${esc(item)}</button>`).join("")}
@@ -2528,7 +2528,7 @@
         </section>` : ""}
 
         ${word.memory ? `
-        <section class="block reveal" style="--d:2.8">
+        <section class="block word-memory-block reveal" style="--d:2.8">
           ${blockHead("06", "记法", "一个记忆钩子")}
           <div class="memory-card">
             <span class="memory-label">顺着这根线</span>
