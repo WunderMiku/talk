@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "114";
+  const APP_VERSION = "116";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -1141,10 +1141,39 @@
     const html = pageHtml(state.route);
     if (!html) return;
     screen.innerHTML = html;
+    enhanceWordColumns(screen);
     applyCacheDisplay();
     refreshCacheBorders();
     updateModuleBar();
     applyContentCopy();
+  }
+
+  function enhanceWordColumns(root = screen) {
+    const page = root?.querySelector?.(".result-page");
+    if (!page || page.querySelector(":scope > .word-columns")) return;
+    const meaning = page.querySelector(":scope > .word-meaning-block");
+    const family = page.querySelector(":scope > .word-family-block");
+    const anchor = family || meaning;
+    if (!anchor) return;
+    const blocks = [];
+    let node = anchor.nextElementSibling;
+    while (node) {
+      if (node.classList?.contains("block")) blocks.push(node);
+      node = node.nextElementSibling;
+    }
+    const origin = blocks.find((block) => block.classList.contains("word-origin-block"));
+    const related = blocks.find((block) => block.classList.contains("word-related-block"));
+    const columns = blocks.filter((block) => block !== origin && block !== related);
+    let wrapper = null;
+    if (columns.length) {
+      wrapper = document.createElement("div");
+      wrapper.className = "word-columns";
+      anchor.after(wrapper);
+      columns.forEach((block) => wrapper.append(block));
+    }
+    const tailAnchor = wrapper || anchor;
+    if (origin) tailAnchor.after(origin);
+    if (related) (origin || tailAnchor).after(related);
   }
 
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
@@ -1157,6 +1186,7 @@
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
       screen.innerHTML = pageHtml(route);
+      enhanceWordColumns(screen);
       applyCacheDisplay();
       refreshCacheBorders(screen);
       if (route.name === "word") {
@@ -2426,7 +2456,7 @@
           </div>` : ""}
         </section>
 
-        <section class="block reveal" style="--d:1.8">
+        <section class="block word-meaning-block reveal" style="--d:1.8">
           ${(() => {
             const groups = wordPosGroups(word);
             const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
@@ -2435,7 +2465,7 @@
         </section>
 
         ${word.family.length ? `
-        <section class="block reveal" style="--d:2">
+        <section class="block word-family-block reveal" style="--d:2">
           ${blockHead("02", "同根词", "派生词")}
           <div class="h-scroll">
             ${word.family.map((item) => `
@@ -2507,7 +2537,7 @@
         </section>` : ""}
 
         ${word.origin ? `
-        <section class="block reveal" style="--d:3">
+        <section class="block word-origin-block reveal" style="--d:3">
           ${blockHead("07", "词源与演变", "从词根看")}
           <div class="origin-card">
             <span class="origin-root">${esc(word.origin.root)}</span>
@@ -2528,7 +2558,7 @@
         </section>` : ""}
 
         ${word.related.length ? `
-        <section class="block reveal" style="--d:3.2">
+        <section class="block word-related-block reveal" style="--d:3.2">
           ${blockHead(word.origin ? "08" : "07", "继续漫游", "下一组词")}
           <div class="related-row">
             ${word.related.map((item) => `
@@ -2988,6 +3018,7 @@
     const scroll = $(".layer-scroll", record.el);
     if (!scroll) return;
     scroll.innerHTML = content;
+    enhanceWordColumns(scroll);
     applyCacheDisplay();
     refreshCacheBorders(scroll);
     scroll.scrollTop = 0;

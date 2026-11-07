@@ -7215,3 +7215,101 @@ textarea:focus-visible,
     white-space: nowrap;
   }
 }
+
+/* Word-page two-column content wrapper (landscape enhancement) */
+.word-columns {
+  display: block;
+}
+
+.word-columns > .block {
+  margin-top: 27px;
+}
+
+@media (orientation: landscape) and (min-width: 720px) {
+  .screen[data-page="word"] .word-meaning-block,
+  .word-layer .word-meaning-block {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .screen[data-page="word"] .result-page > .word-family-block,
+  .word-layer .result-page > .word-family-block {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 22px;
+  }
+
+  .screen[data-page="word"] .word-columns,
+  .word-layer .word-columns {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+    column-gap: 30px;
+  }
+
+  .screen[data-page="word"] .word-columns > .block,
+  .word-layer .word-columns > .block {
+    margin-top: 0;
+    margin-bottom: 24px;
+  }
+
+  /* USSR uses independent newspaper columns: each side stacks on its own. */
+  [data-theme="constructivist"] .screen[data-page="word"] .word-columns,
+  [data-theme="constructivist"] .word-layer .word-columns {
+    display: block;
+    columns: 2;
+    column-gap: 30px;
+  }
+
+  [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
+  [data-theme="constructivist"] .word-layer .word-columns > .block {
+    display: inline-block;
+    width: 100%;
+    break-inside: avoid;
+    margin: 0 0 24px;
+    vertical-align: top;
+  }
+}
+
+/* Landscape word-page section rhythm */
+@media (orientation: landscape) and (min-width: 720px) {
+  .screen[data-page="word"] .result-page > .word-origin-block,
+  .word-layer .result-page > .word-origin-block,
+  .screen[data-page="word"] .result-page > .word-related-block,
+  .word-layer .result-page > .word-related-block {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    margin-top: 24px;
+  }
+
+  .screen[data-page="word"] .word-origin-block,
+  .word-layer .word-origin-block {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: 30px;
+    align-items: start;
+  }
+
+  .screen[data-page="word"] .word-origin-block > .block-head,
+  .word-layer .word-origin-block > .block-head {
+    grid-column: 1 / -1;
+  }
+
+  .screen[data-page="word"] .word-origin-block > .origin-card,
+  .word-layer .word-origin-block > .origin-card {
+    grid-column: 1;
+  }
+
+  .screen[data-page="word"] .word-origin-block > .origin-timeline,
+  .word-layer .word-origin-block > .origin-timeline {
+    grid-column: 2;
+    margin-top: 0;
+  }
+
+  .screen[data-page="word"] .word-related-block,
+  .word-layer .word-related-block {
+    padding-top: 2px;
+  }
+}
