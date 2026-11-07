@@ -7399,7 +7399,7 @@ textarea:focus-visible,
     columns: auto !important;
     column-gap: 30px;
     row-gap: 64px !important;
-    margin-top: 144px !important;
+    margin-top: 96px !important;
   }
 
   [data-theme] .screen[data-page="word"] .word-columns > .block,
