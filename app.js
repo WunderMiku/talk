@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "131";
+  const APP_VERSION = "132";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -33,6 +33,10 @@
   const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
+  // Bumped when the shape of a cached entry changes (POS spelled out, English
+  // glosses, ...). Older records are ignored and quietly replaced on the next
+  // lookup, so nobody keeps reading a stale mix of Chinese and English.
+  const WORD_CACHE_SCHEMA = 2;
   const WORD_CACHE_KEY = "talk.wordcache.v1";
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
@@ -575,18 +579,59 @@
     })[key] || value || "通用";
   }
 
+  /* Part of speech is always the English abbreviation, everywhere: the entry,
+     relation cards, the sentence key words and the detail sheets. Models tend
+     to answer with "noun" one time and "名词" the next, so both spellings are
+     folded into the same short form here instead of at each call site. */
+  const POS_ABBREVIATIONS = {
+    n: "n.",
+    noun: "n.",
+    v: "v.",
+    verb: "v.",
+    adj: "adj.",
+    adjective: "adj.",
+    adv: "adv.",
+    adverb: "adv.",
+    prep: "prep.",
+    preposition: "prep.",
+    pron: "pron.",
+    pronoun: "pron.",
+    conj: "conj.",
+    conjunction: "conj.",
+    num: "num.",
+    numeral: "num.",
+    int: "int.",
+    interjection: "int.",
+    art: "art.",
+    article: "art.",
+    det: "det.",
+    determiner: "det.",
+    phr: "phr.",
+    phrase: "phr.",
+    "名词": "n.",
+    "动词": "v.",
+    "形容词": "adj.",
+    "副词": "adv.",
+    "介词": "prep.",
+    "代词": "pron.",
+    "连词": "conj.",
+    "数词": "num.",
+    "感叹词": "int.",
+    "冠词": "art.",
+    "短语": "phr."
+  };
+
+  function posAbbr(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    const parts = raw.split(/\s*[/、,·]\s*|\s+or\s+|\s+and\s+/i).map((part) => part.trim()).filter(Boolean);
+    const mapped = parts.map((part) => POS_ABBREVIATIONS[part.toLowerCase().replace(/\.$/, "")] || POS_ABBREVIATIONS[part] || "");
+    if (!mapped.length || mapped.some((item) => !item)) return raw;
+    return [...new Set(mapped)].join(" / ");
+  }
+
   function posLabel(value) {
-    const key = String(value || "").toLowerCase();
-    return ({
-      noun: "名词",
-      verb: "动词",
-      adjective: "形容词",
-      adverb: "副词",
-      phrase: "短语",
-      preposition: "介词",
-      pronoun: "代词",
-      conjunction: "连词"
-    })[key] || value || "词";
+    return posAbbr(value) || "—";
   }
 
   function tagLabel(value) {
@@ -876,6 +921,10 @@
     const key = normalizeWord(word);
     const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
+    if (Number(hit.schema || 0) !== WORD_CACHE_SCHEMA) {
+      void removeWordRecord(key);
+      return null;
+    }
     // Detail is metadata only. A cached word is reusable across fast/standard/deep;
     // the user can explicitly regenerate if a different depth is desired.
     if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
@@ -889,7 +938,7 @@
     const key = normalizeWord(word);
     if (!key || !data) return;
     const { context, ...clean } = data;
-    const record = { key, at: Date.now(), detail, data: clean };
+    const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, data: clean };
     wordCache.set(key, record);
     if (wordDb) {
       wordDb.put(WORD_DB_STORE, record).catch((error) => {
@@ -2173,7 +2222,7 @@
         ${lead ? `<button class="poster-lead" type="button" data-action="word" data-word="${attr(lead.word)}" aria-label="查看 ${attr(lead.word)}" style="--i:0">
           <span class="poster-lead-label">01 / ${esc(copy.leadLabel)}</span>
           <span class="poster-lead-word">${esc(lead.word)}</span>
-          <span class="poster-lead-pos">${esc(lead.pos || "word")}</span>
+          <span class="poster-lead-pos">${esc(posLabel(lead.pos))}</span>
           <span class="poster-lead-gloss">${esc(lead.gloss)}</span>
           <span class="poster-lead-why">${esc(lead.why || "")}</span>
         </button>` : ""}
@@ -2181,7 +2230,7 @@
           ${columns.map((item, index) => `<button class="poster-col" type="button" data-action="word" data-word="${attr(item.word)}" aria-label="查看 ${attr(item.word)}" style="--i:${index + 1}">
             <span class="poster-col-index">${String(index + 2).padStart(2, "0")}</span>
             <span class="poster-col-word">${esc(item.word)}</span>
-            <span class="poster-col-pos">${esc(item.pos || "word")}</span>
+            <span class="poster-col-pos">${esc(posLabel(item.pos))}</span>
             <span class="poster-col-gloss">${esc(item.gloss)}</span>
             <span class="poster-col-why">${esc(item.why || "")}</span>
           </button>`).join("")}
@@ -2359,7 +2408,7 @@
           </div>
           <div class="daily-main">
             <p class="daily-word">${esc(daily.word)}</p>
-            <div class="daily-phonetic">${esc(daily.phonetic || "")} · ${esc(daily.pos || "word")}</div>
+            <div class="daily-phonetic">${esc(daily.phonetic || "")} · ${esc(posLabel(daily.pos))}</div>
           </div>
           <div class="daily-bottom">
             <p class="daily-meaning">${esc(daily.translation || daily.short || "")}</p>
@@ -2435,14 +2484,19 @@
       </aside>`;
   }
 
+  /* Relation cards speak Chinese only. A model (or an older cached entry) may
+     hand back an English definition; that is dropped rather than mixed in. */
   function relationGloss(item) {
     const zh = String(item?.zh || "").trim();
-    if (zh && /[\u3400-\u9fff]/.test(zh)) return zh;
-    const gloss = String(item?.gloss || "").trim();
-    if (/[\u3400-\u9fff]/.test(gloss)) return gloss;
+    if (/[\u3400-\u9fff]/.test(zh)) return zh;
     const stub = DATA.lexicon[normalizeWord(item?.word || "")];
     if (stub?.zh) return stub.zh;
-    return gloss;
+    // Demo corpus words carry their own Chinese translation; prefer it over an
+    // English gloss so the offline cards read Chinese too.
+    const entry = DATA.words?.[normalizeWord(item?.word || "")];
+    if (entry?.translation && /[\u3400-\u9fff]/.test(entry.translation)) return entry.translation;
+    const gloss = String(item?.gloss || "").trim();
+    return /[\u3400-\u9fff]/.test(gloss) ? gloss : "";
   }
 
   function wordPosGroups(word) {
@@ -2583,7 +2637,7 @@
             ${word.family.map((item) => `
               <button class="family-card" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="同根词">
                 <span class="family-top">
-                  <span class="family-pos">${esc(item.pos || "—")}</span>
+                  <span class="family-pos">${esc(posLabel(item.pos))}</span>
                   ${icon("arrowUpRight", "family-arrow")}
                 </span>
                 <strong class="family-word">${esc(item.word)}</strong>
@@ -2795,7 +2849,7 @@
               <div class="mini-relations">
                 ${relations.map((item) => `
                   <button class="mini-rel ${item.kind === "syn" ? "syn" : item.kind === "ant" ? "ant" : ""}" type="button"
-                    data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(item.gloss)}" data-pos="${attr(item.pos)}"
+                    data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(posAbbr(item.pos))}"
                     data-relation="${item.kind === "syn" ? "近义词" : item.kind === "ant" ? "反义词" : "同根词"}"
                     title="${attr(item.gloss)}">${esc(item.word)}</button>`).join("")}
               </div>` : ""}
@@ -3478,7 +3532,7 @@
         <span class="sheet-section-label">${esc(label)}</span>
         <div class="sheet-rel-row">
           ${items.map((item) => `
-            <button class="sheet-rel" type="button" data-action="sheet-word" data-word="${attr(item.word)}" data-gloss="${attr(item.gloss || "")}" data-pos="${attr(item.pos || "")}">
+            <button class="sheet-rel" type="button" data-action="sheet-word" data-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(posAbbr(item.pos))}">
               ${esc(item.word)} ${item.gloss ? `<small>${esc(item.gloss)}</small>` : ""}
             </button>`).join("")}
         </div>
@@ -4676,7 +4730,7 @@
       if (typeof item === "string") return { word: item, pos: "", gloss: "" };
       return {
         word: String(item.word || item.term || item.text || ""),
-        pos: String(item.pos || item.partOfSpeech || ""),
+        pos: posAbbr(item.pos || item.partOfSpeech || ""),
         gloss: String(item.gloss || item.meaning || item.definition || item.nuance || ""),
         zh: String(item.zh || item.glossZh || item.meaningZh || item.translation || "")
       };

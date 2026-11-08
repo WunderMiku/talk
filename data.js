@@ -35,7 +35,7 @@ window.TALK_DATA = (() => {
         { word: "chance", gloss: "the unexpected" },
         { word: "fortune", gloss: "good luck" },
         { word: "fluke", gloss: "a lucky accident" },
-        { word: "happy accident", gloss: "fortunate surprise" }
+        { word: "happy accident", gloss: "幸运的意外" }
       ],
       antonyms: [
         { word: "misfortune", gloss: "bad luck" },
@@ -150,7 +150,7 @@ window.TALK_DATA = (() => {
         { word: "fleeting", gloss: "passing quickly" },
         { word: "transient", gloss: "not lasting long" },
         { word: "momentary", gloss: "lasting a moment" },
-        { word: "short-lived", gloss: "brief by nature" }
+        { word: "short-lived", gloss: "天生短暂" }
       ],
       antonyms: [
         { word: "eternal", gloss: "without end" },
@@ -214,7 +214,7 @@ window.TALK_DATA = (() => {
         { word: "tough", gloss: "hard to break" },
         { word: "adaptable", gloss: "able to adjust" },
         { word: "buoyant", gloss: "quick to rise again" },
-        { word: "hardy", gloss: "robust under strain" }
+        { word: "hardy", gloss: "耐折腾的" }
       ],
       antonyms: [
         { word: "fragile", gloss: "easily broken" },
@@ -472,7 +472,7 @@ window.TALK_DATA = (() => {
       antonyms: [
         { word: "bluntness", gloss: "plain, unsubtle speech" },
         { word: "generalisation", gloss: "a broad claim" },
-        { word: "binary", gloss: "only two options" }
+        { word: "binary", gloss: "非此即彼" }
       ],
       examples: [
         {
