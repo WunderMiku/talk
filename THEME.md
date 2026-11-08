@@ -52,6 +52,10 @@ before the app renders and updates the browser `theme-color` meta tag.
 
 ## The four themes
 
+USSR carries one piece of art beyond type and colour: a red silhouette of The
+Motherland Calls, traced from the 80th anniversary emblem and set into the
+bottom corner as a multiply-blended watermark.
+
 | id | label | voice | geometry |
 | --- | --- | --- | --- |
 | `paper` | Paper | paper and highlighter, the default | soft radii, quiet rules |
