@@ -7023,6 +7023,28 @@ textarea:focus-visible,
   --word-columns-lead: 96px;
 }
 
+/* Two columns of translation results as soon as the screen lies on its side,
+   even below the full wide layout: five cards in one column is a lot of scroll
+   for nothing. */
+@media (orientation: landscape) and (min-width: 560px) {
+  .translation-workspace-results {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-content: start;
+    column-gap: 12px;
+  }
+
+  .translation-workspace-results > .translation-result-head,
+  .translation-workspace-results > .translator-empty,
+  .translation-workspace-results > .translation-loading {
+    grid-column: 1 / -1;
+  }
+
+  .translation-workspace-results > .translation-card {
+    align-self: start;
+  }
+}
+
 @media (orientation: landscape) and (min-width: 720px) {
   body {
     overflow: hidden;
@@ -7320,23 +7342,6 @@ textarea:focus-visible,
 
   .screen[data-page="translator"] .translator-landing-hint {
     grid-column: 1 / -1;
-  }
-
-  .translation-workspace-results {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-content: start;
-    column-gap: 12px;
-  }
-
-  .translation-workspace-results > .translation-result-head,
-  .translation-workspace-results > .translator-empty,
-  .translation-workspace-results > .translation-loading {
-    grid-column: 1 / -1;
-  }
-
-  .translation-workspace-results > .translation-card {
-    align-self: start;
   }
 
   /* The word placeholder stays on the left, the block placeholders on the
