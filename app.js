@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "128";
+  const APP_VERSION = "129";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1606,9 +1606,9 @@
               <span class="mono">原文</span>
               <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
             </div>
-            <textarea id="translator-input" rows="3" maxlength="600" placeholder="${attr(copy.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
+            <textarea id="translator-input" rows="3" maxlength="${TRANSLATOR_MAX_CHARS}" placeholder="${attr(copy.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
             <div class="translator-input-foot">
-              <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span></span>
+              <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span><span class="translator-char-count">0 / ${TRANSLATOR_MAX_CHARS}</span></span>
               <button class="search-submit" type="submit" aria-label="生成选中的风格">${icon("arrowUpRight")}</button>
             </div>
           </div>
@@ -1643,10 +1643,11 @@
       <div class="translation-workspace-body">
         <form class="workspace-translator-form" id="workspace-translator-form" novalidate>
           <div class="workspace-input-shell">
-            <textarea id="workspace-translator-input" rows="2" maxlength="600" spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
+            <textarea id="workspace-translator-input" rows="2" maxlength="${TRANSLATOR_MAX_CHARS}" spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
             <div class="workspace-input-foot">
               <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
               <span class="translator-language">自动识别</span>
+              <span class="translator-char-count">0 / ${TRANSLATOR_MAX_CHARS}</span>
               <button class="search-submit" type="submit" aria-label="重新翻译">${icon("arrowUpRight")}</button>
             </div>
           </div>
@@ -1704,6 +1705,11 @@
           ? detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英"
           : "自动识别";
     $$(".translator-language").forEach((label) => { label.textContent = text; });
+    const workspaceValue = $("#workspace-translator-input")?.value ?? value;
+    const shown = $("#workspace-translator-input") ? workspaceValue : value;
+    $$(".translator-char-count").forEach((label) => {
+      label.textContent = `${shown.length} / ${TRANSLATOR_MAX_CHARS}`;
+    });
   }
 
   function renderTranslatorLoading(styles = state.translatorStyles) {
@@ -1875,8 +1881,8 @@
       toast("先输入一句中文或英文");
       return;
     }
-    if (text.length > 600) {
-      toast("请控制在 600 个字符以内");
+    if (text.length > TRANSLATOR_MAX_CHARS) {
+      toast(`请控制在 ${TRANSLATOR_MAX_CHARS} 个字符以内`);
       return;
     }
     const selectedStyles = TRANSLATOR_STYLES
@@ -2320,7 +2326,7 @@
             </div>
           </div>
           <div class="search-row">
-            <textarea class="search-input" id="search-input" rows="1" maxlength="320" placeholder="${attr(copy.searchPlaceholder)}" aria-label="单词或句子" spellcheck="false"></textarea>
+            <textarea class="search-input" id="search-input" rows="1" maxlength="800" placeholder="${attr(copy.searchPlaceholder)}" aria-label="单词或句子" spellcheck="false"></textarea>
             <button class="search-submit" type="submit" aria-label="查询">${icon("arrowUpRight")}</button>
           </div>
           <div class="search-bottom">
@@ -4023,8 +4029,8 @@
       toast("先输入一个单词或一句话");
       return;
     }
-    if (query.length > 320) {
-      toast("请控制在 320 个字符以内");
+    if (query.length > SEARCH_MAX_CHARS) {
+      toast(`请控制在 ${SEARCH_MAX_CHARS} 个字符以内`);
       return;
     }
 
@@ -4102,6 +4108,10 @@
   const WORD_SYSTEM_PROMPT = window.TALK_PROMPTS.word;
   const SENTENCE_SYSTEM_PROMPT = window.TALK_PROMPTS.sentence;
   const TRANSLATOR_STYLES = window.TALK_CONTENT.translator.styles;
+  // Long paragraphs are fine: the request only has to fit the model context.
+  const TRANSLATOR_MAX_CHARS = 4000;
+  // A sentence to analyse can be a paragraph; the word lookup path stays short.
+  const SEARCH_MAX_CHARS = 800;
   const TRANSLATOR_SYSTEM_PROMPT = window.TALK_PROMPTS.translator;
 
   state.translatorStyles = TRANSLATOR_STYLES.map((style) => style.id);

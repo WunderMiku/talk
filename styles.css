@@ -5652,6 +5652,14 @@ textarea:focus-visible,
   color: var(--muted-2);
 }
 
+.translator-char-count {
+  color: var(--muted-2);
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
 .translator-eyebrow .spark {
   background: var(--lime-deep);
   box-shadow: 0 0 0 4px rgba(185, 230, 59, 0.2);
@@ -5919,11 +5927,23 @@ textarea:focus-visible,
 }
 
 .workspace-input-foot .translator-language {
-  flex: 1;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   color: var(--muted-2);
   font-family: var(--mono);
   font-size: 7px;
+  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workspace-input-foot .translator-language {
+  display: none;
+}
+
+.workspace-input-foot .translator-char-count {
+  flex: 0 0 auto;
+  margin-right: auto;
 }
 
 .workspace-input-foot .search-submit {
@@ -7023,9 +7043,36 @@ textarea:focus-visible,
   --word-columns-lead: 96px;
 }
 
-/* Two columns of translation results as soon as the screen lies on its side,
-   even below the full wide layout: five cards in one column is a lot of scroll
-   for nothing. */
+/* The results panel decides for itself: one fluid column until the panel is
+   wide enough for two equal ones, then two columns with a real gap. This keys
+   off the panel, not the viewport, so a tablet in portrait behaves too. */
+.translation-workspace-body {
+  container-type: inline-size;
+}
+
+.translation-workspace-results {
+  gap: 12px;
+}
+
+@container (min-width: 560px) {
+  .translation-workspace-results {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+  }
+
+  .translation-workspace-results > .translation-result-head,
+  .translation-workspace-results > .translator-empty,
+  .translation-workspace-results > .translation-loading {
+    grid-column: 1 / -1;
+  }
+
+  .translation-workspace-results > .translation-card {
+    align-self: start;
+  }
+}
+
+/* Same rule as a viewport fallback, for browsers without container queries. */
 @media (orientation: landscape) and (min-width: 560px) {
   .translation-workspace-results {
     display: grid;
