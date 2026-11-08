@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "130";
+  const APP_VERSION = "131";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2847,9 +2847,9 @@
      Loading / missing / error
      ============================================================ */
 
-  function loadingPage(query, type) {
+  function loadingBody(query, type, { statusText, withPreview = false } = {}) {
+    const status = statusText || (type === "sentence" ? "找出真正重要的词" : "正在理解词义");
     return `
-      ${backTopbar({ label: type === "sentence" ? "正在理解句子" : "正在查询单词", title: shorten(query, 28) })}
       <main class="result-page loading-page">
         <div class="loading-lead">
           <div class="result-kicker reveal" style="--d:0">
@@ -2859,9 +2859,9 @@
           <h1 class="loading-query reveal" style="--d:0.4">${esc(query)}</h1>
           <div class="loading-status reveal" style="--d:0.8">
             <span class="loading-dots"><i></i><i></i><i></i></span>
-            <span id="loading-status-text">${type === "sentence" ? "找出真正重要的词" : "正在理解词义"}</span>
+            <span${withPreview ? ' id="loading-status-text"' : ""}>${status}</span>
           </div>
-          <div class="live-preview" id="live-preview" hidden></div>
+          ${withPreview ? '<div class="live-preview" id="live-preview" hidden></div>' : ""}
           <div class="skeleton-stack reveal" style="--d:1">
             <div class="skeleton hero"></div>
             <div class="skeleton line"></div>
@@ -2874,6 +2874,12 @@
           <div class="skeleton line"></div>
         </div>
       </main>`;
+  }
+
+  function loadingPage(query, type) {
+    return `
+      ${backTopbar({ label: type === "sentence" ? "正在理解句子" : "正在查询单词", title: shorten(query, 28) })}
+      ${loadingBody(query, type, { withPreview: true })}`;
   }
 
   function missPage(type, query, suggestions = []) {
@@ -3023,24 +3029,7 @@
   function layerLoadingPage(word, origin, relation, depth) {
     return `
       ${layerTopbar({ title: word, origin, relation, depth })}
-      <main class="result-page loading-page layer-wait">
-        <div class="result-kicker reveal" style="--d:0">
-          <span class="kicker-pill accent">正在查词</span>
-          <span class="kicker-pill">模型正在整理</span>
-        </div>
-        <h1 class="loading-query reveal" style="--d:0.3">${esc(word)}</h1>
-        <div class="loading-status reveal" style="--d:0.5">
-          <span class="loading-dots"><i></i><i></i><i></i></span>
-          <span>正在生成完整词条</span>
-        </div>
-        <div class="skeleton-stack reveal" style="--d:0.7">
-          <div class="skeleton hero"></div>
-          <div class="skeleton line"></div>
-          <div class="skeleton line short"></div>
-          <div class="skeleton card tall"></div>
-          <div class="skeleton card"></div>
-        </div>
-      </main>`;
+      ${loadingBody(word, "word", { statusText: "正在生成完整词条" })}`;
   }
 
   function layerConnectPage(word, origin, relation, depth) {
@@ -3107,6 +3096,7 @@
     const record = {
       el: layer,
       word,
+      content,
       data: data || null,
       origin,
       relation,
@@ -3116,6 +3106,7 @@
       error: null
     };
     state.wordLayers.push(record);
+    shelveLayersBelow();
     updateScrollLock();
     if (data) schedulePrefetch(data);
     else updateCacheCorner(false, "正在生成本层词条");
@@ -3133,6 +3124,8 @@
     if (!record?.el?.isConnected) return;
     const scroll = $(".layer-scroll", record.el);
     if (!scroll) return;
+    record.content = content;
+    record.shelved = false;
     scroll.innerHTML = content;
     enhanceWordColumns(scroll);
     applyCacheDisplay();
@@ -3301,6 +3294,39 @@
     });
   }
 
+  /* Only the top layer is on screen; everything below it is a 14px strip of
+     background. Emptying those pages keeps long "word chains" from piling up
+     full entries in the document. The markup is kept on the record and put
+     back when the user walks back up the stack. */
+  function shelveLayersBelow() {
+    if (!state.wordLayers.length) return;
+    const top = state.wordLayers[state.wordLayers.length - 1];
+    state.wordLayers.forEach((layer) => {
+      if (layer === top || layer.shelved || layer.loading || !layer.data) return;
+      const scroll = $(".layer-scroll", layer.el);
+      if (!scroll) return;
+      layer.scrollTop = scroll.scrollTop;
+      scroll.replaceChildren();
+      layer.shelved = true;
+    });
+  }
+
+  function restoreLayerContent(record) {
+    if (!record?.shelved) return;
+    const scroll = $(".layer-scroll", record.el);
+    if (!scroll) return;
+    record.shelved = false;
+    scroll.innerHTML = record.content || "";
+    enhanceWordColumns(scroll);
+    applyCacheDisplay();
+    refreshCacheBorders(scroll);
+    const offset = record.scrollTop || 0;
+    scroll.scrollTop = offset;
+    requestAnimationFrame(() => {
+      scroll.scrollTop = offset;
+    });
+  }
+
   function popWordLayer() {
     const item = state.wordLayers.pop();
     if (!item) return;
@@ -3313,6 +3339,7 @@
     if (previous) {
       previous.el.classList.remove("is-behind");
       previous.el.removeAttribute("aria-hidden");
+      restoreLayerContent(previous);
       previous.el.focus({ preventScroll: true });
       refreshCacheBorders(previous.el);
       if (previous.data) schedulePrefetch(previous.data);

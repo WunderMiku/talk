@@ -2422,6 +2422,23 @@ textarea:focus-visible,
   opacity: 1;
 }
 
+/* A full-screen backdrop blur is one of the most expensive things a phone GPU
+   can be asked to do: it re-blurs the whole page every frame of the sheet
+   animation. The scrim alone reads the same on a small screen, so the blur is
+   kept only where there is room to pay for it. */
+@media (max-width: 720px), (prefers-reduced-transparency: reduce) {
+  .sheet-backdrop {
+    background: rgba(20, 21, 17, 0.46);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
+  .topbar {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
 .sheet:focus {
   outline: none;
 }
@@ -2445,6 +2462,17 @@ textarea:focus-visible,
 
 .sheet.show {
   transform: translateY(0);
+}
+
+/* The sheet is its own world: containing it keeps the page behind from being
+   laid out again every time the panel opens or one of its inputs changes. */
+.sheet {
+  contain: layout paint;
+  will-change: transform;
+}
+
+.sheet-scroll {
+  contain: layout paint;
 }
 
 .sheet-handle {
