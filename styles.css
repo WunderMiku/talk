@@ -5250,7 +5250,7 @@ textarea:focus-visible,
   flex-wrap: nowrap;
   overflow: visible;
   gap: 4px;
-  margin: 10px 0 0;
+  margin: 10px 0 16px;
   padding: 0;
 }
 
@@ -5877,6 +5877,13 @@ textarea:focus-visible,
   flex-direction: column;
   min-height: 0;
   padding: 12px 22px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.translation-workspace-body::-webkit-scrollbar {
+  display: none;
 }
 
 .workspace-input-shell {
@@ -5957,15 +5964,8 @@ textarea:focus-visible,
 }
 
 .translation-workspace-results {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
+  flex: 0 0 auto;
   padding: 12px 0 38px;
-  scrollbar-width: none;
-}
-
-.translation-workspace-results::-webkit-scrollbar {
-  display: none;
 }
 
 .translation-workspace .translation-result-head {

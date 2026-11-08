@@ -710,6 +710,36 @@
   );
 }
 
+/* Channels are numbered, not illustrated: no emoji in the terminal. */
+[data-theme="endfield"] .translator-styles {
+  counter-reset: efchan;
+}
+
+[data-theme="endfield"] .translator-style-chip {
+  counter-increment: efchan;
+  justify-content: center;
+  gap: 3px;
+}
+
+[data-theme="endfield"] .translator-style-chip .translator-style-emoji,
+[data-theme="endfield"] .translator-style-check {
+  display: none;
+}
+
+[data-theme="endfield"] .translator-style-chip::before {
+  content: "0" counter(efchan);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  line-height: 1;
+}
+
+[data-theme="endfield"] .translator-style-chip.selected::before {
+  color: var(--lime);
+}
+
 [data-theme="endfield"] .translator-style-chip:hover {
   border-color: var(--ink);
   color: var(--ink);
