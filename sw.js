@@ -1,15 +1,15 @@
 /* talk. service worker — app shell only; model/audio caches stay in IndexedDB. */
-const SHELL_CACHE = "talk-shell-v121";
+const SHELL_CACHE = "talk-shell-v122";
 const SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=121",
-  "./theme.css?v=121",
-  "./theme.js?v=121",
-  "./content.js?v=121",
-  "./prompts.js?v=121",
-  "./data.js?v=121",
-  "./app.js?v=121",
+  "./styles.css?v=122",
+  "./theme.css?v=122",
+  "./theme.js?v=122",
+  "./content.js?v=122",
+  "./prompts.js?v=122",
+  "./data.js?v=122",
+  "./app.js?v=122",
   "./vendor/idb.js",
   "./manifest.webmanifest",
   "./favicon.svg",
@@ -43,11 +43,6 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-
-  // The large Kokoro model, voices and ONNX runtime use their own browser caches.
-  if (url.pathname.includes("/models/") || url.pathname.includes("/vendor/ort/") || /\.(onnx|wasm|bin)$/i.test(url.pathname)) {
-    return;
-  }
 
   if (request.mode === "navigate") {
     event.respondWith(

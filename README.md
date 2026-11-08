@@ -1,26 +1,25 @@
 # talk.
 
 A small bilingual English dictionary prototype built as a **pure static site**.
-No backend, no build step, and no runtime CDN/model download dependency.
+No backend, no build step, no local model.
 
 ## What is in the project
 
 ```text
 index.html
 styles.css
+theme.css
 data.js
 app.js
+theme.js
+content.js
+prompts.js
+manifest.webmanifest
+sw.js
 favicon.svg
-models/
-  onnx-community/Kokoro-82M-v1.0-ONNX/
-    config.json
-    tokenizer.json
-    tokenizer_config.json
-    onnx/model_quantized.onnx
-    voices/*.bin
+icons/
 vendor/
-  kokoro.web.js
-  ort/ort-wasm-simd-threaded.jsep.{mjs,wasm}
+  idb.js
 ```
 
 The word cache is stored in IndexedDB (`talk.words.v1`) through the vendored
@@ -31,26 +30,19 @@ local cache, was generated this time, or is a built-in demo entry.
 Cache management is available from **settings → cache management**. It shows
 word/audio counts, actual bytes, a usage meter, and allows changing the word
 limit (10–2000) and retention (1–3650 days). The estimated word footprint is
-shown above the recent-word list. Audio entries have a separate clear action.
+shown above the recent-word list. Cached Qwen audio has a separate clear action.
 The **regenerate** controls bypass the relevant cache: the word button forces a
 new model lookup, and the small refresh button beside a speaker regenerates the
-WAV instead of replaying the old cached audio.
+audio instead of replaying the cached clip.
 
-Total size is about **115 MB**:
-
-- Kokoro q8 model: ~92 MB
-- ONNX Runtime WASM: ~21 MB
-- Kokoro JS + six voices: ~5 MB
-- app/data/styles/icons: < 1 MB
-- `idb` browser bundle: ~4 KB
-
-The model, runtime, voices, CSS and JS are all served from the same static
-origin. There are no `fetch` calls to Hugging Face or jsDelivr at runtime.
+The whole site is under **1 MB** (HTML/CSS/JS/icons plus a ~4 KB `idb` helper
+that the Pages workflow downloads into `vendor/`). Nothing else is fetched at
+runtime except the user-configured model API.
 
 ## Preview locally
 
 ```bash
-cd talk-web
+bash scripts/fetch-assets.sh .   # once: downloads vendor/idb.js
 python3 -m http.server 8080
 ```
 
@@ -58,67 +50,22 @@ Open <http://127.0.0.1:8080/>.
 
 ## Deploy to GitHub Pages
 
-The recommended path uses **GitHub Actions** to fetch the large Kokoro assets
-during deployment. The repository stays small, and you can create it from the
-GitHub web UI without uploading a 92 MB file.
+The repository is small enough to deploy directly. The Pages workflow copies the
+app shell, downloads the `idb` helper into `vendor/`, and publishes the artifact.
 
-### A. Recommended: GitHub Actions, small repo
-
-Prepare only these files in the repository:
-
-```text
-index.html
-styles.css
-data.js
-app.js
-favicon.svg
-.nojekyll
-.github/workflows/pages.yml
-scripts/fetch-assets.sh
-.gitignore
-```
-
-Do **not** upload `models/` or `vendor/`; the workflow downloads them into the
-Pages artifact at deploy time.
-
-1. Create a public GitHub repository.
-2. Add the files above. GitHub's **Add file → Create new file** supports paths
-   such as `.github/workflows/pages.yml`.
-3. Open **Settings → Pages**.
-4. Set **Build and deployment → Source** to **GitHub Actions**.
-5. Run the workflow from the **Actions** tab (or push to `main` / `master`).
-6. After the deployment finishes, open:
+1. Open **Settings → Pages**.
+2. Set **Build and deployment → Source** to **GitHub Actions**.
+3. Push to `main` / `master`, or run the workflow from the **Actions** tab.
+4. After the deployment finishes, open:
 
    ```text
    https://<user>.github.io/<repo>/
    ```
 
-The workflow also downloads the `idb` browser bundle. The first run downloads
-~115 MB of Kokoro assets and publishes them with the static site. Visitors then download them from Pages, not from
-Hugging Face or jsDelivr.
-
-Limits: GitHub Pages allows a 1 GB site and 100 MB per file. The q8 model is
-~92 MB, so it fits.
-
-### B. Alternative: commit assets and deploy from a branch
-
-Use this only if you have Git/GitHub Desktop and want the model in the repo.
-Force-add the ignored asset folders:
-
-```bash
-git add -f models vendor
-git add .
-git commit -m "Talk static site with local Kokoro assets"
-git branch -M main
-git remote add origin https://github.com/<user>/<repo>.git
-git push -u origin main
-```
-
-Then choose **Settings → Pages → Deploy from a branch → main / (root)**, and
-remove or ignore the Pages workflow if you do not want it to run.
-
-The GitHub web upload form has a 25 MB limit, so the branch route requires Git
-for the 92 MB model.
+Only these files are published: `index.html`, the CSS/JS/theme/copy/prompt
+modules, `manifest.webmanifest`, `sw.js`, `favicon.svg`, `icons/`, `LICENSE`, and
+the downloaded `vendor/idb.js`. There is no model to download and no 100 MB file
+limit to work around, so the site also fits a branch-based deploy if preferred.
 
 ## Settings UX
 
@@ -221,9 +168,9 @@ The site includes:
 - An install button in model settings when the browser emits
   `beforeinstallprompt`
 
-The 115 MB Kokoro model/voices are deliberately **not** pre-cached by the
-service worker; the app shell (HTML/CSS/JS/IDB helper/icons) is cached for
-offline launch. TTS model loading remains a first-use online download.
+The service worker pre-caches the app shell (HTML/CSS/JS/IDB helper/icons) so
+the UI launches offline. Dictionary content still needs the model API, and Qwen
+audio needs the network; the device's built-in speech synthesis works offline.
 
 The deployment workflow copies `manifest.webmanifest`, `sw.js`, and `icons/`
 into the Pages artifact.
@@ -297,86 +244,53 @@ the preview origin; some other providers may not.
 
 ## TTS
 
-Kokoro runs locally in the browser. **Qwen 语音** uses the active Qwen API
-profile's key and calls the regional `POST /api/v1/services/audio/tts/
-SpeechSynthesizer` endpoint directly from the browser (CORS is supported by
-the China endpoints). It defaults to `qwen-audio-3.1-tts-plus` and
-`longanhuan_v3.1`; the model and voice are editable in 设置 → 发音.
+发音 has two engines, selectable in 设置 → 发音:
+
+- **系统原生** — the device's `speechSynthesis`. Instant, no download, offline;
+  voice quality depends on the device. This is the default.
+- **Qwen 语音** — uses the active Qwen API profile's key and calls the regional
+  `POST /api/v1/services/audio/tts/SpeechSynthesizer` endpoint directly from the
+  browser (CORS is supported by the China endpoints). Defaults to
+  `qwen-audio-3.1-tts-plus` and `longanhuan_v3.1`; model and voice are editable.
+  `qwen3-tts*` model names switch to the multimodal generation route.
+
+Qwen results are cached in IndexedDB (`talk.audio.v1`, versioned keys), so a
+repeated playback is instant and offline. Audio cache entries have a dedicated
+clear action in cache management; the refresh button beside a speaker forces a
+new request instead of replaying the cached clip.
+
+If Qwen fails (missing key, blocked CORS, HTTP error), the app shows the error
+and falls back to the device voice, so a word is never left silent.
+
+The bundled local Kokoro model was removed in v122: it cost ~115 MB per visitor,
+took 13–17 seconds to load, and its quantized ONNX session was unreliable on
+Android WebGPU. There is no local inference path any more, and no `models/`
+directory to deploy.
 
 Because this is a static GitHub Pages app, there is no backend that can hide a
 key. Keys are held in `sessionStorage` (or `localStorage` when "记住密钥" is
 checked) and are visible to anything running in that browser. Never commit a
 key; use "记住密钥" off on shared devices, and use a limited quota/key. A
 serverless proxy is required if the key must be hidden from the browser.
- options
-
-The app now exposes a **发音** selector in settings:
-
-- **Kokoro** — local neural TTS; slower first load, better/consistent voice.
-- **系统原生** — immediate device `speechSynthesis`; no model download, voice
-  depends on the device.
-
-Kokoro audio cache keys are versioned (`v3`), so old generated WAVs are not
-replayed after a voice/model fix. Use the refresh button beside a speaker to
-force a new WAV, or clear audio cache from cache management.
-
-The default Kokoro backend is now **WASM 兼容**, because some WebGPU runtimes
-produce bad audio with the q8 quantized session. Use `自动` only if WebGPU is
-known to work on the device. If a voice sounds wrong, press the refresh button
-beside the speaker or clear audio cache; the settings panel reports the active
-backend.
-
-The choice is stored as a non-secret browser preference.
-
-## Kokoro TTS
-
-- 100% browser-side inference.
-- Word lookup is local-first: IndexedDB cache → model API.
-- Cache entries are exported/imported from the model settings as JSON.
-- WebGPU is probed first and used when functional; it automatically falls back
-  to WASM. The settings panel reports the active backend and load/generation
-  timings.
-- The bundled q8 model is the smallest practical Kokoro ONNX variant and keeps
-  the file below GitHub's 100 MB per-file limit. Some WebGPU runtimes reject
-  quantized q8 sessions; those devices will correctly report WASM and use the
-  CPU path. A WebGPU-compatible fp16/fp32 variant would be larger than the
-  single-file GitHub limit.
-- q8 model (`model_quantized.onnx`) and the ONNX Runtime WASM are served
-  locally.
-- All six selectable voices are local.
-- The first load is a large download from the Pages origin; after that,
-  Transformers.js caches model/voice files in Cache Storage.
-- Generated audio is cached in IndexedDB by voice + text.
-- If model loading fails, the app silently falls back to the device's
-  `speechSynthesis`.
-
-The first TTS load on the local preview took ~17 seconds (WASM, Chromium).
-A repeated playback from IndexedDB took about 0.1 seconds.
 
 ## Regression status
 
 - Core interaction suite: **32/32 passed**
-- Kokoro TTS suite: **7/7 passed**
-- Local-only TTS request check: **0 external model/CDN requests**
-- Silent TTS fallback verified by blocking the local model load
+- Word cache hit/miss markers verified for cached, generated and demo entries
 
 ## Notes
 
-- GitHub Pages serves over HTTPS, required for WebGPU and reliable browser
-  storage.
+- GitHub Pages serves over HTTPS, which matters for the service worker and
+  reliable browser storage.
 - Multi-word lookups are treated as phrases; spelling correction only runs for
   single-token input. Prompts also require factual restraint: omit uncertain
   IPA/etymology/relations rather than inventing them.
-- First visit downloads about 115 MB. Later visits reuse browser caches.
-- The LAN HTTP preview (`http://<ip>:8080`) is **not a secure context**, so the
-  Cache API is unavailable there. The app includes an IndexedDB/HTTP-cache
-  fallback, but GitHub Pages over HTTPS is the intended production path.
-- Private/incognito browsing may not retain model or audio caches.
-- GitHub Pages has a soft bandwidth limit; 92 MB per first-time visitor is the
-  main tradeoff of self-hosting the model.
-- On the test machine, first model load was ~13–17s and repeated playback was
-  ~1s; a new word on WASM took ~5s. WebGPU-capable devices are faster. The
-  remaining per-word cost is Kokoro inference, not a network request.
+- The LAN HTTP preview (`http://<ip>:8080`) is **not a secure context**. The page
+  also ships `<meta http-equiv="Content-Security-Policy"
+  content="upgrade-insecure-requests">`, so browsers rewrite its own subresources
+  to `https://` on non-localhost origins — open it from `127.0.0.1`, or serve
+  HTTPS, when previewing over a LAN address.
+- Private/incognito browsing may not retain the word or audio caches.
 
 ## License
 

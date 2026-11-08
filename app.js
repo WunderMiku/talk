@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "121";
+  const APP_VERSION = "122";
 
   function copyFor(section) {
     const themeId = window.TALK_THEME?.current?.().id || "paper";
@@ -29,7 +29,7 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "kokoroVoice", "kokoroBackendMode", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   const WORD_CACHE_KEY = "talk.wordcache.v1";
@@ -53,23 +53,10 @@
     prefetch: false,
     cacheDisplay: "borders",
     detailLevel: "standard",
-    ttsEngine: "kokoro",
-    kokoroVoice: "af_heart",
-    kokoroBackendMode: "wasm",
+    ttsEngine: "native",
     qwenTtsModel: "qwen-audio-3.1-tts-plus",
     qwenTtsVoice: "longanhuan_v3.1"
   };
-
-  const KOKORO_CDN = "./vendor/kokoro.web.js";
-  const KOKORO_MODEL = "onnx-community/Kokoro-82M-v1.0-ONNX";
-  const KOKORO_VOICES = [
-    ["af_heart", "Heart · 美式女声"],
-    ["af_bella", "Bella · 美式女声"],
-    ["af_nicole", "Nicole · 美式女声"],
-    ["am_michael", "Michael · 美式男声"],
-    ["bf_emma", "Emma · 英式女声"],
-    ["bm_george", "George · 英式男声"]
-  ];
 
   const DETAIL_LEVELS = {
     fast: {
@@ -549,12 +536,10 @@
       ...parsed,
       prefetch: Boolean(preferences.prefetch || parsed.prefetch),
       remember: Boolean(parsed.remember),
-      ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "kokoro",
-      kokoroBackendMode: preferences.kokoroBackendMode || parsed.kokoroBackendMode || "wasm",
+      ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "native",
       detailLevel: preferences.detailLevel || parsed.detailLevel || "standard",
       cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
       cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
-      kokoroVoice: preferences.kokoroVoice || parsed.kokoroVoice || "af_heart",
       qwenTtsModel: preferences.qwenTtsModel || parsed.qwenTtsModel || "qwen-audio-3.1-tts-plus",
       qwenTtsVoice: preferences.qwenTtsVoice || parsed.qwenTtsVoice || "longanhuan_v3.1",
       enableThinking: Boolean(selected.enableThinking),
@@ -3456,7 +3441,6 @@
       window.clearTimeout(state.settingsSaveTimer);
       state.settingsSaveTimer = null;
     }
-    const previous = state.settings;
     syncDraftProfile(state.draft);
     state.draft.apiKey = String(state.draft.apiKey || "").trim();
     state.draft.baseUrl = String(state.draft.baseUrl || "").trim();
@@ -3467,12 +3451,6 @@
     };
     persistSettings(state.settings);
     state.settingsDirty = false;
-    if (previous.kokoroBackendMode !== state.settings.kokoroBackendMode) {
-      kokoroTTSPromise = null;
-      kokoroBackend = "";
-      kokoroBackendDetail = "";
-      updateTtsBackendStatus();
-    }
     applyCacheDisplay();
     refreshCacheBorders();
     const active = activeWordData();
@@ -3522,14 +3500,13 @@
   }
 
   function ttsSettingsHtml(draft) {
-    const engine = draft.ttsEngine || "kokoro";
+    const engine = draft.ttsEngine === "qwen" ? "qwen" : "native";
     return `
       <div class="tts-head">
         <span class="settings-subhead">发音</span>
         <div class="tts-engine-switch" role="group" aria-label="发音引擎">
-          <button class="tts-engine-btn ${engine === "kokoro" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="kokoro" aria-pressed="${engine === "kokoro"}">Kokoro</button>
-          <button class="tts-engine-btn ${engine === "qwen" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="qwen" aria-pressed="${engine === "qwen"}">Qwen 语音</button>
           <button class="tts-engine-btn ${engine === "native" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="native" aria-pressed="${engine === "native"}">系统原生</button>
+          <button class="tts-engine-btn ${engine === "qwen" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="qwen" aria-pressed="${engine === "qwen"}">Qwen 语音</button>
         </div>
       </div>
       ${engine === "qwen" ? (() => {
@@ -3545,26 +3522,12 @@
           <span class="tts-status" id="tts-test-status">${qwen ? "密钥已就绪" : "需要先配置 Qwen 密钥"}</span>
           <p class="tts-line tts-https-warning">密钥只保存在本机；语音请求由浏览器直接发往 Qwen。公共设备建议关闭「记住密钥」。</p>
         </div>`;
-      })() : engine === "native" ? `
+      })() : `
         <div class="tts-row">
-          <span class="tts-line">设备原生语音 · 点击即读，无需加载模型</span>
+          <span class="tts-line">设备原生语音 · 点击即读，无需下载模型</span>
           <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
         </div>
-        <span class="tts-status" id="tts-test-status">将使用设备系统语音</span>` : `
-        <div class="tts-row">
-          <select id="kokoro-voice" data-setting="kokoroVoice" aria-label="Kokoro 语音">
-            ${KOKORO_VOICES.map(([id, label]) => `<option value="${id}" ${(draft.kokoroVoice || "af_heart") === id ? "selected" : ""}>${label}</option>`).join("")}
-          </select>
-          <select id="kokoro-backend" data-setting="kokoroBackendMode" aria-label="Kokoro 后端">
-            <option value="auto" ${draft.kokoroBackendMode === "auto" ? "selected" : ""}>自动</option>
-            <option value="wasm" ${(draft.kokoroBackendMode || "wasm") === "wasm" ? "selected" : ""}>WASM 兼容</option>
-          </select>
-          <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
-        </div>
-        <span class="tts-status" id="tts-test-status">首次点发音会加载模型</span>
-        <p class="tts-line" id="tts-backend-status">当前后端：未加载</p>
-        <p class="tts-line">音色异常时先点刷新按钮；仍异常可在上方切到 WASM 兼容。</p>
-        ${!window.isSecureContext ? `<p class="tts-line tts-https-warning">HTTP 环境不会启用 WebGPU，语音加载会慢一些</p>` : ""}
+        <span class="tts-status" id="tts-test-status">将使用设备系统语音</span>
         <p class="tts-error" id="tts-error" hidden></p>`}`;
   }
 
@@ -3682,7 +3645,7 @@
         <button class="link-btn" type="button" data-action="clear-theme-cache">清空主题库</button>
       </div>
       <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
-      <p class="api-note">词条缓存优先从 IndexedDB 读取，未命中才请求模型。Kokoro 模型文件约 115MB，由浏览器单独缓存。</p>`;
+      <p class="api-note">词条缓存优先从 IndexedDB 读取，未命中才请求模型；发音只缓存 Qwen 语音生成的音频。</p>`;
   }
 
   function renderSettingsContent() {
@@ -3709,7 +3672,7 @@
           <button class="btn btn-primary" type="button" data-action="save-settings">完成</button>
         </div>
       </div>`;
-    if (tab === "tts") requestAnimationFrame(updateTtsBackendStatus);
+    if (tab === "tts") requestAnimationFrame(refreshTtsError);
     if (tab === "data") requestAnimationFrame(renderThemeCacheStats);
   }
 
@@ -3731,7 +3694,7 @@
     if (!holder) return;
     holder.innerHTML = `<div class="sheet-content" id="cache-dashboard"><p class="settings-intro">正在读取本机缓存…</p></div>`;
     const words = wordCacheStats();
-    const audio = await getKokoroAudioStats();
+    const audio = await getAudioStats();
     if (!holder.isConnected) return;
     const estimate = wordCacheEstimate();
     const percent = Math.min(100, words.max ? (words.count / words.max) * 100 : 0);
@@ -3768,7 +3731,7 @@
             <input type="number" min="1" max="3650" step="1" value="${words.ttlDays}" data-cache-setting="cacheTtlDays" inputmode="numeric" />
           </label>
         </div>
-        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>；语音缓存另计。Kokoro 模型文件约 115MB，不计入这里。</p>
+        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>；Qwen 语音缓存另计。</p>
         <div class="cache-list-head">
           <span class="settings-subhead">已缓存词条</span>
           <span class="mono">${words.count} 条</span>
@@ -4936,7 +4899,7 @@
       case "tts-engine":
         event.preventDefault();
         if (!state.draft) break;
-        state.draft.ttsEngine = ["native", "qwen"].includes(target.dataset.engine) ? target.dataset.engine : "kokoro";
+        state.draft.ttsEngine = target.dataset.engine === "qwen" ? "qwen" : "native";
         scheduleSettingsCommit();
         renderSettingsContent();
         break;
@@ -5056,7 +5019,7 @@
       case "clear-audio-cache":
         event.preventDefault();
         if (!window.confirm("清空所有已生成的语音缓存？")) break;
-        await clearKokoroAudio();
+        await clearAudioCache();
         refreshCacheUi();
         toast("语音缓存已清空");
         break;
@@ -5410,9 +5373,9 @@
     let voice = String(cfg.qwenTtsVoice || "").trim();
     if (isQwen3 && (!voice || /^longanhuan/i.test(voice))) voice = "Cherry";
     if (!voice) voice = "longanhuan_v3.1";
-    const cacheKey = `qwen|${model}|${voice}|${text}|v1`;
+    const cacheKey = `qwen|${model}|${voice}|${text}|${AUDIO_CACHE_VERSION}`;
     if (!bypassCache) {
-      const cached = await getKokoroAudio(cacheKey);
+      const cached = await getCachedAudio(cacheKey);
       if (cached) {
         await playAudioBlob(cached, button);
         return "qwen-cache";
@@ -5450,7 +5413,7 @@
     const audio = payload.output?.audio || payload.audio || payload.output || {};
     if (audio.data) {
       const blob = base64ToBlob(audio.data, "audio/mpeg");
-      await putKokoroAudio(cacheKey, blob);
+      await putCachedAudio(cacheKey, blob);
       await playAudioBlob(blob, button);
       return "qwen";
     }
@@ -5461,7 +5424,7 @@
         if (file.ok) {
           const blob = await file.blob();
           if (blob.size) {
-            await putKokoroAudio(cacheKey, blob);
+            await putCachedAudio(cacheKey, blob);
             await playAudioBlob(blob, button);
             return "qwen";
           }
@@ -5474,258 +5437,34 @@
     throw new Error("Qwen 语音返回里没有 audio.url 或 audio.data。");
   }
 
-  /* ---------- Kokoro: local browser TTS ---------- */
+  /* ---------- Audio cache (Qwen TTS results only; no local model) ---------- */
 
-  let kokoroTTSPromise = null;
-  let kokoroBackend = "";
-  let kokoroBackendDetail = "";
-  let kokoroLoadMs = 0;
-  let kokoroGenerateMs = 0;
-  let lastKokoroError = "";
+  const AUDIO_DB_NAME = "talk.audio.v1";
+  const AUDIO_DB_STORE = "audio";
+  const AUDIO_CACHE_VERSION = "v4";
+  let lastTtsError = "";
 
-  function rejectAfter(ms, message) {
-    return new Promise((_, reject) => window.setTimeout(() => reject(new Error(message)), ms));
-  }
-
-  async function detectWebGPU() {
-    if (!("gpu" in navigator)) return false;
-    try {
-      const adapter = await navigator.gpu.requestAdapter();
-      if (!adapter) return false;
-      const device = await adapter.requestDevice();
-      const canvas = document.createElement("canvas");
-      canvas.width = 1;
-      canvas.height = 1;
-      const context = canvas.getContext("webgpu");
-      if (!context) {
-        device.destroy();
-        return false;
-      }
-      context.configure({
-        device,
-        format: navigator.gpu.getPreferredCanvasFormat(),
-        alphaMode: "opaque"
-      });
-      device.destroy();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  function openKokoroFileDb() {
+  function openAudioDb() {
     return new Promise((resolve, reject) => {
       if (!("indexedDB" in window)) {
         reject(new Error("IndexedDB unavailable"));
         return;
       }
-      const request = indexedDB.open("talk.kokoro.files.v1", 1);
+      const request = indexedDB.open(AUDIO_DB_NAME, 1);
       request.onupgradeneeded = () => {
         const db = request.result;
-        if (!db.objectStoreNames.contains("files")) db.createObjectStore("files");
+        if (!db.objectStoreNames.contains(AUDIO_DB_STORE)) db.createObjectStore(AUDIO_DB_STORE);
       };
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
   }
 
-  function makeKokoroFileCache() {
-    const keyOf = (input) => typeof input === "string"
-      ? input
-      : input instanceof URL
-        ? input.href
-        : input?.url || String(input);
-    return {
-      async match(input) {
-        try {
-          const db = await openKokoroFileDb();
-          const key = keyOf(input);
-          const record = await new Promise((resolve) => {
-            const request = db.transaction("files", "readonly").objectStore("files").get(key);
-            request.onsuccess = () => resolve(request.result);
-            request.onerror = () => resolve(null);
-          });
-          if (!record?.blob) return undefined;
-          return new Response(record.blob, {
-            status: record.status || 200,
-            headers: record.headers || {}
-          });
-        } catch (_) {
-          return undefined;
-        }
-      },
-      async put(input, response) {
-        try {
-          const db = await openKokoroFileDb();
-          const key = keyOf(input);
-          const blob = await response.clone().blob();
-          const headers = {};
-          response.headers.forEach((value, name) => { headers[name] = value; });
-          await new Promise((resolve, reject) => {
-            const tx = db.transaction("files", "readwrite");
-            tx.objectStore("files").put({
-              blob,
-              headers,
-              status: response.status,
-              at: Date.now()
-            }, key);
-            tx.oncomplete = () => resolve();
-            tx.onerror = () => reject(tx.error);
-          });
-        } catch (_) {
-          // A failed cache write must not break model loading.
-        }
-      }
-    };
-  }
-
-  function installKokoroVoiceBridge() {
-    if (window.__talkKokoroVoiceBridge) return;
-    const originalFetch = window.fetch.bind(window);
-    const modelMarker = "Kokoro-82M-v1.0-ONNX";
-    const localRoot = new URL("./models/onnx-community/Kokoro-82M-v1.0-ONNX/", location.href).href;
-
-    window.fetch = (input, init) => {
-      const url = typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input?.url || "";
-
-      if (url.includes(modelMarker) && url.startsWith("https://huggingface.co/")) {
-        const clean = url.split("?")[0].split("#")[0];
-        const filename = clean.split("/").pop() || "";
-        let folder = "";
-        if (clean.includes("/onnx/") || filename.endsWith(".onnx")) folder = "onnx/";
-        else if (clean.includes("/voices/") || filename.endsWith(".bin")) folder = "voices/";
-        if (filename && (folder || filename.endsWith(".json"))) {
-          return originalFetch(new URL(`${folder}${filename}`, localRoot).href, init);
-        }
-      }
-      return originalFetch(input, init);
-    };
-    window.__talkKokoroVoiceBridge = true;
-  }
-
-  function showTtsHttpsNotice() {
-    if (window.isSecureContext) return;
+  async function getCachedAudio(key) {
     try {
-      if (localStorage.getItem("talk.httpsNoticeSeen") === "1") return;
-      localStorage.setItem("talk.httpsNoticeSeen", "1");
-    } catch (_) { /* show it if storage is unavailable */ }
-    if (document.getElementById("tts-https-notice")) return;
-
-    const layer = document.createElement("div");
-    layer.id = "tts-https-notice";
-    layer.className = "notice-layer";
-    layer.innerHTML = `
-      <section class="notice-card" role="dialog" aria-labelledby="notice-title">
-        <span class="mono">ENVIRONMENT</span>
-        <h2 id="notice-title">WebGPU 被 HTTP 禁用了</h2>
-        <p>当前页面通过 <code>${esc(location.origin)}</code> 打开。浏览器只在 HTTPS 或 localhost 下启用 WebGPU，所以 Talk 正在回退到 WASM，语音加载和合成会明显变慢。</p>
-        <p class="notice-hint">部署到 GitHub Pages 的 <code>https://…</code> 地址，或在本机用 <code>localhost</code> 访问，就能启用 WebGPU。</p>
-        <button class="btn btn-primary notice-close" type="button" data-notice-close>知道了</button>
-      </section>`;
-    app.appendChild(layer);
-    requestAnimationFrame(() => layer.classList.add("show"));
-    const close = () => {
-      layer.classList.remove("show");
-      window.setTimeout(() => layer.remove(), 260);
-    };
-    layer.querySelectorAll("[data-notice-close]").forEach((el) => el.addEventListener("click", close));
-    layer.querySelector(".notice-close")?.focus({ preventScroll: true });
-  }
-
-  async function loadKokoro() {
-    if (kokoroTTSPromise) return kokoroTTSPromise;
-    kokoroTTSPromise = (async () => {
-      const loadStarted = performance.now();
-      installKokoroVoiceBridge();
-      const module = await import(KOKORO_CDN);
-      if (module.env) {
-        const hasCacheApi = typeof caches !== "undefined";
-        module.env.useBrowserCache = hasCacheApi;
-        module.env.useCustomCache = !hasCacheApi;
-        if (!hasCacheApi) module.env.customCache = makeKokoroFileCache();
-        module.env.allowRemoteModels = false;
-        module.env.allowLocalModels = true;
-        module.env.localModelPath = new URL("./models/", location.href).href;
-        const ortPath = new URL("./vendor/ort/", location.href).href;
-        module.env.wasmPaths = ortPath;
-        if (module.env.backends?.onnx?.wasm) {
-          module.env.backends.onnx.wasm.wasmPaths = ortPath;
-        }
-      }
-      const { KokoroTTS } = module;
-      const forceWasm = (state.settings.kokoroBackendMode || "wasm") !== "auto";
-      if (!forceWasm && await detectWebGPU()) {
-        try {
-          const webgpu = KokoroTTS.from_pretrained(KOKORO_MODEL, {
-            dtype: "q8",
-            device: "webgpu"
-          });
-          webgpu.catch(() => { /* handled by the race below */ });
-          const tts = await Promise.race([
-            webgpu,
-            rejectAfter(60_000, "WebGPU model load timed out")
-          ]);
-          kokoroBackend = "webgpu";
-          kokoroBackendDetail = "WebGPU";
-          kokoroLoadMs = Math.round(performance.now() - loadStarted);
-          updateTtsBackendStatus();
-          return tts;
-        } catch (error) {
-          kokoroBackendDetail = "WebGPU 初始化失败，已回退 WASM";
-          console.warn("Kokoro WebGPU unavailable, falling back to WASM.", error);
-          if (!window.isSecureContext) showTtsHttpsNotice();
-        }
-      } else if (!window.isSecureContext && !forceWasm) {
-        showTtsHttpsNotice();
-      }
-      const wasm = KokoroTTS.from_pretrained(KOKORO_MODEL, {
-        dtype: "q8",
-        device: "wasm"
-      });
-      wasm.catch(() => { /* handled by the race below */ });
-      const tts = await Promise.race([
-        wasm,
-        rejectAfter(120_000, "Kokoro WASM model load timed out")
-      ]);
-      kokoroBackend = "wasm";
-      if (!kokoroBackendDetail) kokoroBackendDetail = "WebGPU 不可用";
-      kokoroLoadMs = Math.round(performance.now() - loadStarted);
-      updateTtsBackendStatus();
-      return tts;
-    })();
-    try {
-      return await kokoroTTSPromise;
-    } catch (error) {
-      kokoroTTSPromise = null;
-      throw error;
-    }
-  }
-
-  function openKokoroAudioDb() {
-    return new Promise((resolve, reject) => {
-      if (!("indexedDB" in window)) {
-        reject(new Error("IndexedDB unavailable"));
-        return;
-      }
-      const request = indexedDB.open("talk.kokoro.audio.v1", 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains("audio")) db.createObjectStore("audio");
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async function getKokoroAudio(key) {
-    try {
-      const db = await openKokoroAudioDb();
+      const db = await openAudioDb();
       return await new Promise((resolve) => {
-        const request = db.transaction("audio", "readonly").objectStore("audio").get(key);
+        const request = db.transaction(AUDIO_DB_STORE, "readonly").objectStore(AUDIO_DB_STORE).get(key);
         request.onsuccess = () => resolve(request.result?.blob || null);
         request.onerror = () => resolve(null);
       });
@@ -5734,13 +5473,11 @@
     }
   }
 
-  const KOKORO_AUDIO_CACHE_VERSION = "v3";
-
-  async function getKokoroAudioStats() {
+  async function getAudioStats() {
     try {
-      const db = await openKokoroAudioDb();
+      const db = await openAudioDb();
       const records = await new Promise((resolve) => {
-        const req = db.transaction("audio", "readonly").objectStore("audio").getAll();
+        const req = db.transaction(AUDIO_DB_STORE, "readonly").objectStore(AUDIO_DB_STORE).getAll();
         req.onsuccess = () => resolve(req.result || []);
         req.onerror = () => resolve([]);
       });
@@ -5758,12 +5495,12 @@
     }
   }
 
-  async function clearKokoroAudio() {
+  async function clearAudioCache() {
     try {
-      const db = await openKokoroAudioDb();
+      const db = await openAudioDb();
       await new Promise((resolve) => {
-        const tx = db.transaction("audio", "readwrite");
-        tx.objectStore("audio").clear();
+        const tx = db.transaction(AUDIO_DB_STORE, "readwrite");
+        tx.objectStore(AUDIO_DB_STORE).clear();
         tx.oncomplete = () => resolve();
         tx.onerror = () => resolve();
       });
@@ -5772,12 +5509,12 @@
     }
   }
 
-  async function putKokoroAudio(key, blob) {
+  async function putCachedAudio(key, blob) {
     try {
-      const db = await openKokoroAudioDb();
+      const db = await openAudioDb();
       await new Promise((resolve, reject) => {
-        const tx = db.transaction("audio", "readwrite");
-        tx.objectStore("audio").put({ blob, at: Date.now() }, key);
+        const tx = db.transaction(AUDIO_DB_STORE, "readwrite");
+        tx.objectStore(AUDIO_DB_STORE).put({ blob, at: Date.now() }, key);
         tx.oncomplete = () => resolve();
         tx.onerror = () => reject(tx.error);
       });
@@ -5786,115 +5523,58 @@
     }
   }
 
-  async function speakKokoro(text, button, cfg, { bypassCache = false } = {}) {
-    const voice = KOKORO_VOICES.some(([id]) => id === cfg.kokoroVoice)
-      ? cfg.kokoroVoice
-      : "af_heart";
-    const backendMode = cfg.kokoroBackendMode || "wasm";
-    const cacheKey = `${voice}|${text}|0.98|${KOKORO_AUDIO_CACHE_VERSION}|${backendMode}`;
-    if (!bypassCache) {
-      const cached = await getKokoroAudio(cacheKey);
-      if (cached) {
-        await playAudioBlob(cached, button);
-        return "kokoro-cache";
-      }
-    }
-
-    const tts = await loadKokoro();
-    const generateStarted = performance.now();
-    const audio = await tts.generate(text, { voice, speed: 0.98 });
-    kokoroGenerateMs = Math.round(performance.now() - generateStarted);
-    updateTtsBackendStatus();
-    const blob = audio.toBlob ? audio.toBlob() : new Blob([audio.toWav()], { type: "audio/wav" });
-    await putKokoroAudio(cacheKey, blob);
-    await playAudioBlob(blob, button);
-    return kokoroBackend === "webgpu" ? "kokoro-webgpu" : "kokoro-wasm";
+  function refreshTtsError() {
+    const box = $("#tts-error");
+    if (!box) return;
+    box.hidden = !lastTtsError;
+    box.textContent = lastTtsError ? `最近错误：${lastTtsError}` : "";
   }
 
   async function speakText(text, button = null, cfg = state.settings, options = {}) {
     const clean = String(text || "").trim();
     if (!clean) return null;
-    if ((cfg.ttsEngine || "kokoro") === "native") {
+    const engine = cfg.ttsEngine === "qwen" ? "qwen" : "native";
+    if (engine === "native") {
       stopSpeech();
       return speakSystem(clean, button);
     }
     primeAudio();
     stopSpeech();
     setTtsLoading(button, true);
-    if ((cfg.ttsEngine || "kokoro") === "qwen") {
-      try {
-        return await speakQwen(clean, button, cfg, options);
-      } catch (error) {
-        const message = String(error?.message || error || "未知错误");
-        lastKokoroError = message;
-        toast(message);
-        console.warn("Qwen TTS failed; falling back to system speech.", error);
-        return speakSystem(clean, button);
-      } finally {
-        setTtsLoading(button, false);
-      }
-    }
     try {
-      return await speakKokoro(clean, button, cfg, options);
+      const result = await speakQwen(clean, button, cfg, options);
+      lastTtsError = "";
+      return result;
     } catch (error) {
-      lastKokoroError = String(error?.message || error || "未知错误");
-      console.warn("Kokoro TTS failed; silently falling back to system speech.", error);
+      lastTtsError = String(error?.message || error || "未知错误");
+      refreshTtsError();
+      toast(lastTtsError);
+      console.warn("Qwen TTS failed; falling back to system speech.", error);
       return speakSystem(clean, button);
     } finally {
       setTtsLoading(button, false);
     }
   }
 
-  function updateTtsBackendStatus() {
-    const target = $("#tts-backend-status");
-    if (!target) return;
-    if (!kokoroBackend) {
-      target.textContent = "当前后端：未加载";
-      return;
-    }
-    const backend = kokoroBackend === "webgpu" ? "WebGPU" : "WASM";
-    const loadTiming = kokoroLoadMs ? ` · 模型 ${(kokoroLoadMs / 1000).toFixed(1)}s` : "";
-    const timing = kokoroGenerateMs
-      ? ` · 合成 ${(kokoroGenerateMs / 1000).toFixed(1)}s`
-      : "";
-    target.textContent = `当前后端：${backend}${kokoroBackendDetail ? ` · ${kokoroBackendDetail}` : ""}${loadTiming}${timing}`;
-    const errorBox = $("#tts-error");
-    if (errorBox) {
-      errorBox.hidden = !lastKokoroError;
-      errorBox.textContent = lastKokoroError ? `最近错误：${lastKokoroError}` : "";
-    }
-  }
-
   async function testTts(button) {
     const status = $("#tts-test-status");
-    const selectedEngine = (state.draft || state.settings)?.ttsEngine || "kokoro";
-    if (status) status.textContent = selectedEngine === "qwen" ? "正在请求 Qwen 语音…" : "正在加载 Kokoro 模型…";
-    lastKokoroError = "";
     const selected = state.draft || state.settings;
-    const engine = await speakText(
-      "Talk is ready.",
-      button,
-      selected,
-      { bypassCache: true }
-    );
+    const engine = selected.ttsEngine === "qwen" ? "qwen" : "native";
     if (status) {
-      if ((selected.ttsEngine || "kokoro") === "native") {
-        status.textContent = "正在使用设备系统语音";
-      } else if ((selected.ttsEngine || "kokoro") === "qwen") {
-        status.textContent = engine.startsWith("qwen")
-          ? "Qwen 语音已就绪"
-          : `Qwen 语音失败，已回退系统语音：${lastKokoroError || "未知错误"}`;
-      } else {
-        const timing = kokoroGenerateMs ? ` · 合成 ${(kokoroGenerateMs / 1000).toFixed(1)}s` : "";
-        const backend = kokoroBackend === "webgpu" ? "WebGPU" : "WASM";
-        status.textContent = engine === "system"
-          ? (kokoroBackend
-              ? `已加载，但合成或播放失败：${lastKokoroError || "未知错误"}`
-              : `模型加载失败：${lastKokoroError || "未知错误"}`)
-          : `Kokoro 已就绪 · ${backend}${timing}`;
-      }
+      status.textContent = engine === "qwen" ? "正在请求 Qwen 语音…" : "正在使用设备系统语音";
     }
-    if ((selected.ttsEngine || "kokoro") !== "native") updateTtsBackendStatus();
+    lastTtsError = "";
+    const result = await speakText("Talk is ready.", button, selected, { bypassCache: true });
+    if (engine === "native") {
+      refreshTtsError();
+      return;
+    }
+    if (status) {
+      status.textContent = String(result || "").startsWith("qwen")
+        ? "Qwen 语音已就绪"
+        : `Qwen 语音失败，已回退系统语音：${lastTtsError || "未知错误"}`;
+    }
+    refreshTtsError();
   }
 
   async function copyText(text) {
