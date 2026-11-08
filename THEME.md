@@ -63,8 +63,11 @@ Endfield is the most opinionated one, so it is the best example of what a theme
 may own: it flattens every radius with a single `[data-theme="endfield"] *`
 rule, clips card corners with `clip-path`, prints a faint 45° hatch on
 `.screen`, and turns the module bar's top edge into the only magenta / yellow /
-mint strip in the product. Its yellow (`#fffa00`) is a fill for "current"
-only — labels, numbers and rules stay ink. When adding a theme like this, keep
+mint strip in the product. The archive sheet and the word hero carry survey-map
+etching — contour rings in paper-grey (5% ink) plus tiny registration marks at
+the sheet corners; the poster masthead holds the same rings in signal yellow.
+Its yellow (`#fffa00`) is a fill for "current" only — labels, numbers and rules
+stay ink. When adding a theme like this, keep
 the same split: colour and shape in the theme file, layout and rhythm in
 `styles.css`.
 
