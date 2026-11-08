@@ -1,0 +1,175 @@
+# talk. 实现说明
+
+给要改代码的人看。README 讲它是什么、能做什么；这里讲它是怎么拼起来的，以及几个关键取舍的原因。
+
+整个应用是纯静态的 HTML/CSS/JS，没有构建、没有后端。浏览器直接读模型 API，数据落在 IndexedDB 和 localStorage。
+
+## 一次查词的完整链路
+
+```text
+输入
+ └─ normalizeQuery()          小写、去空白、判断单词 / 短语
+     └─ 缓存查找                 内存 Map → IndexedDB（talk.words.v1）
+         ├─ 命中 ─────────────► 直接渲染词条页（不联网）
+         └─ 未命中
+             └─ 组装 user message：task / detail / query（动态内容永远在末尾）
+                 └─ POST {baseUrl}/chat/completions，SSE 流式
+                     ├─ 字段逐个完整 ──► loading 页上的渐进预览
+                     └─ JSON 对象结束 ──► 词条页 + 写缓存 + 后台预取同根词（≤4 个）
+```
+
+句子查词走同一条链路，只是任务换成 `sentence`，输出结构不同。
+
+## 提示词：静态前缀，动态尾巴
+
+`prompts.js` 里三个系统提示词（单词 / 句子 / 主题沙龙）都是**完全静态**的字符串：角色、JSON schema、规则、各深度的数量要求、few-shot 示例全在里面。
+
+用户消息只放会变的东西：
+
+```text
+单词   {"task":"word","detail":"fast","query":"serendipity"}
+句子   {"task":"sentence","detail":"fast","text":"Hope is not a prediction."}
+主题   {"task":"theme","detail":"standard","exclude":["雨夜的天文台","..."]}
+```
+
+这样做的原因是**供应商的前缀缓存**：同一个模型连续查词时，系统提示词那一大段永远不变，命中缓存后按缓存价计费、首字也更快。
+
+主题沙龙把 `exclude` 放在用户消息**末尾**，而不是系统提示词里，也是同一个理由——已展出的标题每轮都在变，放进前缀会把缓存打碎。
+
+## JSON 模式与流式
+
+- 普通请求带 `response_format: {"type":"json_object"}`，模型必须回 JSON。
+- 流式请求**故意不带** `response_format`：不少 OpenAI 兼容网关在「流式 + 结构化输出」同时开启时会先把整个响应缓冲下来，流式就失效了。JSON 仍然由静态系统提示词约束。
+- 流式时客户端按括号深度扫描增量文本，`word`/`phonetic`/`translation`/`short`/`sentence translation`/`tone`/`structure` 这些字段一旦闭合就先渲染出来。
+- 如果供应商拒绝流式（报错或直接返回非流式 JSON），客户端**重试一次**普通的非流式请求。
+
+## 数据模型
+
+词条（`app.js` 顶部的注释与 `data.js` 的示例一致）：
+
+```text
+word, phonetic, pos, translation, short, tags[]
+origin      { original, story, era }
+stages[]    { when, label, text }        when 里的 19th century / Old English 在渲染时归一
+posGroups[] { pos, senses[] }            多词性；老缓存没有这个字段就当成单一词性
+senses[]    { zh, en, label }
+family[]    { word, pos, gloss }
+synonyms[], antonyms[], collocations[]
+examples[]  { en, zh, tag }
+memory                                记法
+```
+
+兼容原则：新字段一律可选。缺 `posGroups` 的老缓存按「一个词性 + 原有 `senses`」渲染，不需要迁移脚本，也不需要清缓存。
+
+## 缓存与本地存储
+
+| 位置 | 键 | 内容 | 上限 |
+| --- | --- | --- | --- |
+| IndexedDB | `talk.words.v1` | 完整词条 JSON | 300 条 / 90 天（可在设置里改） |
+| IndexedDB | `talk.audio.v1` | Qwen 语音音频 | 键里带版本，可一键清空 |
+| IndexedDB | `talk.themeDecks.v1` | 主题沙龙版本库 | 全量保留；首页展示队列最多 8 版 |
+| localStorage | `talk.model.v1` | 模型配置与 API key | — |
+| localStorage | `talk.translations.v3` | 翻译结果（按源语言 + 原文分键） | 40 条 / 30 天 |
+| localStorage | `talk.prefs.v1` | 深度、缓存上限、发音引擎等偏好 | — |
+| localStorage | `talk.theme.v1` | 当前主题 id | — |
+| localStorage | `talk.history.v1` / `talk.saved.v1` | 最近查词 / 收藏 | — |
+
+几条规则：
+
+- **缓存跨深度复用**。fast / standard / deep 共用同一条缓存，换深度不会重新请求；想换版本要点词条页的「重新生成词条」。
+- **翻译缓存按源语言 + 文本分键**（`talk.translations.v3`），所以中→英和英→英不会串味。
+- 键名里的版本号（`v1`/`v3`）就是数据结构版本，改结构时手动 bump，老数据自然失效，不用写迁移。
+- 设置 → 数据里的「缓存管理」可以查看占用、导出 JSON、导入 JSON、单独清音频缓存或主题库。
+
+## 生成深度
+
+| | fast | standard | deep |
+| --- | --- | --- | --- |
+| max_tokens | 1200 | 2200 | 3200 |
+| 义项 | 1 | 2 | 3 |
+| 同根词 | 2 | 3 | 4 |
+| 近义词 / 反义词 | 2 / 1 | 3 / 2 | 4 / 3 |
+| 例句 / 搭配 | 1 / 2 | 2 / 4 | 3 / 5 |
+| 时间轴 / 重点词 | 2 / 3 | 3 / 4 | 4 / 5 |
+
+数值都在 `app.js` 的 `DETAIL_LEVELS` 里，提示词里另有一份同样的数量要求（`prompts.js`）。改深度要两边一起改，否则模型会收到互相矛盾的指令。
+
+## 主题系统
+
+主题是「基础 token + 覆盖文件」的结构：
+
+```text
+theme.css            基础 token 契约（Paper 就是它本身）
+themes/ussr.css      constructivist 覆盖
+themes/rhine.css     Rhine Lab 覆盖
+theme.js             注册表：id / label / themeColor / accent / css / copyKey / description
+content.js           基础文案 + themeCopy[<id>] 的主题语气改写
+prompts.js           与主题无关，主题不影响提示词
+```
+
+`theme.js` 的 `apply()` 负责写 `<html data-theme>`、切换 `theme-color`、懒加载对应样式表；`list()` 直接喂给设置面板，所以加一个主题只需要：一个 CSS 文件、一条注册表项、可选的文案块。完整步骤见 [THEME.md](../THEME.md)。
+
+主题**不参与组件布局**。版式差异（比如横屏间距）走 `styles.css` 里的 `--word-*` 变量，而不是在主题文件里写 `!important` 覆写——这是 2026 年 11 月那次重构的核心约束。
+
+## 发音
+
+两个引擎，设置 → 发音里切换：
+
+- **系统原生**（默认）：`window.speechSynthesis`，离线、零下载，音色取决于设备。
+- **Qwen 语音**：用当前 Qwen 模型配置里的 key，浏览器直接请求 `POST /api/v1/services/audio/tts/SpeechSynthesizer`。默认 `qwen-audio-3.1-tts-plus` + `longanhuan_v3.1`；模型名以 `qwen3-tts` 开头时改走多模态生成接口，并把不兼容的音色换成 `Cherry`。
+
+Qwen 的结果写进 `talk.audio.v1`，同一个词第二次点播放不联网。失败（没 key、CORS 被拦、HTTP 错误）时提示错误并回退到系统语音，不会静默无声。
+
+v122 之前打包过一个本地 Kokoro 模型，每个访客要多下约 115 MB、加载 13–17 秒，量化后的 ONNX 在 Android WebGPU 上不稳定，已经整体移除。
+
+## 部署
+
+`.github/workflows/pages.yml` 把静态文件拷进 `dist/` 再发布到 GitHub Pages，没有任何构建步骤：
+
+```text
+cp index.html styles.css theme.css theme.js content.js prompts.js data.js app.js \
+   favicon.svg manifest.webmanifest sw.js .nojekyll LICENSE dist/
+cp -r icons themes dist/
+bash scripts/fetch-assets.sh dist      # 只下载 vendor/idb.js
+```
+
+改前端资源后有三处版本号要一起动，否则老用户会拿到新旧混杂的缓存：
+
+1. `app.js` 里的 `APP_VERSION`
+2. `index.html` 里所有 `?v=` 查询参数（含 `themes/*.css`）
+3. `sw.js` 的缓存名（`talk-shell-vNNN`）和 `?v=`
+
+新增静态目录时记得同步 `pages.yml` 的拷贝清单——`themes/` 最初就是因为漏了这一步而 404。
+
+## 本地开发
+
+```bash
+python3 -m http.server 8080     # 或任意静态服务器
+```
+
+请用 `http://127.0.0.1:8080` 打开，**不要用局域网 IP**：页面带 `upgrade-insecure-requests`，非 localhost 的 HTTP 源会被浏览器改写成 HTTPS，子资源全部失败，表现为白屏。要在手机上调试就起一个 HTTPS 服务，或者接受 localhost 的信任例外。
+
+截图脚本 `scripts/screenshots.mjs` 用 Playwright 生成 README 图片，需要先 `npm i -D playwright && npx playwright install chromium`。脚本以 `SHOT_OUT` 指定输出目录。
+
+## 手工验收清单
+
+改完 UI 或提示词后至少过一遍：
+
+- [ ] 首页三种主题各切一次，标题文案与语气对得上
+- [ ] 查一个缓存词（离线可用）和一个新词（走 API），标记正确
+- [ ] 同一个词切 fast/standard/deep，确认命中缓存不重新请求
+- [ ] 词条页横屏：左栏 hero、右栏义项，同根词独占整排
+- [ ] 句子查词：重点词高亮、整句意思、值得注意的词
+- [ ] 翻译：中→英、英→英各一次，五个风格都出结果
+- [ ] 主题沙龙：再印一版、选一版、翻页都正常
+- [ ] 设置：模型 / 发音 / 数据三页保存后刷新不丢
+- [ ] 断网后重开，外壳仍能启动（service worker 生效）
+
+## 已知限制
+
+- 没有自动化测试套件。上面那份清单是目前唯一的回归手段，改动依赖手测。
+- 纯前端意味着 API key 一定暴露在浏览器里，只能用限额 key；要藏 key 就得加一层服务端代理。
+- 流式解析是容错的括号扫描，不是完整的增量 JSON parser；极端情况下（模型在字符串里输出未转义的括号）预览可能短暂错乱，最终结果仍以完整 JSON 为准。
+- 宽屏下同根词卡片仍是固定宽度，右侧会留白。
+- 吸顶栏是半透明 + 模糊，滚动时下面的内容会透出来，视觉上偶尔显得脏。
+- 隐身模式下 IndexedDB 可能被立即回收，缓存自然失效。

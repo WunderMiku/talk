@@ -1,5 +1,8 @@
 # Theme, copy, and prompt architecture
 
+How the app is put together overall — request pipeline, caches, deployment — is
+in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); this file only covers themes.
+
 ## Files
 
 | File | Responsibility |
