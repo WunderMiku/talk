@@ -1,0 +1,1422 @@
+/* ============================================================
+   USSR — Russian constructivist. Loud, angular, poster-like.
+   Only overrides; base tokens stay in theme.css.
+   ============================================================ */
+
+[data-theme="constructivist"] {
+  --paper: #efe4d0;
+  --paper-deep: #e4d4bb;
+  --card: #f8eedc;
+  --ink: #171512;
+  --ink-soft: #2b2822;
+  --muted: #6e6252;
+  --muted-2: #9b8b75;
+  --line: rgba(23, 21, 18, 0.26);
+  --line-strong: #171512;
+  --lime: #d23b2f;
+  --lime-deep: #b62c21;
+  --lime-wash: #f3c6b9;
+  --coral: #d23b2f;
+  --coral-wash: #f3c6b9;
+  --lavender: #2d2a23;
+  --lavender-wash: #e4d7c0;
+  --sky: #a58e6d;
+  --sky-wash: #eee0c8;
+  --surface-raised: #fff6e7;
+  --surface-soft: rgba(248, 238, 220, 0.72);
+  --accent: #d23b2f;
+  --accent-strong: #b62c21;
+  --accent-wash: #f3c6b9;
+  --accent-ink: #711a13;
+  --focus-ring: rgba(210, 59, 47, 0.38);
+  --font: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", "PingFang SC", "Noto Sans SC", sans-serif;
+  --display: var(--font);
+  --sans: var(--font);
+  --mono: "Courier New", "SFMono-Regular", ui-monospace, monospace;
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-card: 0;
+  --radius-sheet: 0;
+  --radius-pill: 0;
+  --shadow-card: 6px 6px 0 rgba(23, 21, 18, 0.15);
+  --shadow-float: 10px 10px 0 rgba(23, 21, 18, 0.2);
+}
+
+[data-theme="constructivist"] body {
+  background:
+    linear-gradient(122deg, #171512 0 9%, transparent 9%),
+    linear-gradient(302deg, #d23b2f 0 12%, transparent 12%),
+    #e9ddc7;
+}
+
+[data-theme="constructivist"] .ambient {
+  display: none;
+}
+
+[data-theme="constructivist"] .grain {
+  opacity: 0.08;
+}
+
+[data-theme="constructivist"] .stage-meta,
+[data-theme="constructivist"] .stage-hint {
+  color: #efe4d0;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .stage-mark .dot,
+[data-theme="constructivist"] .brand .dot {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .device {
+  border-radius: 0;
+  background: #171512;
+  box-shadow:
+    14px 14px 0 #d23b2f,
+    26px 26px 0 rgba(23, 21, 18, 0.12);
+}
+
+[data-theme="constructivist"] .device::after {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .app {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .module-bar {
+  background: #171512;
+  border-bottom: 3px solid #d23b2f;
+}
+
+[data-theme="constructivist"] .module-bar-label {
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .module-switch {
+  gap: 0;
+  padding: 2px;
+  border: 1px solid #efe4d0;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme="constructivist"] .module-btn {
+  border-radius: 0;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .module-btn.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .topbar {
+  background: linear-gradient(180deg, #efe4d0 0%, #efe4d0 72%, rgba(239, 228, 208, 0) 100%);
+}
+
+[data-theme="constructivist"] .brand {
+  letter-spacing: -0.09em;
+}
+
+[data-theme="constructivist"] .home-title,
+[data-theme="constructivist"] .translator-title,
+[data-theme="constructivist"] .word-title {
+  font-family: var(--display);
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .home-title em,
+[data-theme="constructivist"] .translator-title em {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .eyebrow .spark,
+[data-theme="constructivist"] .translator-eyebrow .spark {
+  background: #d23b2f;
+  box-shadow: 0 0 0 4px rgba(210, 59, 47, 0.16);
+}
+
+[data-theme="constructivist"] .search-card,
+[data-theme="constructivist"] .translator-input-shell,
+[data-theme="constructivist"] .workspace-input-shell {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.14);
+}
+
+[data-theme="constructivist"] .search-submit,
+[data-theme="constructivist"] .icon-btn,
+[data-theme="constructivist"] .btn,
+[data-theme="constructivist"] .speak-btn,
+[data-theme="constructivist"] .chip,
+[data-theme="constructivist"] .mode-btn,
+[data-theme="constructivist"] .provider-btn,
+[data-theme="constructivist"] .cache-action-btn,
+[data-theme="constructivist"] .detail-btn,
+[data-theme="constructivist"] .tts-engine-btn,
+[data-theme="constructivist"] .theme-option,
+[data-theme="constructivist"] .mood-refresh {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .search-submit {
+  background: #d23b2f;
+  color: #fff6e7;
+  border: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .btn,
+[data-theme="constructivist"] .speak-btn,
+[data-theme="constructivist"] .icon-btn {
+  border: 2px solid #171512;
+  box-shadow: 3px 3px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .btn-primary {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .btn-secondary,
+[data-theme="constructivist"] .speak-btn {
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .daily {
+  border: 3px solid #d23b2f;
+  border-radius: 0;
+  background: #171512;
+  box-shadow: 8px 8px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .daily-word {
+  color: #efe4d0;
+  font-family: var(--display);
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .daily-badge {
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  border: 0;
+}
+
+[data-theme="constructivist"] .mood-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .word-layer,
+[data-theme="constructivist"] .sheet,
+[data-theme="constructivist"] .translation-workspace {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .sheet {
+  border-top: 4px solid #d23b2f;
+}
+
+[data-theme="constructivist"] .sheet-handle {
+  border-radius: 0;
+  background: #d23b2f;
+}
+
+[data-theme="constructivist"] .translation-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .translation-emoji {
+  border-radius: 0;
+  background: #171512;
+}
+
+[data-theme="constructivist"] .translation-workspace-head {
+  border-bottom: 3px solid #d23b2f;
+}
+
+[data-theme="constructivist"] .translator-style-chip {
+  border: 2px solid #171512;
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .translator-style-chip.selected {
+  border-color: #d23b2f;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .translator-style-check {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .translation-detail {
+  border: 2px solid #171512;
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .settings-tabs {
+  gap: 0;
+  padding: 0;
+  border-bottom: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .settings-tab {
+  border-radius: 0;
+  border-right: 1px solid #171512;
+}
+
+[data-theme="constructivist"] .settings-tab.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .model-profile-chip,
+[data-theme="constructivist"] .model-profile-add,
+[data-theme="constructivist"] .tts-engine-switch,
+[data-theme="constructivist"] .detail-switch,
+[data-theme="constructivist"] .theme-switch,
+[data-theme="constructivist"] .cache-display-switch,
+[data-theme="constructivist"] .cache-settings-summary,
+[data-theme="constructivist"] .notice-card,
+[data-theme="constructivist"] .toast {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .model-profile-chip.active {
+  background: #d23b2f;
+  color: #fff6e7;
+  border-color: #171512;
+}
+
+[data-theme="constructivist"] .settings-footer {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .translation-detail-copy {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .tone-yellow {
+  --tone: #b9852d;
+  --tone-ink: #5f3e0e;
+  --tone-wash: #e7cf9e;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-sage {
+  --tone: #6b6b3a;
+  --tone-ink: #45451f;
+  --tone-wash: #dfd8b5;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-sky {
+  --tone: #4f6d75;
+  --tone-ink: #2f4a50;
+  --tone-wash: #d5e0dc;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-coral {
+  --tone: #c83226;
+  --tone-ink: #711a13;
+  --tone-wash: #f0c1b9;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] .tone-lavender {
+  --tone: #5a403b;
+  --tone-ink: #39241f;
+  --tone-wash: #e6d4c8;
+  --tone-border: #171512;
+}
+
+[data-theme="constructivist"] :where(
+  .meaning-card, .family-card, .example-card, .origin-card, .memory-card,
+  .key-card, .sentence-card, .history-item, .cache-word-item,
+  .cache-summary-card, .settings-intro, .api-note, .error-detail,
+  .recent-row .chip, .related-pill, .collocation, .word-layer .btn
+) {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .home-hero,
+[data-theme="constructivist"] .translator-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="constructivist"] .home-hero::before {
+  content: "СЛОВО";
+  position: absolute;
+  top: -30px;
+  right: -16px;
+  z-index: -1;
+  color: rgba(210, 59, 47, 0.14);
+  font-family: var(--display);
+  font-size: clamp(68px, 20vw, 96px);
+  font-weight: 900;
+  letter-spacing: -0.09em;
+  line-height: 1;
+  transform: rotate(-7deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .home-hero::after {
+  content: "";
+  position: absolute;
+  top: -28px;
+  right: -38px;
+  z-index: -2;
+  width: 220px;
+  height: 220px;
+  background: repeating-conic-gradient(
+    from -12deg,
+    rgba(210, 59, 47, 0.13) 0 7deg,
+    transparent 7deg 15deg
+  );
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .home-title em,
+[data-theme="constructivist"] .translator-title em {
+  display: inline-block;
+  padding: 0 0.08em 0.02em;
+  background: #d23b2f;
+  color: #efe4d0;
+  box-shadow: 8px 8px 0 #171512;
+  transform: skew(-4deg) rotate(-1deg);
+}
+
+[data-theme="constructivist"] .theme-manifesto {
+  position: relative;
+  margin: 18px 0 2px;
+  padding: 12px 16px 10px;
+  border-left: 8px solid #d23b2f;
+  background: #171512;
+  color: #efe4d0;
+  box-shadow: 8px 8px 0 #d23b2f;
+  transform: skew(-4deg);
+}
+
+[data-theme="constructivist"] .manifesto-ru {
+  display: block;
+  font-family: var(--display);
+  font-size: clamp(19px, 5.8vw, 25px);
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .manifesto-zh {
+  display: block;
+  margin-top: 5px;
+  color: #d23b2f;
+  font-family: var(--mono);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+}
+
+[data-theme="constructivist"] .translator-hero::before {
+  content: "ПЕРЕВОД";
+  position: absolute;
+  top: -26px;
+  right: -8px;
+  z-index: -1;
+  color: rgba(210, 59, 47, 0.13);
+  font-family: var(--display);
+  font-size: clamp(48px, 15vw, 72px);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 1;
+  transform: rotate(-5deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .translator-title {
+  letter-spacing: -0.055em;
+}
+
+[data-theme="constructivist"] .translator-lede {
+  max-width: 30ch;
+  color: #171512;
+  font-weight: 550;
+}
+
+[data-theme="constructivist"] .section-kicker {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+}
+
+[data-theme="constructivist"] .relation-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+}
+
+[data-theme="constructivist"] .relation-card.syn {
+  background: #e4d6b8;
+}
+
+[data-theme="constructivist"] .relation-card.ant {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .relation-card::after {
+  right: -26px;
+  bottom: -30px;
+  width: 84px;
+  height: 84px;
+  border-radius: 0;
+  background: #d23b2f;
+  opacity: 0.16;
+  transform: rotate(45deg);
+}
+
+[data-theme="constructivist"] .relation-head h3 {
+  font-family: var(--display);
+  letter-spacing: -0.04em;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .relation-card.ant .relation-head h3,
+[data-theme="constructivist"] .relation-card.ant .rel-word {
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-gloss {
+  color: rgba(239, 228, 208, 0.62);
+}
+
+[data-theme="constructivist"] .relation-icon {
+  border: 1px solid currentColor;
+  border-radius: 0;
+  background: transparent;
+}
+
+[data-theme="constructivist"] .rel-chip {
+  border: 1px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+  box-shadow: 2px 2px 0 rgba(23, 21, 18, 0.12);
+}
+
+[data-theme="constructivist"] .rel-chip:hover {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .rel-chip:hover .rel-gloss {
+  color: rgba(255, 246, 231, 0.72);
+}
+
+[data-theme="constructivist"] .rel-gloss {
+  color: rgba(23, 21, 18, 0.56);
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip {
+  color: #171512;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip .rel-word {
+  color: #171512;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip .rel-gloss {
+  color: rgba(23, 21, 18, 0.56);
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip:hover {
+  color: #fff6e7;
+  background: #d23b2f;
+}
+
+[data-theme="constructivist"] .relation-card.ant .rel-chip:hover .rel-word,
+[data-theme="constructivist"] .relation-card.ant .rel-chip:hover .rel-gloss {
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .translator-styles {
+  padding-bottom: 9px;
+}
+
+[data-theme="constructivist"] .translator-landing-hint {
+  margin-top: 24px;
+}
+
+[data-theme="constructivist"] .result-page {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="constructivist"] .result-page::before {
+  content: "";
+  position: absolute;
+  top: 28px;
+  right: -58px;
+  z-index: -1;
+  width: 178px;
+  height: 46px;
+  background: #d23b2f;
+  opacity: 0.13;
+  transform: rotate(-28deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .block-head {
+  align-items: flex-end;
+  gap: 11px;
+  margin-bottom: 14px;
+}
+
+[data-theme="constructivist"] .block-index {
+  padding: 5px 7px;
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  font-size: 9px;
+  font-weight: 700;
+  transform: rotate(-15deg);
+}
+
+[data-theme="constructivist"] .block-head h2 {
+  font-family: var(--display);
+  font-size: 21px;
+  letter-spacing: -0.045em;
+}
+
+[data-theme="constructivist"] .block-head .rule {
+  height: 4px;
+  margin-bottom: 5px;
+  background: #171512;
+  transform: rotate(-3deg);
+  transform-origin: left center;
+}
+
+[data-theme="constructivist"] .block-head .block-note {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+[data-theme="constructivist"] .meaning-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 7px 7px 0 rgba(23, 21, 18, 0.16);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 17px), calc(100% - 17px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .collocation {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 3px 3px 0 rgba(23, 21, 18, 0.14);
+  transform: rotate(-1.4deg);
+}
+
+[data-theme="constructivist"] .collocation:nth-child(even) {
+  transform: rotate(1.4deg);
+}
+
+[data-theme="constructivist"] .collocation:hover {
+  background: #d23b2f;
+  color: #fff6e7;
+  transform: rotate(-1.4deg) translate(2px, -2px);
+}
+
+[data-theme="constructivist"] .memory-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  padding: 19px 28px 20px 19px;
+  background: #171512;
+  color: #efe4d0;
+  box-shadow: 8px 8px 0 #d23b2f;
+  clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .memory-card::after {
+  right: -40px;
+  bottom: -46px;
+  width: 118px;
+  height: 118px;
+  border: 13px dashed rgba(210, 59, 47, 0.52);
+  border-radius: 50%;
+  background: none;
+  color: transparent;
+  content: "";
+  transform: rotate(18deg);
+}
+
+[data-theme="constructivist"] .memory-label {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+[data-theme="constructivist"] .memory-text {
+  color: #efe4d0;
+  font-family: var(--display);
+  font-size: 18px;
+  line-height: 1.58;
+}
+
+[data-theme="constructivist"] .origin-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  padding: 19px 20px 17px;
+  background: #e4d6b8;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.16);
+  transform: skew(1.2deg);
+}
+
+[data-theme="constructivist"] .origin-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 72px;
+  height: 72px;
+  background:
+    linear-gradient(#171512, #171512) center / 100% 5px no-repeat,
+    linear-gradient(#171512, #171512) center / 5px 100% no-repeat;
+  opacity: 0.12;
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .origin-root {
+  border: 1px solid #171512;
+  border-radius: 0;
+  background: #171512;
+  color: #efe4d0;
+  font-weight: 650;
+}
+
+[data-theme="constructivist"] .origin-original {
+  border-top: 2px dashed #171512;
+}
+
+[data-theme="constructivist"] .origin-timeline::before {
+  left: 4px;
+  width: 3px;
+  background: linear-gradient(180deg, #d23b2f, #171512);
+}
+
+[data-theme="constructivist"] .origin-stage {
+  grid-template-columns: 64px 1fr;
+}
+
+[data-theme="constructivist"] .origin-stage + .origin-stage {
+  border-top: 1px solid #171512;
+}
+
+[data-theme="constructivist"] .origin-stage::before {
+  top: 13px;
+  left: -21px;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #171512;
+  border-radius: 50%;
+  background: #d23b2f;
+  box-shadow: none;
+}
+
+[data-theme="constructivist"] .origin-when {
+  color: #b62c21;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .origin-label {
+  font-family: var(--display);
+  font-size: 12px;
+}
+
+[data-theme="constructivist"] .family-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 4px 4px 0 rgba(23, 21, 18, 0.13);
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n) {
+  transform: rotate(1.2deg);
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n + 1) {
+  transform: rotate(-1.2deg);
+}
+
+[data-theme="constructivist"] .example-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  box-shadow: 6px 6px 0 rgba(23, 21, 18, 0.14);
+}
+
+[data-theme="constructivist"] .example-card::after {
+  font-size: 98px;
+  color: rgba(210, 59, 47, 0.18);
+}
+
+[data-theme="constructivist"] .example-text mark {
+  background: #e7cf9e;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .relation-icon {
+  width: 26px;
+  height: 26px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 13px;
+}
+
+[data-theme="constructivist"] .search-submit {
+  transform: rotate(-6deg);
+}
+
+[data-theme="constructivist"] .search-submit svg {
+  width: 22px;
+  height: 22px;
+}
+
+[data-theme="constructivist"] .icon-btn svg {
+  width: 19px;
+  height: 19px;
+}
+
+[data-theme="constructivist"] .daily-arrow svg {
+  width: 22px;
+  height: 22px;
+}
+
+[data-theme="constructivist"] .eyebrow .spark,
+[data-theme="constructivist"] .translator-eyebrow .spark {
+  width: 9px;
+  height: 9px;
+}
+
+[data-theme="constructivist"] .block-head .block-note,
+[data-theme="constructivist"] .side-note {
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .memory-card {
+  transform: rotate(-1.2deg);
+  filter: drop-shadow(6px 6px 0 #d23b2f);
+}
+
+[data-theme="constructivist"] .origin-card {
+  transform: skew(1.2deg) rotate(0.6deg);
+}
+
+[data-theme="constructivist"] .meaning-card {
+  filter: drop-shadow(6px 6px 0 rgba(23, 21, 18, 0.16));
+}
+
+[data-theme="constructivist"] .result-hero {
+  position: relative;
+  isolation: isolate;
+}
+
+[data-theme="constructivist"] .result-hero::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: -40px;
+  z-index: -1;
+  width: 170px;
+  height: 38px;
+  background: #d23b2f;
+  opacity: 0.12;
+  transform: rotate(-30deg);
+  pointer-events: none;
+}
+
+[data-theme="constructivist"] .mood-section .section-head h2 {
+  font-family: var(--display);
+  font-size: 25px;
+  letter-spacing: -0.05em;
+}
+
+[data-theme="constructivist"] .mood-section .section-actions .side-note {
+  color: #d23b2f;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .mood-refresh {
+  padding: 6px 9px;
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+  box-shadow: 2px 2px 0 rgba(23, 21, 18, 0.14);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+[data-theme="constructivist"] .mood-refresh:hover {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .mood-scroll {
+  gap: 12px;
+  padding-bottom: 9px;
+}
+
+[data-theme="constructivist"] .mood-card {
+  flex-basis: 158px;
+  min-height: 148px;
+  padding: 14px 15px;
+  border: 2px solid #171512;
+  border-radius: 0;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .mood-card:nth-child(3n + 1) {
+  transform: rotate(-1.2deg);
+}
+
+[data-theme="constructivist"] .mood-card:nth-child(3n + 2) {
+  transform: rotate(1deg);
+}
+
+[data-theme="constructivist"] .mood-card:nth-child(3n) {
+  transform: rotate(-0.6deg);
+}
+
+[data-theme="constructivist"] .mood-card:hover {
+  transform: translateY(-3px) rotate(-1.2deg);
+  box-shadow: 7px 7px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .mood-card.lime {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .mood-card.lavender {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .mood-card.coral {
+  background: #e4d6b8;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .mood-card.lime .mood-kicker,
+[data-theme="constructivist"] .mood-card.lime .mood-words,
+[data-theme="constructivist"] .mood-card.lavender .mood-kicker,
+[data-theme="constructivist"] .mood-card.lavender .mood-words {
+  color: rgba(255, 246, 231, 0.66);
+}
+
+[data-theme="constructivist"] .mood-card.coral .mood-kicker,
+[data-theme="constructivist"] .mood-card.coral .mood-words {
+  color: rgba(23, 21, 18, 0.56);
+}
+
+[data-theme="constructivist"] .mood-title {
+  font-family: var(--display);
+  font-size: 21px;
+  letter-spacing: -0.05em;
+}
+
+[data-theme="constructivist"] .mood-kicker {
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+[data-theme="constructivist"] .mood-kicker span:last-child {
+  font-size: 12px;
+}
+
+[data-theme="constructivist"] .mood-card::after {
+  right: -26px;
+  bottom: -36px;
+  width: 112px;
+  height: 54px;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.16);
+  filter: none;
+  transform: rotate(-38deg);
+}
+
+[data-theme="constructivist"] .mood-card.lavender::after {
+  background: #d23b2f;
+  opacity: 0.4;
+}
+
+[data-theme="constructivist"] .mood-card.coral::after {
+  background: #171512;
+  opacity: 0.12;
+}
+
+[data-theme="constructivist"] .qwen-tts-panel input[type="text"] {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .mode-switch,
+[data-theme="constructivist"] .translator-mode-switch,
+[data-theme="constructivist"] .cache-display-switch {
+  border-radius: 0;
+  background: transparent;
+  border: 2px solid #171512;
+  padding: 2px;
+}
+
+[data-theme="constructivist"] .mode-btn,
+[data-theme="constructivist"] .translator-mode-btn,
+[data-theme="constructivist"] .cache-display-btn {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .mode-btn.active,
+[data-theme="constructivist"] .translator-mode-btn.active,
+[data-theme="constructivist"] .cache-display-btn.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .h-scroll {
+  mask-image: none;
+  -webkit-mask-image: none;
+  padding-right: 26px;
+  gap: 11px;
+}
+
+[data-theme="constructivist"] .family-card,
+[data-theme="constructivist"] .family-card:nth-child(2n),
+[data-theme="constructivist"] .family-card:nth-child(2n + 1) {
+  transform: none;
+}
+
+[data-theme="constructivist"] .family-card:hover {
+  transform: translateY(-3px);
+}
+
+[data-theme="constructivist"] .cache-display-borders .family-card,
+[data-theme="constructivist"] .cache-display-borders .rel-chip,
+[data-theme="constructivist"] .cache-display-borders .related-pill,
+[data-theme="constructivist"] .cache-display-borders .mini-rel {
+  border: 2px dashed rgba(23, 21, 18, 0.46);
+}
+
+[data-theme="constructivist"] .cache-display-borders .family-card.is-cache-ready,
+[data-theme="constructivist"] .cache-display-borders .rel-chip.is-cache-ready,
+[data-theme="constructivist"] .cache-display-borders .related-pill.is-cache-ready,
+[data-theme="constructivist"] .cache-display-borders .mini-rel.is-cache-ready {
+  border: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n) {
+  transform: rotate(1.4deg);
+}
+
+[data-theme="constructivist"] .family-card:nth-child(2n + 1) {
+  transform: rotate(-1.4deg);
+}
+
+[data-theme="constructivist"] .h-scroll {
+  padding-top: 5px;
+  padding-bottom: 10px;
+}
+
+[data-theme="constructivist"] .theme-salon {
+  padding-top: 7px;
+}
+
+[data-theme="constructivist"] .theme-salon-kicker .spark {
+  background: #d23b2f;
+  box-shadow: 0 0 0 4px rgba(210, 59, 47, 0.16);
+}
+
+[data-theme="constructivist"] .theme-salon-title {
+  text-transform: uppercase;
+  letter-spacing: -0.065em;
+}
+
+[data-theme="constructivist"] .theme-generate {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .theme-word-card {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #e4d6b8;
+  box-shadow: 5px 5px 0 rgba(23, 21, 18, 0.16);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(1) {
+  background: #171512;
+  color: #efe4d0;
+  box-shadow: 7px 7px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(2) {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(3) {
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .theme-word-index,
+[data-theme="constructivist"] .theme-word-pos {
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(1) .theme-word-index,
+[data-theme="constructivist"] .theme-word-card:nth-child(1) .theme-word-pos {
+  color: #d23b2f;
+}
+
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-index,
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-pos,
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-gloss,
+[data-theme="constructivist"] .theme-word-card:nth-child(2) .theme-word-why {
+  color: rgba(255, 246, 231, 0.72);
+}
+
+[data-theme="constructivist"] .theme-scene {
+  border-left: 7px solid #d23b2f;
+  background: #e4d6b8;
+  color: #171512;
+  box-shadow: 4px 4px 0 rgba(23, 21, 18, 0.12);
+}
+
+[data-theme="constructivist"] .theme-salon {
+  margin: 34px -22px 0;
+}
+
+[data-theme="constructivist"] .theme-poster {
+  padding: 18px 22px 14px;
+  border: 3px solid #171512;
+  border-top: 3px solid #171512;
+  border-bottom: 3px solid #171512;
+  background: #efe4d0;
+  box-shadow: 10px 10px 0 #d23b2f;
+}
+
+[data-theme="constructivist"] .poster-masthead {
+  border-bottom: 4px solid #d23b2f;
+  padding-bottom: 8px;
+}
+
+[data-theme="constructivist"] .poster-brand-mark {
+  font-family: var(--display);
+  font-size: 23px;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .poster-brand-section,
+[data-theme="constructivist"] .poster-edition {
+  color: #171512;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+[data-theme="constructivist"] .poster-rule {
+  height: 3px;
+  margin: 10px 0 13px;
+  background: #171512;
+}
+
+[data-theme="constructivist"] .poster-title {
+  color: #171512;
+  font-family: var(--display);
+  font-size: clamp(40px, 12vw, 58px);
+  letter-spacing: -0.08em;
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .poster-kicker .spark {
+  background: #d23b2f;
+  box-shadow: 0 0 0 4px rgba(210, 59, 47, 0.16);
+}
+
+[data-theme="constructivist"] .poster-subtitle {
+  color: #171512;
+  font-weight: 550;
+}
+
+[data-theme="constructivist"] .poster-generate {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .poster-body {
+  margin-top: 15px;
+  border-top: 4px solid #171512;
+}
+
+[data-theme="constructivist"] .poster-lead {
+  margin: 0 -22px;
+  padding: 13px 22px 15px;
+  border: 0;
+  background: #171512;
+  color: #efe4d0;
+  clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .poster-lead-label {
+  color: #d23b2f;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+[data-theme="constructivist"] .poster-lead-word {
+  color: #efe4d0;
+  font-size: clamp(44px, 13vw, 64px);
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .poster-lead-pos {
+  color: rgba(239, 228, 208, 0.55);
+}
+
+[data-theme="constructivist"] .poster-lead-gloss {
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .poster-lead-why {
+  color: rgba(239, 228, 208, 0.68);
+}
+
+[data-theme="constructivist"] .poster-columns {
+  column-gap: 0;
+}
+
+[data-theme="constructivist"] .poster-col {
+  padding: 12px 11px 13px;
+  border-bottom: 2px solid #171512;
+  background: transparent;
+}
+
+[data-theme="constructivist"] .poster-col:nth-child(2n) {
+  border-left: 2px solid #171512;
+  padding-left: 13px;
+}
+
+[data-theme="constructivist"] .poster-col-index {
+  color: #b62c21;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .poster-col-word {
+  color: #171512;
+  font-family: var(--display);
+  text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .poster-col-pos {
+  color: #b62c21;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .poster-col-gloss {
+  color: #171512;
+}
+
+[data-theme="constructivist"] .poster-col-why {
+  color: #5f5141;
+}
+
+[data-theme="constructivist"] .poster-scene {
+  margin-top: 12px;
+  padding: 11px 12px;
+  border-left: 8px solid #d23b2f;
+  background: #e4d6b8;
+}
+
+[data-theme="constructivist"] .poster-scene span {
+  color: #b62c21;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+}
+
+[data-theme="constructivist"] .poster-scene p {
+  color: #171512;
+}
+
+[data-theme="constructivist"] .poster-footer {
+  border-top: 2px solid #171512;
+  color: #171512;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+[data-theme="constructivist"] .poster-title {
+  font-size: clamp(32px, 9.4vw, 44px);
+  line-height: 0.98;
+}
+
+[data-theme="constructivist"] .poster-lead {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%);
+}
+
+[data-theme="constructivist"] .poster-lead-word {
+  font-size: clamp(36px, 10.2vw, 50px);
+  letter-spacing: -0.075em;
+  overflow-wrap: anywhere;
+}
+
+[data-theme="constructivist"] .poster-edition {
+  align-items: flex-end;
+}
+
+[data-theme="constructivist"] .poster-nav button {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .poster-nav button:hover:not(:disabled) {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .poster-bottom {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .poster-cache-count {
+  color: #171512;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .poster-batch {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .poster-batch:hover:not(:disabled) {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .poster-batch-status {
+  color: #171512;
+  font-weight: 700;
+  border-left: 4px solid #d23b2f;
+  padding-left: 7px;
+}
+
+[data-theme="constructivist"] .poster-picker,
+[data-theme="constructivist"] .poster-single {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .poster-single {
+  background: #d23b2f;
+  color: #fff6e7;
+  box-shadow: 3px 3px 0 #171512;
+}
+
+[data-theme="constructivist"] .poster-picker:hover,
+[data-theme="constructivist"] .poster-single:hover:not(:disabled) {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .theme-picker-item {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .theme-picker-item.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .theme-picker-item.active .theme-picker-copy small,
+[data-theme="constructivist"] .theme-picker-item.active .theme-picker-count,
+[data-theme="constructivist"] .theme-picker-item.active .theme-picker-index {
+  color: rgba(255, 246, 231, 0.72);
+}
+
+[data-theme="constructivist"] .theme-cache-setting {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .pos-tab {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+}
+
+[data-theme="constructivist"] .pos-tab.active {
+  background: #d23b2f;
+  color: #fff6e7;
+}
+
+[data-theme="constructivist"] .meaning-pager-foot {
+  border-top: 2px solid #171512;
+}
+
+[data-theme="constructivist"] .meaning-pager-arrow {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #171512;
+}
+
+[data-theme="constructivist"] .meaning-pager-arrow:hover {
+  background: #171512;
+  color: #efe4d0;
+}
+
+[data-theme="constructivist"] .word-gloss-tag {
+  border: 2px solid #171512;
+  border-radius: 0;
+  background: #f8eedc;
+  color: #b62c21;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .module-version {
+  color: #efe4d0;
+  font-weight: 700;
+}
+
+[data-theme="constructivist"] .meaning-pager-dots i {
+  border-radius: 0;
+}
+

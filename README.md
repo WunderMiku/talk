@@ -9,6 +9,9 @@ No backend, no build step, no local model.
 index.html
 styles.css
 theme.css
+themes/
+  ussr.css
+  rhine.css
 data.js
 app.js
 theme.js
@@ -63,8 +66,8 @@ app shell, downloads the `idb` helper into `vendor/`, and publishes the artifact
    ```
 
 Only these files are published: `index.html`, the CSS/JS/theme/copy/prompt
-modules, `manifest.webmanifest`, `sw.js`, `favicon.svg`, `icons/`, `LICENSE`, and
-the downloaded `vendor/idb.js`. There is no model to download and no 100 MB file
+modules, `themes/`, `manifest.webmanifest`, `sw.js`, `favicon.svg`, `icons/`,
+`LICENSE`, and the downloaded `vendor/idb.js`. There is no model to download and no 100 MB file
 limit to work around, so the site also fits a branch-based deploy if preferred.
 
 ## Settings UX
@@ -130,12 +133,25 @@ call happens on page load.
 
 ## Theme and content architecture
 
-Visual tokens live in `theme.css`, theme registration/persistence in `theme.js`,
-interface copy in `content.js`, and static model prompts in `prompts.js`.
-See [THEME.md](THEME.md) for adding a theme, style, or copy system.
+`theme.css` holds the base token contract (Paper). Each additional theme is one
+file under `themes/` that only overrides what it needs:
 
-The current themes are **Paper**, **USSR**, and **Rhine Lab**, selectable
-from settings → data → appearance.
+```text
+theme.css          base palette + shape/motion tokens
+themes/ussr.css    constructivist overrides
+themes/rhine.css   Rhine Lab overrides
+theme.js           registry: label, chrome colour, stylesheet, copy key
+content.js         base copy + themeCopy[<id>] voices
+prompts.js         static model prompts (theme-independent)
+```
+
+The theme selector in **设置 → 数据** is generated from the registry, so a new
+theme only needs a CSS file, a `theme.js` entry, and optionally a copy block.
+See [THEME.md](THEME.md) for the exact steps and the token list.
+
+The current themes are **Paper**, **USSR**, and **Rhine Lab**. Word-page spacing
+in landscape is controlled by `--word-columns-lead` and friends in `styles.css`
+instead of per-theme `!important` overrides.
 
 ## Model profiles
 

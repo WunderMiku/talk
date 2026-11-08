@@ -8,12 +8,13 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "122";
+  const APP_VERSION = "123";
 
   function copyFor(section) {
-    const themeId = window.TALK_THEME?.current?.().id || "paper";
+    const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
     const base = CONTENT[section] || {};
-    const override = CONTENT.themeCopy?.[themeId]?.[section];
+    const key = theme.copyKey || theme.id;
+    const override = CONTENT.themeCopy?.[key]?.[section];
     return override ? { ...base, ...override } : base;
   }
   const app = document.getElementById("app");
@@ -3606,7 +3607,7 @@
       <div class="theme-setting">
         <span class="settings-subhead">外观主题</span>
         <div class="theme-switch" role="group" aria-label="外观主题">
-          ${Object.values(window.TALK_THEME.themes).map((theme) => `<button class="theme-option ${window.TALK_THEME.current().id === theme.id ? "active" : ""}" type="button" data-action="theme" data-theme="${attr(theme.id)}" aria-pressed="${window.TALK_THEME.current().id === theme.id}">${esc(theme.label)}</button>`).join("")}
+          ${Object.values(window.TALK_THEME.themes).map((theme) => `<button class="theme-option ${window.TALK_THEME.current().id === theme.id ? "active" : ""}" type="button" data-action="theme" data-theme="${attr(theme.id)}" title="${attr(theme.description || theme.label)}" aria-pressed="${window.TALK_THEME.current().id === theme.id}">${esc(theme.label)}</button>`).join("")}
         </div>
       </div>
       <label class="pref-toggle">

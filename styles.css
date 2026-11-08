@@ -6043,11 +6043,6 @@ textarea:focus-visible,
   letter-spacing: 0.04em;
 }
 
-[data-theme="constructivist"] .module-version {
-  color: #efe4d0;
-  font-weight: 700;
-}
-
 /* Version inside the settings footer */
 .settings-footer [data-app-version] {
   color: var(--muted-2);
@@ -6961,10 +6956,6 @@ textarea:focus-visible,
   gap: 7px;
 }
 
-[data-theme="constructivist"] .meaning-pager-dots i {
-  border-radius: 0;
-}
-
 .pos-tab:active {
   transform: scale(0.96);
 }
@@ -7001,7 +6992,27 @@ textarea:focus-visible,
 
 /* ============================================================
    Landscape / wide-screen layout
+   One breakpoint owns the whole wide layout. The word page keeps its
+   rhythm in these variables, so a theme never has to re-declare spacing.
    ============================================================ */
+
+.word-columns {
+  display: block;
+}
+
+.word-columns > .block {
+  margin-top: 27px;
+}
+
+:root {
+  --word-page-gutter: 30px;
+  --word-col-gap: 30px;
+  --word-row-gap: 64px;
+  --word-family-gap: 42px;
+  --word-section-gap: 64px;
+  /* Gap under the 同根词 row; the single knob for that spacing. */
+  --word-columns-lead: 96px;
+}
 
 @media (orientation: landscape) and (min-width: 720px) {
   body {
@@ -7040,14 +7051,15 @@ textarea:focus-visible,
   }
 
   .screen {
-    padding: 0 30px 44px;
+    padding: 0 var(--word-page-gutter) 44px;
   }
 
+  /* Home: hero on the left, search and daily word on the right. */
   .screen[data-page="home"] {
     display: grid;
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
     align-content: start;
-    column-gap: 30px;
+    column-gap: var(--word-col-gap);
   }
 
   .screen[data-page="home"] > .topbar {
@@ -7089,7 +7101,8 @@ textarea:focus-visible,
   }
 
   .screen[data-page="home"] .home-title {
-    font-size: clamp(52px, 8.4vw, 82px);
+    font-size: clamp(43px, 6.5vw, 58px);
+    white-space: nowrap;
   }
 
   .screen[data-page="home"] .home-lede {
@@ -7100,12 +7113,13 @@ textarea:focus-visible,
     margin-top: 20px;
   }
 
+  /* Word page: hero left, meaning right, then full-width rows. */
   .screen[data-page="word"] .result-page,
   .word-layer .result-page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
-    column-gap: 30px;
+    column-gap: var(--word-col-gap);
   }
 
   .screen[data-page="word"] .result-hero,
@@ -7121,26 +7135,110 @@ textarea:focus-visible,
     margin-top: 9px;
   }
 
-  .screen[data-page="word"] .spelling-banner,
-  .word-layer .spelling-banner {
-    grid-column: 1 / -1;
-  }
-
   .screen[data-page="word"] .result-page > .block:first-of-type,
   .word-layer .result-page > .block:first-of-type {
     margin-top: 0;
   }
 
-  .screen[data-page="word"] .page-actions,
-  .word-layer .page-actions {
+  .screen[data-page="word"] .word-meaning-block,
+  .word-layer .word-meaning-block {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .screen[data-page="word"] .result-page > .word-family-block,
+  .word-layer .result-page > .word-family-block {
+    grid-column: 1 / -1 !important;
+    grid-row: 2;
+    margin-top: var(--word-family-gap) !important;
+  }
+
+  .screen[data-page="word"] .spelling-banner,
+  .word-layer .spelling-banner {
     grid-column: 1 / -1;
   }
 
+  /* The two-column block cluster under the family row. */
+  .screen[data-page="word"] .word-columns,
+  .word-layer .word-columns {
+    grid-column: 1 / -1;
+    grid-row: auto;
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    align-items: start;
+    column-gap: var(--word-col-gap);
+    row-gap: var(--word-row-gap) !important;
+    margin-top: var(--word-columns-lead) !important;
+    columns: auto !important;
+  }
+
+  .screen[data-page="word"] .word-columns > .block,
+  .word-layer .word-columns > .block {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+
+  /* One rule for every theme: the grid above owns the layout. */
+  [data-theme] .screen[data-page="word"] .word-columns > .block,
+  [data-theme] .word-layer .word-columns > .block {
+    display: block !important;
+    width: auto !important;
+    break-inside: auto !important;
+    margin: 0 !important;
+    vertical-align: top;
+  }
+
+  .screen[data-page="word"] .result-page > .word-origin-block,
+  .word-layer .result-page > .word-origin-block,
+  .screen[data-page="word"] .result-page > .word-related-block,
+  .word-layer .result-page > .word-related-block {
+    grid-column: 1 / -1 !important;
+    grid-row: auto;
+    margin-top: var(--word-section-gap) !important;
+  }
+
+  /* Origin: etymology card left, timeline right. */
+  .screen[data-page="word"] .word-origin-block,
+  .word-layer .word-origin-block {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    column-gap: var(--word-col-gap);
+    align-items: start;
+  }
+
+  .screen[data-page="word"] .word-origin-block > .block-head,
+  .word-layer .word-origin-block > .block-head {
+    grid-column: 1 / -1;
+  }
+
+  .screen[data-page="word"] .word-origin-block > .origin-card,
+  .word-layer .word-origin-block > .origin-card {
+    grid-column: 1;
+  }
+
+  .screen[data-page="word"] .word-origin-block > .origin-timeline,
+  .word-layer .word-origin-block > .origin-timeline {
+    grid-column: 2;
+    margin-top: 0;
+  }
+
+  .screen[data-page="word"] .word-related-block,
+  .word-layer .word-related-block {
+    padding-top: 2px;
+  }
+
+  .screen[data-page="word"] .page-actions,
+  .word-layer .page-actions {
+    grid-column: 1 / -1;
+    margin-top: var(--word-section-gap) !important;
+  }
+
+  /* Translator: hero left, input and style chips right. */
   .screen[data-page="translator"] .translator-page {
     display: grid;
     grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
     align-content: start;
-    column-gap: 30px;
+    column-gap: var(--word-col-gap);
   }
 
   .screen[data-page="translator"] .translator-hero {
@@ -7181,6 +7279,7 @@ textarea:focus-visible,
     align-self: start;
   }
 
+  /* Sheets stay centred instead of hugging the phone frame. */
   .sheet {
     left: 50%;
     right: auto;
@@ -7201,227 +7300,5 @@ textarea:focus-visible,
   .translation-workspace-head {
     padding-top: 10px;
     padding-bottom: 7px;
-  }
-}
-
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="home"] .home-title {
-    font-size: clamp(43px, 6.5vw, 58px);
-    white-space: nowrap;
-  }
-}
-
-/* Word-page two-column content wrapper (landscape enhancement) */
-.word-columns {
-  display: block;
-}
-
-.word-columns > .block {
-  margin-top: 27px;
-}
-
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="word"] .word-meaning-block,
-  .word-layer .word-meaning-block {
-    grid-column: 2;
-    grid-row: 1;
-  }
-
-  .screen[data-page="word"] .result-page > .word-family-block,
-  .word-layer .result-page > .word-family-block {
-    grid-column: 1 / -1;
-    grid-row: 2;
-    margin-top: 22px;
-  }
-
-  .screen[data-page="word"] .word-columns,
-  .word-layer .word-columns {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    align-items: start;
-    column-gap: 30px;
-  }
-
-  .screen[data-page="word"] .word-columns > .block,
-  .word-layer .word-columns > .block {
-    margin-top: 0;
-    margin-bottom: 24px;
-  }
-
-
-  [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
-  [data-theme="constructivist"] .word-layer .word-columns > .block {
-    display: inline-block;
-    width: 100%;
-    break-inside: avoid;
-    margin: 0 0 24px;
-    vertical-align: top;
-  }
-}
-
-/* Landscape word-page section rhythm */
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer .result-page > .word-origin-block,
-  .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer .result-page > .word-related-block {
-    grid-column: 1 / -1;
-    grid-row: auto;
-    margin-top: 24px;
-  }
-
-  .screen[data-page="word"] .word-origin-block,
-  .word-layer .word-origin-block {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    column-gap: 30px;
-    align-items: start;
-  }
-
-  .screen[data-page="word"] .word-origin-block > .block-head,
-  .word-layer .word-origin-block > .block-head {
-    grid-column: 1 / -1;
-  }
-
-  .screen[data-page="word"] .word-origin-block > .origin-card,
-  .word-layer .word-origin-block > .origin-card {
-    grid-column: 1;
-  }
-
-  .screen[data-page="word"] .word-origin-block > .origin-timeline,
-  .word-layer .word-origin-block > .origin-timeline {
-    grid-column: 2;
-    margin-top: 0;
-  }
-
-  .screen[data-page="word"] .word-related-block,
-  .word-layer .word-related-block {
-    padding-top: 2px;
-  }
-}
-
-/* More air between landscape word rows. */
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="word"] .word-columns,
-  .word-layer .word-columns {
-    row-gap: 34px;
-  }
-
-  .screen[data-page="word"] .word-columns > .block,
-  .word-layer .word-columns > .block {
-    margin-bottom: 0;
-  }
-
-  .screen[data-page="word"] .result-page > .word-family-block,
-  .word-layer .result-page > .word-family-block {
-    margin-top: 30px;
-  }
-
-  .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer .result-page > .word-origin-block,
-  .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer .result-page > .word-related-block {
-    margin-top: 34px;
-  }
-
-  [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
-  [data-theme="constructivist"] .word-layer .word-columns > .block {
-    margin-bottom: 34px;
-  }
-}
-
-/* Give the landscape word rows more breathing room. */
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="word"] .word-columns,
-  .word-layer .word-columns {
-    row-gap: 56px;
-  }
-
-  .screen[data-page="word"] .result-page > .word-family-block,
-  .word-layer .result-page > .word-family-block {
-    margin-top: 42px;
-  }
-
-  .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer .result-page > .word-origin-block,
-  .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer .result-page > .word-related-block {
-    margin-top: 56px;
-  }
-
-  [data-theme="constructivist"] .screen[data-page="word"] .word-columns > .block,
-  [data-theme="constructivist"] .word-layer .word-columns > .block {
-    margin-bottom: 56px;
-  }
-
-  .screen[data-page="word"] .page-actions,
-  .word-layer .page-actions {
-    margin-top: 56px;
-  }
-}
-
-/* Landscape word rows: larger separation and row-paired columns for every theme. */
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="word"] .word-columns,
-  .word-layer .word-columns {
-    margin-top: 64px;
-    row-gap: 64px;
-  }
-
-  .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer .result-page > .word-origin-block,
-  .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer .result-page > .word-related-block {
-    margin-top: 64px;
-  }
-
-  .screen[data-page="word"] .page-actions,
-  .word-layer .page-actions {
-    margin-top: 64px;
-  }
-
-}
-
-
-/* All three themes share the same landscape word-page rhythm. */
-@media (orientation: landscape) and (min-width: 720px) {
-  .screen[data-page="word"] .word-columns,
-  .word-layer .word-columns {
-    display: grid !important;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-    columns: auto !important;
-    column-gap: 30px;
-    row-gap: 64px !important;
-    margin-top: 96px !important;
-  }
-
-  [data-theme] .screen[data-page="word"] .word-columns > .block,
-  [data-theme] .word-layer .word-columns > .block {
-    display: block !important;
-    width: auto !important;
-    break-inside: auto !important;
-    margin: 0 !important;
-    vertical-align: top;
-  }
-
-  .screen[data-page="word"] .result-page > .word-family-block,
-  .word-layer .result-page > .word-family-block {
-    grid-column: 1 / -1 !important;
-    margin-top: 42px !important;
-  }
-
-  .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer .result-page > .word-origin-block,
-  .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer .result-page > .word-related-block {
-    grid-column: 1 / -1 !important;
-    margin-top: 64px !important;
-  }
-
-  .screen[data-page="word"] .page-actions,
-  .word-layer .page-actions {
-    margin-top: 64px !important;
   }
 }
