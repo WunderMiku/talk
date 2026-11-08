@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "124";
+  const APP_VERSION = "125";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2845,20 +2845,24 @@
     return `
       ${backTopbar({ label: type === "sentence" ? "正在理解句子" : "正在查询单词", title: shorten(query, 28) })}
       <main class="result-page loading-page">
-        <div class="result-kicker reveal" style="--d:0">
-          <span class="kicker-pill accent">${type === "sentence" ? "句子" : "单词"}</span>
-          <span class="kicker-pill">正在整理</span>
+        <div class="loading-lead">
+          <div class="result-kicker reveal" style="--d:0">
+            <span class="kicker-pill accent">${type === "sentence" ? "句子" : "单词"}</span>
+            <span class="kicker-pill">正在整理</span>
+          </div>
+          <h1 class="loading-query reveal" style="--d:0.4">${esc(query)}</h1>
+          <div class="loading-status reveal" style="--d:0.8">
+            <span class="loading-dots"><i></i><i></i><i></i></span>
+            <span id="loading-status-text">${type === "sentence" ? "找出真正重要的词" : "正在理解词义"}</span>
+          </div>
+          <div class="live-preview" id="live-preview" hidden></div>
+          <div class="skeleton-stack reveal" style="--d:1">
+            <div class="skeleton hero"></div>
+            <div class="skeleton line"></div>
+            <div class="skeleton line short"></div>
+          </div>
         </div>
-        <h1 class="loading-query reveal" style="--d:0.4">${esc(query)}</h1>
-        <div class="loading-status reveal" style="--d:0.8">
-          <span class="loading-dots"><i></i><i></i><i></i></span>
-          <span id="loading-status-text">${type === "sentence" ? "找出真正重要的词" : "正在理解词义"}</span>
-        </div>
-        <div class="live-preview" id="live-preview" hidden></div>
-        <div class="skeleton-stack reveal" style="--d:1">
-          <div class="skeleton hero"></div>
-          <div class="skeleton line"></div>
-          <div class="skeleton line short"></div>
+        <div class="skeleton-blocks reveal" style="--d:1">
           <div class="skeleton card tall"></div>
           <div class="skeleton card"></div>
           <div class="skeleton line"></div>
