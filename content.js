@@ -269,3 +269,75 @@ window.TALK_CONTENT.themeCopy.rhine = {
     ]
   }
 };
+
+/* Endfield voice: an industrial field terminal. Labelled, numbered, terse. */
+window.TALK_CONTENT.themeCopy.endfield = {
+  modules: {
+    dictionary: "词条",
+    translator: "转译"
+  },
+  home: {
+    eyebrow: "FIELD TERMINAL · 语言终端",
+    titleLead: "把词，",
+    titleAccent: "拆开。",
+    lede: "每个词都是一份现场记录。查一个词，读它的结构、它的来路、它在别处的用法。",
+    manifesto: {
+      ru: "FIELD RECORD",
+      zh: "现场记录"
+    },
+    searchKicker: "检索",
+    searchPlaceholder: "输入词，或一整句话…",
+    recentLabel: "近期",
+    modes: {
+      auto: "自动",
+      word: "词",
+      sentence: "句"
+    },
+    dailySectionKicker: "每日一条",
+    dailySectionTitle: "今日记录",
+    moodSectionKicker: "按主题归档",
+    moodSectionTitle: "主题巡览",
+    footerLeft: "语言是工具，也是现场",
+    footerRight: "逐条记录，逐条拆解"
+  },
+  translator: {
+    kicker: "转译台 · 中 / EN",
+    titleLead: "一句，",
+    titleAccent: "五种语气。",
+    lede: "同一句话，五种说法。语气不是修饰，是选择站在哪个位置说话。",
+    inputPlaceholder: "把要转译的句子放进来…",
+    empty: "写下你的句子。它会转译成五种说法。",
+    workspaceKicker: "转译台",
+    workspaceTitle: "转译"
+  },
+  themeSalon: {
+    kicker: "主题档案 · 现场记录",
+    brand: "TERMINAL",
+    masthead: "THEME ARCHIVE",
+    editionLabel: "主题档案",
+    leadLabel: "LEAD",
+    cta: "换一份",
+    singleCta: "再记一版",
+    pickerCta: "调档",
+    pickerKicker: "主题档案库",
+    pickerTitle: "从档案库里调一版",
+    printing: "正在归档",
+    cacheUnit: "份在档",
+    libraryLabel: "库存",
+    libraryUnit: "份",
+    noCache: "本地档案",
+    loading: "正在归档…",
+    local: "常设档案",
+    sceneLabel: "现场",
+    footerRight: "点一条记录，继续展开"
+  },
+  settings: {
+    kicker: "TERMINAL / CONFIG",
+    title: "控制台",
+    tabs: [
+      ["model", "接口"],
+      ["tts", "音频"],
+      ["data", "存档"]
+    ]
+  }
+};

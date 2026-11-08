@@ -42,6 +42,15 @@
       css: "themes/rhine.css",
       copyKey: "rhine",
       description: "安静的实验室：细线、刻度与观察记录"
+    },
+    endfield: {
+      id: "endfield",
+      label: "Endfield",
+      themeColor: "#f4f4f2",
+      accent: "#fffa00",
+      css: "themes/endfield.css",
+      copyKey: "endfield",
+      description: "工业终端：纸白底、切角与唯一一种信号黄"
     }
   };
 

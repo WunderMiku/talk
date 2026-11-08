@@ -16,7 +16,7 @@ in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); this file only covers themes.
 | `app.js` | Product logic and rendering |
 
 Load order in `index.html`: `styles.css` → `theme.css` → `themes/ussr.css` →
-`themes/rhine.css`, then `data.js`, `theme.js`, `content.js`, `prompts.js`,
+`themes/rhine.css` → `themes/endfield.css`, then `data.js`, `theme.js`, `content.js`, `prompts.js`,
 `vendor/idb.js`, `app.js`. Theme files therefore win over both base component
 rules and the token defaults.
 
@@ -49,6 +49,24 @@ mytheme: {
 The theme selector in **设置 → 数据** is generated from the registry, so no UI
 change is needed. Selection is stored in `talk.theme.v1`; `theme.js` applies it
 before the app renders and updates the browser `theme-color` meta tag.
+
+## The four themes
+
+| id | label | voice | geometry |
+| --- | --- | --- | --- |
+| `paper` | Paper | paper and highlighter, the default | soft radii, quiet rules |
+| `constructivist` | USSR | red/black poster, diagonal blocks | hard cuts, stamps |
+| `rhine` | Rhine Lab | lab index, cool and clinical | hairlines, ticks, numbering |
+| `endfield` | Endfield | industrial field terminal | square, cut corners, one signal yellow |
+
+Endfield is the most opinionated one, so it is the best example of what a theme
+may own: it flattens every radius with a single `[data-theme="endfield"] *`
+rule, clips card corners with `clip-path`, prints a faint 45° hatch on
+`.screen`, and turns the module bar's top edge into the only magenta / yellow /
+mint strip in the product. Its yellow (`#fffa00`) is a fill for "current"
+only — labels, numbers and rules stay ink. When adding a theme like this, keep
+the same split: colour and shape in the theme file, layout and rhythm in
+`styles.css`.
 
 ## Token contract
 

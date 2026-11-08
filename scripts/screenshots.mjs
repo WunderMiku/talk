@@ -26,6 +26,8 @@ const SHOTS = [
   { name: "home-paper", hash: "", width: 390, height: 844 },
   { name: "word-paper", hash: "#/word/serendipity", width: 390, height: 844 },
   { name: "word-ussr", hash: "#/word/serendipity", width: 390, height: 844, theme: "constructivist" },
+  { name: "home-endfield", hash: "", width: 390, height: 844, theme: "endfield" },
+  { name: "word-endfield", hash: "#/word/serendipity", width: 390, height: 844, theme: "endfield" },
   { name: "word-wide-paper", hash: "#/word/serendipity", width: 1366, height: 1024, expand: true },
   { name: "sentence", hash: "#/sentence/science-serendipity", width: 390, height: 844 },
   { name: "translator", hash: "#/translate", width: 390, height: 844 },

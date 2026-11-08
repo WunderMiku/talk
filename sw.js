@@ -1,17 +1,18 @@
 /* talk. service worker — app shell only; model/audio caches stay in IndexedDB. */
-const SHELL_CACHE = "talk-shell-v125";
+const SHELL_CACHE = "talk-shell-v126";
 const SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=125",
-  "./theme.css?v=125",
-  "./themes/ussr.css?v=125",
-  "./themes/rhine.css?v=125",
-  "./theme.js?v=125",
-  "./content.js?v=125",
-  "./prompts.js?v=125",
-  "./data.js?v=125",
-  "./app.js?v=125",
+  "./styles.css?v=126",
+  "./theme.css?v=126",
+  "./themes/ussr.css?v=126",
+  "./themes/rhine.css?v=126",
+  "./themes/endfield.css?v=126",
+  "./theme.js?v=126",
+  "./content.js?v=126",
+  "./prompts.js?v=126",
+  "./data.js?v=126",
+  "./app.js?v=126",
   "./vendor/idb.js",
   "./manifest.webmanifest",
   "./favicon.svg",

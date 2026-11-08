@@ -37,7 +37,7 @@
 | **句子** | 重点词高亮、整句翻译、语气与句式分析、值得注意的词逐个展开 |
 | **翻译** | 极简口语 / 地道习语 / 书面正式 / 网络流行 / 优雅文句，五选多，一次调用 |
 | **主题沙龙** | AI 策展：一个场景、五个词，像一期小展览 |
-| **三套主题** | Paper、USSR、Rhine Lab，各有自己的语气和版式细节 |
+| **四套主题** | Paper、USSR、Rhine Lab、Endfield，各有自己的语气和版式细节 |
 | **离线可用** | PWA 外壳 + 词条缓存，断网也能翻查过的词 |
 | **两套发音** | 设备原生语音（默认、离线）或 Qwen 语音（可缓存音频） |
 | **八个模型预设** | DeepSeek、OpenAI、Qwen、Kimi、GLM、OpenRouter、Claude、自定义 |
@@ -68,11 +68,18 @@
 
 ## 主题
 
-三套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
+四套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
 
-<img src="docs/screenshots/home-paper.jpg" width="330" alt="首页 Paper 主题">
+<img src="docs/screenshots/home-paper.jpg" width="330" alt="首页 Paper 主题"> <img src="docs/screenshots/home-endfield.jpg" width="330" alt="首页 Endfield 主题">
 
-Paper 是纸感与荧光笔；USSR 是构成主义的红黑斜切；Rhine Lab 是冷调的实验档案。主题在 **设置 → 数据** 里切换，加一套新主题只需要一个 CSS 文件加一条注册表项，见 [THEME.md](THEME.md)。
+- **Paper**：纸感与荧光笔，默认主题，字距最松。
+- **USSR**：构成主义的红黑斜切，标题像海报。
+- **Rhine Lab**：冷调的实验档案，细线、刻度与编号。
+- **Endfield**：工业终端的现场记录。纸白底、切角面板、编号区块，全站只有一种信号黄，只用来点「当前」。
+
+<img src="docs/screenshots/word-endfield.jpg" width="330" alt="词条页 Endfield 主题">
+
+主题在 **设置 → 数据** 里切换，加一套新主题只需要一个 CSS 文件加一条注册表项，见 [THEME.md](THEME.md)。
 
 ## 主题沙龙
 
@@ -129,6 +136,7 @@ styles.css              布局与组件，横屏间距收敛为 --word-* 变量
 theme.css               基础 token（Paper）
 themes/ussr.css         构成主义主题覆盖
 themes/rhine.css        Rhine Lab 主题覆盖
+themes/endfield.css     Endfield 主题覆盖
 theme.js                主题注册表
 content.js              基础文案 + 各主题的语气改写
 prompts.js              静态模型提示词（与主题无关）
@@ -186,6 +194,6 @@ docs/ARCHITECTURE.md    实现说明与设计取舍
 
 **talk.** is a static, backend-free English–Chinese dictionary and translator that runs entirely in the browser. It renders a word as a living entry — IPA, multiple parts of speech, etymology timeline, word family, synonyms, collocations, examples, mnemonics — and parses whole sentences into key words, tone, and structure. A multi-style translator turns one sentence into five English registers in a single model call.
 
-There is no build step and no bundled model: the site is plain HTML/CSS/JS (< 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and three visual themes (Paper, USSR, Rhine Lab) share one token contract. Model profiles for DeepSeek, OpenAI, Qwen, Kimi, GLM, OpenRouter, and Claude are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
+There is no build step and no bundled model: the site is plain HTML/CSS/JS (< 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and four visual themes (Paper, USSR, Rhine Lab, Endfield) share one token contract. Model profiles for DeepSeek, OpenAI, Qwen, Kimi, GLM, OpenRouter, and Claude are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request pipeline, prompt structure, cache layout, and deployment details.
