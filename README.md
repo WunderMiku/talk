@@ -186,6 +186,6 @@ docs/ARCHITECTURE.md    实现说明与设计取舍
 
 **talk.** is a static, backend-free English–Chinese dictionary and translator that runs entirely in the browser. It renders a word as a living entry — IPA, multiple parts of speech, etymology timeline, word family, synonyms, collocations, examples, mnemonics — and parses whole sentences into key words, tone, and structure. A multi-style translator turns one sentence into five English registers in a single model call.
 
-There is no build step and no bundled model: the site is plain HTML/CSS/JS (< 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and three visual themes (Paper, USSR, Rhine Lab) share one token contract. Model profiles for DeepSeek, OpenAI, Qwen, Kimi, GLM, OpenRouter, and Claude are stored locally; keys never leave the browser.
+There is no build step and no bundled model: the site is plain HTML/CSS/JS (< 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and three visual themes (Paper, USSR, Rhine Lab) share one token contract. Model profiles for DeepSeek, OpenAI, Qwen, Kimi, GLM, OpenRouter, and Claude are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request pipeline, prompt structure, cache layout, and deployment details.
