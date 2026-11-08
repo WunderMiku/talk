@@ -571,7 +571,7 @@
   width: 178px;
   height: 46px;
   background: #d23b2f;
-  opacity: 0.13;
+  opacity: 0.055;
   transform: rotate(-28deg);
   pointer-events: none;
 }
@@ -1426,12 +1426,13 @@
 [data-theme="constructivist"] body::after {
   content: "";
   position: fixed;
-  right: -3vh;
-  bottom: -7vh;
-  width: 44vh;
-  height: 60vh;
+  right: -7vh;
+  bottom: -11vh;
+  width: 40vh;
+  height: 56vh;
   background: url("ussr-statue.svg") no-repeat right bottom / contain;
-  opacity: 0.16;
+  opacity: 0.065;
+  mix-blend-mode: multiply;
   pointer-events: none;
   z-index: 0;
 }
