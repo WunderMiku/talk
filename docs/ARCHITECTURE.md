@@ -72,6 +72,7 @@ memory                                记法
 | localStorage | `talk.translations.v3` | 翻译结果（按源语言 + 原文分键） | 40 条 / 30 天 |
 | localStorage | `talk.prefs.v1` | 深度、缓存上限、发音引擎等偏好 | — |
 | localStorage | `talk.theme.v1` | 当前主题 id | — |
+| IndexedDB | `talk.vault.v1` | 用于解封密钥的 AES-GCM `CryptoKey` | 不可导出（`extractable: false`） |
 | localStorage | `talk.history.v1` / `talk.saved.v1` | 最近查词 / 收藏 | — |
 
 几条规则：
@@ -80,6 +81,24 @@ memory                                记法
 - **翻译缓存按源语言 + 文本分键**（`talk.translations.v3`），所以中→英和英→英不会串味。
 - 键名里的版本号（`v1`/`v3`）就是数据结构版本，改结构时手动 bump，老数据自然失效，不用写迁移。
 - 设置 → 数据里的「缓存管理」可以查看占用、导出 JSON、导入 JSON、单独清音频缓存或主题库。
+
+## API 密钥怎么存
+
+密钥在磁盘上永远是密文：
+
+```text
+内存      state.settings.apiKey（明文，只在运行期）
+会话/本地 talk.model.v1 里每个 apiKey = "sealed:v1:<base64 iv>.<base64 ciphertext>"
+信封密钥  IndexedDB talk.vault.v1 / keys / api-key-wrap，AES-256-GCM，extractable: false
+```
+
+- 启动时 `loadSettings()` 同步读出密文，`init()` 第一件事 `await unlockStoredKeys()` 解封到内存，之后渲染和请求才拿得到明文。
+- 写盘时 `persistSettings()` 先把快照整体封好再写入；默认只写 `sessionStorage`，勾「记住密钥」才写 `localStorage`，取消勾选会主动删除本地副本。
+- 旧版本留下的明文字段在启动时会被识别出来，并立刻重写为密文，不需要用户操作。
+- 解封失败（清过 IndexedDB、换了设备）会丢掉该 key 并提示，不会把密文当密钥发出去。
+- 降级：非安全上下文（没有 `crypto.subtle`）或 IndexedDB 不可用时退回明文存储，控制台会 warn 一条。
+
+**边界要说清楚**：信封密钥不可导出，所以从存储里偷到的只有密文；但页面自己必须能解密，所以任何能在本 origin 执行 JS 的东西（XSS、恶意扩展、改过的构建）仍然拿得到明文。这是"防翻看"，不是"防使用"——真正的隔离只能把 key 放到服务端代理。
 
 ## 生成深度
 

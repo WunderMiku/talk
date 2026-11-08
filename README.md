@@ -112,7 +112,7 @@ python3 -m http.server 8080
 - 支持 `reasoning` 开关的模型（`deepseek-v4*`、`glm-5*`、`qwen3.7-flash`、`kimi-k2/k3` 等）会自动显示思考预算输入框。
 - Qwen 预设默认关掉思考，否则它会把输出预算耗在推理上，查词变慢。
 
-key 只存在浏览器里（`sessionStorage`，勾选「记住密钥」才落 `localStorage`），从不进仓库。
+密钥加密后存在本机：用 AES-GCM 封成密文再写 `sessionStorage`（勾选「记住密钥」才写 `localStorage`），解封用的密钥是不可导出的 `CryptoKey`，存在 IndexedDB 里读不出来。它能挡住翻存储、翻备份，但挡不住能在本页执行脚本的人——纯前端从原理上藏不住 key，要真隔离只能用代理。详见 [实现说明](docs/ARCHITECTURE.md#api-密钥怎么存)。
 
 ## 发音
 
@@ -162,7 +162,7 @@ docs/ARCHITECTURE.md    实现说明与设计取舍
 ## 已知限制
 
 - **没有自动化测试**。改动依赖 [验收清单](docs/ARCHITECTURE.md#手工验收清单) 手测。
-- **key 是可见的**。纯前端应用无法隐藏密钥，请用限额 key；要真正藏住只能加代理。
+- **key 是加密存储、而非真正保密**。密文挡得住翻看，挡不住同源脚本；请用限额 key，要真正隔离只能加代理。
 - **局域网 HTTP 预览会白屏**，原因见上文。
 - 宽屏下同根词卡片宽度固定，右侧会留白；吸顶栏半透明，滚动时偶尔显得脏。
 

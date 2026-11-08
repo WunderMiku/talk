@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "123";
+  const APP_VERSION = "124";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -42,6 +42,106 @@
   let wordDb = null;
   let wordStoreFallback = false;
   const wordCache = new Map();
+
+  /* ---- key vault -------------------------------------------------------
+     API keys are never written as plain text when WebCrypto is available.
+     A non-extractable AES-GCM key lives in IndexedDB (it cannot be read
+     back out), and the settings blob stores only ciphertext. This keeps
+     keys out of a casual devtools/localStorage inspection and out of
+     storage backups; it is not a defence against someone who can run code
+     in this origin, because the page itself can decrypt. */
+  const VAULT_DB_NAME = "talk.vault.v1";
+  const VAULT_STORE = "keys";
+  const VAULT_KEY_ID = "api-key-wrap";
+  const SEAL_PREFIX = "sealed:v1:";
+  const vault = { db: null, key: null, broken: false };
+  let storedKeysPlain = false;
+  let storageChain = Promise.resolve();
+
+  const canSeal = () => Boolean(window.crypto?.subtle && window.idb?.openDB && "indexedDB" in window);
+
+  function toBase64(bytes) {
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  }
+
+  function fromBase64(text) {
+    const binary = atob(text);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  }
+
+  async function vaultKey() {
+    if (vault.key) return vault.key;
+    if (vault.broken || !canSeal()) return null;
+    try {
+      if (!vault.db) {
+        vault.db = await window.idb.openDB(VAULT_DB_NAME, 1, {
+          upgrade(db) {
+            if (!db.objectStoreNames.contains(VAULT_STORE)) db.createObjectStore(VAULT_STORE);
+          }
+        });
+      }
+      let key = await vault.db.get(VAULT_STORE, VAULT_KEY_ID);
+      if (!key || key.type !== "secret") {
+        key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+        await vault.db.put(VAULT_STORE, key, VAULT_KEY_ID);
+      }
+      vault.key = key;
+      return key;
+    } catch (error) {
+      vault.broken = true;
+      console.warn("Key vault unavailable; settings will fall back to plain storage.", error);
+      return null;
+    }
+  }
+
+  async function sealText(text) {
+    if (!text) return text;
+    const key = await vaultKey();
+    if (!key) return text;
+    try {
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(text));
+      return `${SEAL_PREFIX}${toBase64(iv)}.${toBase64(new Uint8Array(sealed))}`;
+    } catch (error) {
+      console.warn("Could not seal an API key; storing it unsealed.", error);
+      return text;
+    }
+  }
+
+  async function unsealText(value) {
+    const text = String(value || "");
+    if (!text.startsWith(SEAL_PREFIX)) return text;
+    const key = await vaultKey();
+    if (!key) return "";
+    try {
+      const [ivPart, bodyPart] = text.slice(SEAL_PREFIX.length).split(".");
+      if (!ivPart || !bodyPart) return "";
+      const plain = await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: fromBase64(ivPart) },
+        key,
+        fromBase64(bodyPart)
+      );
+      return new TextDecoder().decode(plain);
+    } catch (error) {
+      console.warn("A stored API key could not be decrypted; it has been dropped.", error);
+      return "";
+    }
+  }
+
+  async function unlockStoredKeys() {
+    if (!canSeal()) return;
+    const settings = state.settings;
+    settings.apiKey = await unsealText(settings.apiKey);
+    for (const profile of settings.profiles || []) {
+      profile.apiKey = await unsealText(profile.apiKey);
+    }
+    const active = activeProfile(settings);
+    if (active) settings.apiKey = active.apiKey || "";
+  }
 
   const DEFAULT_SETTINGS = {
     provider: "deepseek",
@@ -530,6 +630,10 @@
     } catch (_) { /* no-op */ }
 
     const normalized = normalizeModelProfiles(parsed.profiles, parsed);
+    const activeKeys = [parsed.apiKey, ...(normalized.profiles || []).map((profile) => profile.apiKey)];
+    storedKeysPlain = activeKeys.some(
+      (value) => typeof value === "string" && value.trim() && !value.startsWith(SEAL_PREFIX)
+    );
     const selected = normalized.profiles.find((profile) => profile.id === normalized.activeProfileId) || normalized.profiles[0];
     return applyProfileToSettings({
       ...fallback,
@@ -558,17 +662,33 @@
       active.apiKey = String(settings.apiKey || "");
       active.provider = String(settings.provider || active.provider || "custom");
     }
-    const raw = JSON.stringify(settings);
-    try { sessionStorage.setItem(CONFIG_KEY, raw); } catch (_) { /* no-op */ }
-    try {
-      if (settings.remember) localStorage.setItem(CONFIG_KEY, raw);
-      else localStorage.removeItem(CONFIG_KEY);
-    } catch (_) { /* no-op */ }
-    try {
-      const preferences = {};
-      for (const key of PREFERENCE_FIELDS) preferences[key] = settings[key];
-      localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-    } catch (_) { /* no-op */ }
+    const raw = JSON.parse(JSON.stringify(settings));
+    storageChain = storageChain
+      .then(async () => {
+        await sealSettingsSnapshot(raw);
+        const payload = JSON.stringify(raw);
+        try { sessionStorage.setItem(CONFIG_KEY, payload); } catch (_) { /* no-op */ }
+        try {
+          if (raw.remember) localStorage.setItem(CONFIG_KEY, payload);
+          else localStorage.removeItem(CONFIG_KEY);
+        } catch (_) { /* no-op */ }
+        try {
+          const preferences = {};
+          for (const key of PREFERENCE_FIELDS) preferences[key] = settings[key];
+          localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+        } catch (_) { /* no-op */ }
+      })
+      .catch((error) => console.warn("Could not save settings.", error));
+    return storageChain;
+  }
+
+  async function sealSettingsSnapshot(snapshot) {
+    if (!canSeal()) return snapshot;
+    snapshot.apiKey = await sealText(snapshot.apiKey);
+    for (const profile of snapshot.profiles || []) {
+      profile.apiKey = await sealText(profile.apiKey);
+    }
+    return snapshot;
   }
 
   function loadHistory() {
@@ -2780,7 +2900,7 @@
       <main class="result-page state-page">
         <div class="state-orb coral reveal" style="--d:0">!</div>
         <h1 class="state-title reveal" style="--d:0.4">这次没接住。</h1>
-        <p class="state-copy reveal" style="--d:0.6">模型请求没有完整返回。${isCors ? "浏览器直连常会被 CORS 拦截；Android 版会改为原生请求，不受这个限制。" : "请检查接口地址、模型名和密钥，然后再试一次。"}</p>
+        <p class="state-copy reveal" style="--d:0.6">模型请求没有完整返回。${isCors ? "浏览器直连常会被 CORS 拦截；可以把 API 地址换成你自己的代理。" : "请检查接口地址、模型名和密钥，然后再试一次。"}</p>
         <span class="state-query reveal" style="--d:0.8">${esc(shorten(route.query || "", 88))}</span>
         ${route.message ? `<div class="error-detail reveal" style="--d:1">${esc(shorten(route.message, 320))}</div>` : ""}
         <div class="state-actions reveal" style="--d:1.1">
@@ -3584,7 +3704,7 @@
       <div class="field">
         <label for="api-key">API 密钥</label>
         <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
-        <p class="field-hint">只发送到你的接口；不勾选“记住”时仅保存在当前会话。</p>
+        <p class="field-hint">加密后保存在本机；关闭“记住”时只留在当前会话。</p>
       </div>
       <label class="check-row">
         <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
@@ -3597,7 +3717,7 @@
       <div class="settings-inline-actions">
         <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试连接</button>
       </div>
-      <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。Android 原生请求不受这个限制。</p>`;
+      <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>`;
   }
 
   function dataSettingsHtml(draft) {
@@ -5700,6 +5820,8 @@
   }
 
   async function init() {
+    await unlockStoredKeys();
+    if (storedKeysPlain) persistSettings(state.settings);
     setupInstallPrompt();
     await initThemeStore();
     applyCacheDisplay();
