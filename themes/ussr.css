@@ -29,7 +29,7 @@
   --accent-wash: #f3c6b9;
   --accent-ink: #711a13;
   --focus-ring: rgba(210, 59, 47, 0.38);
-  --font: "Arial Narrow", "Roboto Condensed", "Helvetica Neue", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font: "Inter", "Helvetica Neue", "PingFang SC", "Noto Sans SC", "Roboto", system-ui, sans-serif;
   --display: var(--font);
   --sans: var(--font);
   --mono: "Courier New", "SFMono-Regular", ui-monospace, monospace;
@@ -124,7 +124,14 @@
 [data-theme="constructivist"] .translator-title,
 [data-theme="constructivist"] .word-title {
   font-family: var(--display);
+  font-weight: 900;
+  letter-spacing: -0.03em;
   text-transform: uppercase;
+}
+
+[data-theme="constructivist"] .home-title em,
+[data-theme="constructivist"] .translator-title em {
+  font-weight: 900;
 }
 
 [data-theme="constructivist"] .home-title em,
@@ -195,6 +202,9 @@
 [data-theme="constructivist"] .daily-word {
   color: #efe4d0;
   font-family: var(--display);
+  font-weight: 900;
+  font-size: clamp(20px, 7.6vw, 34px);
+  letter-spacing: -0.045em;
   text-transform: uppercase;
 }
 
