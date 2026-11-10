@@ -7955,3 +7955,113 @@ textarea:focus-visible,
   white-space: pre-wrap;
   word-break: break-all;
 }
+/* ---- sentence typography: magazine, not marker pen -------------------- */
+.sentence-text { line-height: 1.8; letter-spacing: -0.012em; }
+
+.sentence-text .kw,
+.sentence-text .kw:hover,
+.sentence-text .kw:focus-visible {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  border-bottom: 2px solid var(--accent);
+  border-radius: 0;
+  cursor: pointer;
+  position: relative;
+}
+.sentence-text .kw::after { display: none; }
+
+.sentence-text .kw[data-tip]:hover::before,
+.sentence-text .kw[data-tip]:focus-visible::before {
+  content: attr(data-tip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  z-index: 6;
+  padding: 7px 10px;
+  min-width: max-content;
+  max-width: 240px;
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 8px;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.onion-mark {
+  border: 0;
+  background: none;
+  padding: 0;
+  margin: 0 0.18em;
+  color: color-mix(in srgb, var(--ink) 32%, transparent);
+  font-family: var(--sans);
+  font-size: 0.9em;
+  font-weight: 400;
+  line-height: 1;
+  vertical-align: 0.02em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.onion-mark:hover,
+.onion-slot.is-open > .onion-mark { color: color-mix(in srgb, var(--ink) 62%, transparent); }
+
+.onion-clause {
+  border: 0 !important;
+  background: none;
+  padding: 0;
+  margin: 0;
+  color: color-mix(in srgb, var(--ink) 60%, transparent);
+  font-size: 1em;
+  font-weight: 400;
+  letter-spacing: inherit;
+  line-height: inherit;
+  opacity: 1;
+}
+
+.onion-slot.is-open .onion-wrap {
+  display: block;
+  margin: 0.15em 0 0.5em 1.4em;
+  padding-left: 0.9em;
+  border-left: 1px solid var(--line);
+}
+
+.onion-clause.depth-1 { color: color-mix(in srgb, var(--ink) 60%, transparent); font-size: 1em; }
+.onion-clause.depth-2 { color: color-mix(in srgb, var(--ink) 36%, transparent); font-size: 0.9em; }
+.onion-clause.depth-3 { color: color-mix(in srgb, var(--ink) 28%, transparent); font-size: 0.86em; }
+.onion-clause:hover { color: color-mix(in srgb, var(--ink) 78%, transparent); }
+.onion-clause .kw { border-bottom-width: 1.5px; }
+.onion-slot.is-stacked > .onion-mark { opacity: 0; pointer-events: none; }
+.onion-slot.is-open + .onion-slot > .onion-mark { display: none; }
+.onion-mark { font-size: 0.75em; }
+/* a small, quiet control that still reads as tappable */
+.onion-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15em;
+  height: 1.15em;
+  margin: 0 0.22em;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  font-family: var(--sans);
+  font-size: 0.52em;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 0.12em;
+  cursor: pointer;
+}
+.onion-mark:hover,
+.onion-mark:focus-visible { background: var(--accent-wash); color: var(--accent-ink); }
+.onion-slot.is-open > .onion-mark { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }

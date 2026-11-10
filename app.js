@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "157";
+  const APP_VERSION = "158";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3142,8 +3142,14 @@
       if (/,\s*$/.test(before)) start = before.replace(/,\s*$/, "").length;
       const after = source.slice(end);
       if (/^\s*,/.test(after)) end += after.match(/^\s*,/)[0].length;
-      html += plain(tidyClauseText(source.slice(cursor, start)));
-      html += " " + onionSlot(hit.child, keyWords, depth) + " ";
+      const chunk = tidyClauseText(source.slice(cursor, start));
+      html += plain(chunk);
+      const rest = source.slice(end);
+      const nextChar = rest.trimStart().charAt(0);
+      const padBefore = /[\s]$/.test(html) || !html ? "" : " ";
+      const padAfter = nextChar && /[.,;:!?]/.test(nextChar) ? "" : " ";
+      const slotHtml = onionSlot(hit.child, keyWords, depth);
+      html += (padBefore === "" ? slotHtml.replace('class="onion-slot"', 'class="onion-slot is-stacked"') : padBefore + slotHtml) + padAfter;
       cursor = end;
     });
     html += plain(tidyClauseText(source.slice(cursor)));
@@ -3298,7 +3304,8 @@
       .map((keyWord, index) => ({
         index,
         surface: String(keyWord.surface || keyWord.word || ""),
-        word: String(keyWord.word || keyWord.surface || "")
+        word: String(keyWord.word || keyWord.surface || ""),
+        tip: String(keyWord.meaningZh || keyWord.meaning || "").slice(0, 46)
       }))
       .filter((item) => item.surface)
       .sort((a, b) => b.surface.length - a.surface.length);
@@ -3316,7 +3323,7 @@
     for (const match of text.matchAll(re)) {
       out += esc(text.slice(last, match.index));
       const matched = items.find((item) => item.surface.toLowerCase() === match[0].toLowerCase()) || items[0];
-      out += `<button class="kw" type="button" data-action="open-key" data-index="${matched.index}" aria-label="查看 ${attr(matched.word)}">${esc(match[0])}</button>`;
+      out += `<button class="kw" type="button" data-action="open-key" data-index="${matched.index}"${matched.tip ? ` data-tip="${attr(matched.tip)}"` : ""} aria-label="查看 ${attr(matched.word)}">${esc(match[0])}</button>`;
       last = match.index + match[0].length;
     }
     out += esc(text.slice(last));
@@ -5561,6 +5568,13 @@
         slot.classList.toggle("is-open", open);
         target.setAttribute("aria-expanded", open ? "true" : "false");
         target.textContent = open ? "−" : "+";
+        if (open) {
+          let next = target.closest(".onion-slot")?.nextElementSibling;
+          while (next && next.classList.contains("is-stacked")) {
+            next.classList.remove("is-stacked");
+            next = next.nextElementSibling;
+          }
+        }
         break;
       }
 
