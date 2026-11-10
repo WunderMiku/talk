@@ -1145,3 +1145,9 @@
     background-position: center top, right 7% top 175px, 0 0, 0 0;
   }
 }
+/* On phones the airship only crowds the copy, so the header keeps sky and paper */
+@media (max-width: 719px) {
+  [data-theme="bitterworld"] .screen {
+    background-size: 100% 470px, 0 0, 13px 13px, 100% 100%;
+  }
+}
