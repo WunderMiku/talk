@@ -23,7 +23,8 @@
       // Paper is the base token set in theme.css, so it ships no own file.
       css: null,
       copyKey: null,
-      description: "现代海报：米白纸面，荧光绿与珊瑚红"
+      description: "现代海报：米白纸面，荧光绿与珊瑚红",
+      exampleStyle: "干净利落的现代书面英语，一句一行，像海报上的短句"
     },
     constructivist: {
       id: "constructivist",
@@ -32,7 +33,8 @@
       accent: "#d23b2f",
       css: "themes/ussr.css",
       copyKey: "constructivist",
-      description: "俄式构成主义：粗斜切块与标语"
+      description: "俄式构成主义：粗斜切块与标语",
+      exampleStyle: "口号式、短促有力的英语，动词开头，像标语或广播"
     },
     rhine: {
       id: "rhine",
@@ -41,7 +43,8 @@
       accent: "#c46a3b",
       css: "themes/rhine.css",
       copyKey: "rhine",
-      description: "安静的实验室：细线、刻度与观察记录"
+      description: "安静的实验室：细线、刻度与观察记录",
+      exampleStyle: "冷静、精确的观察记录式英语，带测量或条件描述"
     },
     endfield: {
       id: "endfield",
@@ -50,7 +53,8 @@
       accent: "#fffa00",
       css: "themes/endfield.css",
       copyKey: "endfield",
-      description: "工业终端：纸白底、切角与唯一一种信号黄"
+      description: "工业终端：纸白底、切角与唯一一种信号黄",
+      exampleStyle: "工程说明与现场记录式英语，简短、参数化、少形容词"
     },
     bitterworld: {
       id: "bitterworld",
@@ -59,7 +63,8 @@
       accent: "#be3a28",
       css: "themes/bitterworld.css",
       copyKey: "bitterworld",
-      description: "票根拼贴：米纸、墨线、检票章与一条虚线路线"
+      description: "票根拼贴：米纸、墨线、检票章与一条虚线路线",
+      exampleStyle: "旅途与票根口吻的英语，带地名、路线或告示感"
     }
   };
 

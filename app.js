@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "148";
+  const APP_VERSION = "149";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -30,13 +30,28 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel"];
+  const EXAMPLE_STYLE_KEY = "talk.exampleStyles.v1";
+  // One table drives the prompt, the settings picker and the on-page slicing.
+  const SENTENCE_LEVELS = [
+    { id: "zhongkao", label: "中考", maxKeyWords: 3, hint: "基础词与固定搭配优先" },
+    { id: "gaokao", label: "高考", maxKeyWords: 4, hint: "常见高频词与基本句型" },
+    { id: "cet4", label: "CET-4", maxKeyWords: 5, hint: "四级核心词与常见从句" },
+    { id: "cet6", label: "CET-6", maxKeyWords: 6, hint: "六级词与复杂修饰" },
+    { id: "kaoyan", label: "考研", maxKeyWords: 7, hint: "考研长难句与学术表达" },
+    { id: "ielts", label: "雅思", maxKeyWords: 7, hint: "雅思阅读句式与同义替换" },
+    { id: "toefl", label: "托福", maxKeyWords: 8, hint: "托福学术句与抽象概念" }
+  ];
+  const SENTENCE_LEVEL_DEFAULT = "gaokao";
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   // Bumped when the shape of a cached entry changes (POS spelled out, English
   // glosses, ...). Older records are ignored and quietly replaced on the next
   // lookup, so nobody keeps reading a stale mix of Chinese and English.
-  const WORD_CACHE_SCHEMA = 2;
+  // Bumped when the stored shape grows, never to invalidate old entries:
+  // schema 2 payloads stay readable and are upgraded in place on next write.
+  const WORD_CACHE_SCHEMA = 3;
+  const WORD_CACHE_MIN_SCHEMA = 2;
   const WORD_CACHE_KEY = "talk.wordcache.v1";
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
@@ -921,7 +936,7 @@
     const key = normalizeWord(word);
     const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
-    if (Number(hit.schema || 0) !== WORD_CACHE_SCHEMA) {
+    if (Number(hit.schema || 0) < WORD_CACHE_MIN_SCHEMA) {
       void removeWordRecord(key);
       return null;
     }
@@ -1331,6 +1346,67 @@
     if (related) (origin || tailAnchor).after(related);
   }
 
+  /* ============================================================
+     Theme example backfill
+     ============================================================ */
+
+  const examplesInFlight = new Set();
+  const THEME_EXAMPLE_LIMIT = 8;
+
+  function scheduleThemeExamples(word) {
+    if (!word || !hasModelConfig()) return;
+    const missing = themesMissingExamples(word);
+    if (!missing.length) return;
+    const key = normalizeWord(word.word);
+    if (!key || examplesInFlight.has(key)) return;
+    examplesInFlight.add(key);
+    fillThemeExamples(word, missing)
+      .catch(() => { /* keep the old examples; try again on a later visit */ })
+      .finally(() => examplesInFlight.delete(key));
+  }
+
+  async function fillThemeExamples(word, missing) {
+    const cfg = state.settings;
+    const themes = missing.slice(0, THEME_EXAMPLE_LIMIT).map((id) => ({ id, style: exampleStyleFor(id) }));
+    if (!themes.length) return;
+    const payload = {
+      task: "themes",
+      word: word.word,
+      pos: word.pos,
+      short: word.short,
+      senses: (word.senses || []).slice(0, 3).map((sense) => sense.zh || sense.en).filter(Boolean),
+      existing: (word.examples || []).map((item) => item.en).filter(Boolean).slice(0, 6),
+      themes
+    };
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 45_000);
+    let data;
+    try {
+      const response = await postChat(endpointFor(cfg.baseUrl), cfg, [
+        { role: "system", content: window.TALK_PROMPTS.examples },
+        { role: "user", content: JSON.stringify(payload) }
+      ], controller.signal, true, 900);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      let content = json?.choices?.[0]?.message?.content;
+      if (Array.isArray(content)) content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+      data = parseJsonObject(content);
+    } finally {
+      window.clearTimeout(timer);
+    }
+    const fresh = normalizeExamplesByTheme(data.examplesByTheme || data.examples_by_theme || data);
+    if (!fresh) return;
+    const merged = normalizeExamplesByTheme({ ...(word.examplesByTheme || {}), ...fresh });
+    if (!merged) return;
+    word.examplesByTheme = merged;
+    const cached = cacheGetWord(word.word);
+    if (cached) {
+      cached.examplesByTheme = merged;
+      cachePutWord(normalizeWord(word.word), cached, state.settings.detailLevel || "standard");
+    }
+    if (state.route?.name === "word") refreshThemedPage();
+  }
+
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
     const apply = () => {
       state.route = route;
@@ -1341,12 +1417,16 @@
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
       screen.innerHTML = pageHtml(route);
+      applyInputMode($("#search-input"), "en");
       enhanceWordColumns(screen);
       applyCacheDisplay();
       refreshCacheBorders(screen);
       if (route.name === "word") {
         const word = getWord(route);
-        if (word) schedulePrefetch(word);
+        if (word) {
+          schedulePrefetch(word);
+          scheduleThemeExamples(word);
+        }
       } else {
         prefetchToken += 1;
         hideCacheCorner();
@@ -1754,11 +1834,34 @@
           ? detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英"
           : "自动识别";
     $$(".translator-language").forEach((label) => { label.textContent = text; });
+    const typingLang = translatorTargetIsChinese() ? "zh" : "en";
+    applyInputMode(input, typingLang);
+    applyInputMode($("#workspace-translator-input"), typingLang);
     const workspaceValue = $("#workspace-translator-input")?.value ?? value;
     const shown = $("#workspace-translator-input") ? workspaceValue : value;
     $$(".translator-char-count").forEach((label) => {
       label.textContent = `${shown.length} / ${TRANSLATOR_MAX_CHARS}`;
     });
+  }
+
+  /* Phones pick a keyboard from inputmode. A word search wants a Latin
+     keyboard; translating from Chinese wants the Chinese one. Keep this in one
+     place so a future language pair only needs a mapping entry. */
+  function inputModeFor(lang) {
+    if (lang === "zh") return { inputmode: "text", lang: "zh-CN", autocapitalize: "off" };
+    return { inputmode: "latin", lang: "en", autocapitalize: "none" };
+  }
+
+  function applyInputMode(target, lang) {
+    if (!target) return;
+    const mode = inputModeFor(lang);
+    target.setAttribute("inputmode", mode.inputmode);
+    target.setAttribute("lang", mode.lang);
+    target.setAttribute("autocapitalize", mode.autocapitalize);
+  }
+
+  function translatorTargetIsChinese() {
+    return state.translatorMode === "zh";
   }
 
   function renderTranslatorLoading(styles = state.translatorStyles) {
@@ -2434,6 +2537,79 @@
   }
 
   /* ============================================================
+     Theme-aware examples
+     ============================================================ */
+
+  function themeIds() {
+    const list = window.TALK_THEME?.list?.() || [];
+    return list.map((theme) => theme.id);
+  }
+
+  function exampleStyleOverrides() {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(EXAMPLE_STYLE_KEY) || "{}");
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function exampleStyleFor(themeId) {
+    const overrides = exampleStyleOverrides();
+    const own = String(overrides[themeId] || "").trim();
+    if (own) return own;
+    const meta = window.TALK_THEME?.metaOf?.(themeId);
+    const registered = String(meta?.exampleStyle || "").trim();
+    return registered || "自然、日常的英语，句子短，适合记忆";
+  }
+
+  function saveExampleStyles(next) {
+    try { localStorage.setItem(EXAMPLE_STYLE_KEY, JSON.stringify(next || {})); } catch (_) { /* no-op */ }
+  }
+
+  function normalizeExamplesByTheme(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+    const out = {};
+    for (const [id, list] of Object.entries(value)) {
+      const examples = normalizeExamples(list);
+      if (examples.length) out[id] = examples;
+    }
+    return Object.keys(out).length ? out : null;
+  }
+
+  function normalizeCulture(value) {
+    if (!value) return null;
+    if (typeof value === "string") {
+      const note = value.trim();
+      return note ? { note, region: "", tags: [] } : null;
+    }
+    if (typeof value !== "object") return null;
+    const note = String(value.note || value.text || value.background || "").trim();
+    if (!note) return null;
+    return {
+      note,
+      region: String(value.region || value.area || "").trim(),
+      tags: normalizeStrings(value.tags)
+    };
+  }
+
+  function exampleForTheme(word, themeId = window.TALK_THEME?.current?.().id) {
+    if (!word) return [];
+    const themed = word.examplesByTheme?.[themeId];
+    if (Array.isArray(themed) && themed.length) return themed;
+    return word.examples || [];
+  }
+
+  function themesMissingExamples(word) {
+    if (!word) return [];
+    return themeIds().filter((id) => !(word.examplesByTheme?.[id] || []).length);
+  }
+
+  function sentenceLevelOf(value) {
+    return SENTENCE_LEVELS.find((level) => level.id === value) || SENTENCE_LEVELS.find((level) => level.id === SENTENCE_LEVEL_DEFAULT);
+  }
+
+  /* ============================================================
      Word page
      ============================================================ */
 
@@ -2466,6 +2642,8 @@
       synonyms: normalizeRelations(raw.synonyms),
       antonyms: normalizeRelations(raw.antonyms),
       examples: normalizeExamples(raw.examples),
+      examplesByTheme: normalizeExamplesByTheme(raw.examplesByTheme || raw.examples_by_theme),
+      culture: normalizeCulture(raw.culture || raw.culturalNote || raw.cultural),
       collocations: normalizeStrings(raw.collocations),
       related: normalizeStrings(raw.related),
       origin: normalizeOrigin(raw.origin || raw.etymology),
@@ -2576,6 +2754,11 @@
   }
 
   function wordPage(word, layer = null) {
+    let blockNo = 0;
+    const nextNo = () => String(++blockNo).padStart(2, "0");
+    const exampleTheme = window.TALK_THEME?.current?.() || { id: "paper", label: "Paper" };
+    const themedExamples = exampleForTheme(word, exampleTheme.id);
+    const missingThemes = themesMissingExamples(word);
     const bookmark = `word:${normalizeWord(word.word)}`;
     const heroNote = word.note ? rich(word.note) : "";
     const header = layer
@@ -2628,13 +2811,13 @@
           ${(() => {
             const groups = wordPosGroups(word);
             const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
-            return `${blockHead("01", "词义", `${totalSenses} 个义项`)}${wordSensesPagerHtml(groups)}`;
+            return `${blockHead(nextNo(), "词义", `${totalSenses} 个义项`)}${wordSensesPagerHtml(groups)}`;
           })()}
         </section>
 
         ${word.family.length ? `
         <section class="block word-family-block reveal" style="--d:2">
-          ${blockHead("02", "同根词", "派生词")}
+          ${blockHead(nextNo(), "同根词", "派生词")}
           <div class="h-scroll">
             ${word.family.map((item) => `
               <button class="family-card" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="同根词">
@@ -2650,7 +2833,7 @@
 
         ${(word.synonyms.length || word.antonyms.length) ? `
         <section class="block word-relation-block reveal" style="--d:2.2">
-          ${blockHead("03", "近义与反义", "点击继续查")}
+          ${blockHead(nextNo(), "近义与反义", "点击继续查")}
           <div class="relation-grid">
             <div class="relation-card syn">
               <div class="relation-head"><h3>近义词</h3><span class="relation-icon">+</span></div>
@@ -2675,21 +2858,29 @@
           </div>
         </section>` : ""}
 
-        ${word.examples.length ? `
+        ${themedExamples.length ? `
         <section class="block word-example-block reveal" style="--d:2.4">
-          ${blockHead("04", "例句", `${word.examples.length} 个例句`)}
-          ${word.examples.map((example) => `
+          ${blockHead(nextNo(), "例句", `${esc(exampleTheme.label)} · ${themedExamples.length} 条`)}
+          <div class="example-toolbar">
+            <span class="mono">按当前主题的语气写出</span>
+            <button class="link-btn" type="button" data-action="regen-examples" data-word="${attr(word.word)}">换一批</button>
+          </div>
+          ${themedExamples.map((example) => `
             <div class="example-card">
               <span class="example-quote">“</span>
               <p class="example-en">${highlightPlain(example.en, word.word)}</p>
               ${example.zh ? `<p class="example-zh">${esc(example.zh)}</p>` : ""}
-              ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : ""}
+              <div class="example-foot">
+                ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : `<span class="example-source">${esc(exampleTheme.label)}</span>`}
+                <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
+              </div>
             </div>`).join("")}
+          ${missingThemes.length ? `<p class="example-hint">还有 ${missingThemes.length} 套主题没有例句，切过去时会自动补上。</p>` : ""}
         </section>` : ""}
 
         ${word.collocations.length ? `
         <section class="block word-collocation-block reveal" style="--d:2.6">
-          ${blockHead("05", "常见搭配", "固定说法")}
+          ${blockHead(nextNo(), "常见搭配", "固定说法")}
           <div class="collocation-row">
             ${word.collocations.map((item) => `<button class="collocation" type="button" data-action="lookup" data-query="${attr(item)}" data-type="word">${esc(item)}</button>`).join("")}
           </div>
@@ -2697,7 +2888,7 @@
 
         ${word.memory ? `
         <section class="block word-memory-block reveal" style="--d:2.8">
-          ${blockHead("06", "记法", "一个记忆钩子")}
+          ${blockHead(nextNo(), "记法", "一个记忆钩子")}
           <div class="memory-card">
             <span class="memory-label">顺着这根线</span>
             <p class="memory-text">${rich(word.memory)}</p>
@@ -2706,7 +2897,7 @@
 
         ${word.origin ? `
         <section class="block word-origin-block reveal" style="--d:3">
-          ${blockHead("07", "词源与演变", "从词根看")}
+          ${blockHead(nextNo(), "词源与演变", "从词根看")}
           <div class="origin-card">
             <span class="origin-root">${esc(word.origin.root)}</span>
             <p class="origin-story">${rich(word.origin.story)}</p>
@@ -2736,6 +2927,15 @@
           </div>
         </section>` : ""}
 
+        ${word.culture?.note ? `
+        <section class="block reveal" style="--d:2.9">
+          ${blockHead("✳", "文化背景", esc(word.culture.region || "语境"))}
+          <div class="culture-card">
+            <p>${esc(word.culture.note)}</p>
+            ${(word.culture.tags || []).length ? `<div class="culture-tags">${word.culture.tags.map((tag) => `<span>${esc(tag)}</span>`).join("")}</div>` : ""}
+          </div>
+        </section>` : ""}
+
         <div class="page-actions reveal" style="--d:3.2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
@@ -2749,6 +2949,57 @@
      Sentence page
      ============================================================ */
 
+  const STRUCTURE_KINDS = ["main", "clause", "phrase", "modifier"];
+
+  /* The sentence tree is model-authored. The client only normalises it so a
+     partial or malformed tree still renders, and so a future node kind can be
+     added without breaking old data. */
+  function normalizeStructureNodes(value, depth = 0, out = { count: 0 }) {
+    if (!Array.isArray(value) || depth > 4) return [];
+    return value.map((node, index) => {
+      if (!node || typeof node !== "object") return null;
+      const text = String(node.text || node.en || "").trim();
+      if (!text) return null;
+      out.count += 1;
+      const kind = STRUCTURE_KINDS.includes(node.kind) ? node.kind : (depth === 0 ? "main" : "clause");
+      const children = normalizeStructureNodes(node.children || node.items, depth + 1, out);
+      return {
+        id: String(node.id || `n${depth}-${index}`),
+        kind,
+        label: String(node.label || node.role || "").trim(),
+        text,
+        role: String(node.role || node.function || "").trim(),
+        gloss: String(node.gloss || node.meaningZh || node.zh || "").trim(),
+        note: String(node.note || node.explain || "").trim(),
+        children
+      };
+    }).filter(Boolean);
+  }
+
+  function normalizeStructureTree(value) {
+    if (!value) return [];
+    if (Array.isArray(value)) return normalizeStructureNodes(value);
+    if (typeof value !== "object") return [];
+    const nodes = value.tree || value.nodes || value.root;
+    if (Array.isArray(nodes)) return normalizeStructureNodes(nodes);
+    if (nodes && typeof nodes === "object") return normalizeStructureNodes([nodes]);
+    return [];
+  }
+
+  function normalizeSentenceParts(value) {
+    if (!Array.isArray(value)) return [];
+    return value.map((part) => {
+      const text = String(part?.text || part?.sentence || "").trim();
+      if (!text) return null;
+      return {
+        text,
+        translation: String(part.translation || "").trim(),
+        summary: String(part.summary || "").trim(),
+        tree: normalizeStructureTree(part.tree || part.structure)
+      };
+    }).filter(Boolean);
+  }
+
   function ensureSentence(raw) {
     if (!raw) return null;
     const keyWords = normalizeKeyWords(raw.keyWords || raw.key_words || raw.words);
@@ -2761,13 +3012,53 @@
       tone: String(raw.tone || ""),
       structure: String(raw.structure || ""),
       source: String(raw.source || "Talk demo corpus"),
+      summary: String(raw.summary || raw.gist || "").trim(),
+      tree: normalizeStructureTree(raw.tree || raw.structureTree || (raw.structure && raw.structure.tree)),
+      sentences: normalizeSentenceParts(raw.sentences || raw.parts),
       keyWords,
       sourceType: raw.sourceType || raw.source || "demo",
       model: raw.model || ""
     };
   }
 
+  function treeKindLabel(kind) {
+    return ({ main: "主干", clause: "从句", phrase: "短语", modifier: "修饰" })[kind] || "结构";
+  }
+
+  function registerTreeNodes(nodes, bucket) {
+    (nodes || []).forEach((node) => {
+      bucket[node.id] = node;
+      registerTreeNodes(node.children, bucket);
+    });
+    return bucket;
+  }
+
+  function structureTreeHtml(nodes, depth = 0) {
+    if (!Array.isArray(nodes) || !nodes.length) return "";
+    return `<ul class="tree-list" data-depth="${depth}">
+      ${nodes.map((node) => `
+        <li class="tree-node kind-${esc(node.kind)}">
+          <div class="tree-row">
+            ${node.children?.length ? `<button class="tree-expand" type="button" data-action="tree-expand" aria-expanded="false" aria-label="展开这一层">${icon("chevronDown")}</button>` : `<span class="tree-expand is-leaf" aria-hidden="true"></span>`}
+            <button class="tree-main" type="button" data-action="structure-node" data-node-id="${attr(node.id)}">
+              <span class="tree-kind">${treeKindLabel(node.kind)}</span>
+              <span class="tree-text">${esc(node.text)}</span>
+              ${node.role ? `<span class="tree-role">${esc(node.role)}</span>` : ""}
+            </button>
+          </div>
+          ${node.children?.length ? `<div class="tree-children" hidden>${structureTreeHtml(node.children, depth + 1)}</div>` : ""}
+        </li>`).join("")}
+    </ul>`;
+  }
+
   function sentencePage(sentence) {
+    let blockNo = 0;
+    const nextNo = () => String(++blockNo).padStart(2, "0");
+    const parts = Array.isArray(sentence.sentences) && sentence.sentences.length
+      ? sentence.sentences
+      : [{ text: sentence.text, translation: sentence.translation, summary: sentence.summary || "", tree: sentence.tree || [] }];
+    const tree = sentence.tree?.length ? sentence.tree : (parts[0]?.tree || []);
+    state.structureNodes = registerTreeNodes(tree.concat(...parts.map((part) => part.tree || [])), {});
     const bookmark = `sentence:${sentence.id}`;
     return `
       ${backTopbar({ label: "句子", title: `${sentence.keyWords.length} 个重点词`, bookmark })}
@@ -2787,7 +3078,7 @@
         </section>
 
         <section class="block reveal" style="--d:1.3">
-          ${blockHead("01", "整句意思", "中文翻译")}
+          ${blockHead(nextNo(), "整句意思", "中文翻译")}
           <div class="translation-card">
             <span class="translation-label">${icon("quote")} 整句理解</span>
             <p class="translation-text">${esc(sentence.translation || "连接模型后生成翻译。")}</p>
@@ -2806,8 +3097,34 @@
           </div>` : ""}
         </section>
 
+        ${sentence.summary ? `
+        <section class="block reveal" style="--d:1.35">
+          ${blockHead(nextNo(), "浓缩主旨", "一句话记住")}
+          <div class="summary-card">${esc(sentence.summary)}</div>
+        </section>` : ""}
+
+        ${tree.length ? `
+        <section class="block reveal" style="--d:1.45">
+          ${blockHead(nextNo(), "句子结构", "点开看每一层")}
+          <div class="tree-toolbar">
+            <span class="mono">默认只看主干</span>
+            <button class="link-btn" type="button" data-action="tree-toggle-all" data-mode="expand">全部展开</button>
+            <button class="link-btn" type="button" data-action="tree-toggle-all" data-mode="collapse">收起到主干</button>
+          </div>
+          ${structureTreeHtml(tree)}
+          ${parts.length > 1 ? parts.slice(0).map((part, index) => part.tree?.length ? `
+            <div class="tree-part">
+              <span class="mono">第 ${index + 1} 句 · ${esc(shorten(part.text, 40))}</span>
+              ${structureTreeHtml(part.tree)}
+            </div>` : "").join("") : ""}
+        </section>` : (sentence.structure ? `
+        <section class="block reveal" style="--d:1.45">
+          ${blockHead(nextNo(), "句子结构", "连接模型后可展开")}
+          <div class="insight"><p>${esc(sentence.structure)}</p></div>
+        </section>` : "")}
+
         <section class="block reveal" style="--d:1.5">
-          ${blockHead("02", "值得注意的词", "点击展开")}
+          ${blockHead(nextNo(), "值得注意的词", "点击展开")}
           <div class="key-list">
             ${sentence.keyWords.map((keyWord, index) => keyCard(keyWord, index)).join("")}
           </div>
@@ -3842,6 +4159,28 @@
           }).join("")}
         </div>
       </div>
+      <div class="setting-group">
+        <span class="settings-subhead">学习阶段</span>
+        <p class="settings-note">只影响句子分析：决定重点词数量与难度。</p>
+        <div class="level-row">
+          ${SENTENCE_LEVELS.map((level) => `
+            <button class="level-chip${draft.sentenceLevel === level.id ? " active" : ""}" type="button"
+              data-action="sentence-level" data-level="${attr(level.id)}" aria-pressed="${draft.sentenceLevel === level.id}"
+              title="${attr(level.hint)}">${esc(level.label)}</button>`).join("")}
+        </div>
+      </div>
+      <div class="setting-group">
+        <span class="settings-subhead">例句风格</span>
+        <p class="settings-note">每套主题用自己的语气写例句；改完只影响之后生成的例句。</p>
+        <div class="example-style-list">
+          ${(window.TALK_THEME?.list?.() || []).map((theme) => `
+            <label class="example-style-row">
+              <span>${esc(theme.label)}</span>
+              <input type="text" data-example-style="${attr(theme.id)}" value="${attr(exampleStyleFor(theme.id))}" spellcheck="false" aria-label="${attr(theme.label)} 的例句风格" />
+            </label>`).join("")}
+        </div>
+        <button class="link-btn" type="button" data-action="reset-example-styles">恢复默认风格</button>
+      </div>
       <label class="pref-toggle">
         <span class="pref-copy">
           <strong>预加载二级词条</strong>
@@ -4234,14 +4573,34 @@
     return type === "sentence" ? SENTENCE_SYSTEM_PROMPT : WORD_SYSTEM_PROMPT;
   }
 
+  function themeBriefs() {
+    return (window.TALK_THEME?.list?.() || []).map((theme) => ({
+      id: theme.id,
+      style: exampleStyleFor(theme.id)
+    }));
+  }
+
   function wordPrompt(query, detail = "standard") {
     // Dynamic query is deliberately last so the static system prefix and the
     // task/detail prefix can be reused by provider prompt caches.
-    return JSON.stringify({ task: "word", detail, query: String(query) });
+    return JSON.stringify({
+      task: "word",
+      detail,
+      themes: themeBriefs(),
+      query: String(query)
+    });
   }
 
   function sentencePrompt(query, detail = "standard") {
-    return JSON.stringify({ task: "sentence", detail, text: String(query) });
+    const level = sentenceLevelOf(state.settings?.sentenceLevel);
+    return JSON.stringify({
+      task: "sentence",
+      detail,
+      level: level.id,
+      maxKeyWords: level.maxKeyWords,
+      levelHint: level.hint,
+      text: String(query)
+    });
   }
 
   async function modelLookup(query, type, cfg, options = {}) {
@@ -4557,6 +4916,8 @@
       synonyms: normalizeRelations(base.synonyms),
       antonyms: normalizeRelations(base.antonyms),
       examples: normalizeExamples(base.examples),
+      examplesByTheme: normalizeExamplesByTheme(base.examplesByTheme || base.examples_by_theme),
+      culture: normalizeCulture(base.culture || base.culturalNote || base.cultural),
       collocations: normalizeStrings(base.collocations),
       memory: String(base.memory || base.memoryHook || ""),
       related: normalizeStrings(base.related),
@@ -4578,13 +4939,17 @@
     const text = String(base.text || base.sentence || fallbackSentence || "").trim();
     const keyWords = normalizeKeyWords(base.keyWords || base.key_words || base.words);
     if (!text) throw new Error("模型返回的内容里没有原句。");
-    if (!keyWords.length) throw new Error("模型没有返回重点词。");
+    // A sentence with no key words is still a valid page (short or plain
+    // sentences happen); only a missing sentence is fatal.
     return {
       id: `model-${Date.now()}`,
       text,
       translation: String(base.translation || ""),
       tone: String(base.tone || ""),
-      structure: String(base.structure || ""),
+      structure: typeof base.structure === "string" ? base.structure : String(base.structure?.note || ""),
+      summary: String(base.summary || base.gist || "").trim(),
+      tree: normalizeStructureTree(base.tree || base.structureTree || (base.structure && base.structure.tree)),
+      sentences: normalizeSentenceParts(base.sentences || base.parts),
       keyWords,
       source: "语境分析",
       sourceType: "model"
@@ -4733,10 +5098,13 @@
           pos: "",
           meaning: "",
           why: "",
+          level: "",
+          sentenceIndex: 0,
           family: [],
           synonyms: [],
           antonyms: [],
-          example: null
+          example: null,
+          externalExample: null
         };
       }
       const word = String(item.word || item.term || item.surface || "").trim();
@@ -4750,10 +5118,13 @@
         meaning: String(item.meaning || item.definition || item.meaningInContext || ""),
         meaningZh: String(item.meaningZh || item.meaning_zh || item.zh || ""),
         why: String(item.why || item.whyItMatters || item.nuance || ""),
+        level: String(item.level || item.stage || "").trim().toLowerCase(),
+        sentenceIndex: Number.isFinite(Number(item.sentenceIndex)) ? Number(item.sentenceIndex) : 0,
         family: normalizeRelations(item.family || item.derivatives),
         synonyms: normalizeRelations(item.synonyms),
         antonyms: normalizeRelations(item.antonyms),
-        example: normalizeExample(example)
+        example: normalizeExample(example),
+        externalExample: normalizeExample(item.externalExample || item.outsideExample || item.extraExample)
       };
     }).filter((item) => item.word);
   }
@@ -4970,6 +5341,85 @@
         if (!key || !hasModelConfig()) break;
         await removeWordRecord(key);
         await runSearch(key, "word");
+        break;
+      }
+
+      case "sentence-level": {
+        event.preventDefault();
+        const level = sentenceLevelOf(target.dataset.level);
+        if (state.draft) state.draft.sentenceLevel = level.id;
+        scheduleSettingsCommit();
+        $$(".level-chip").forEach((chip) => {
+          const active = chip.dataset.level === level.id;
+          chip.classList.toggle("active", active);
+          chip.setAttribute("aria-pressed", String(active));
+        });
+        break;
+      }
+
+      case "reset-example-styles": {
+        event.preventDefault();
+        saveExampleStyles({});
+        $$("[data-example-style]").forEach((input) => {
+          input.value = exampleStyleFor(input.dataset.exampleStyle);
+        });
+        toast("已恢复默认例句风格");
+        break;
+      }
+
+      case "regen-examples": {
+        event.preventDefault();
+        const active = activeWordData();
+        if (!active) break;
+        if (!hasModelConfig()) {
+          toast("先连接模型，才能按主题换例句。");
+          break;
+        }
+        const themeId = window.TALK_THEME?.current?.().id || "paper";
+        const merged = { ...(active.examplesByTheme || {}) };
+        delete merged[themeId];
+        active.examplesByTheme = merged;
+        await fillThemeExamples(active, [themeId]).catch(() => {});
+        toast("已按当前主题换了一批例句");
+        break;
+      }
+
+      case "tree-expand": {
+        event.preventDefault();
+        const row = target.closest(".tree-node");
+        const box = row?.querySelector(":scope > .tree-children");
+        if (!box) break;
+        box.hidden = !box.hidden;
+        row.classList.toggle("open", !box.hidden);
+        target.setAttribute("aria-expanded", String(!box.hidden));
+        break;
+      }
+
+      case "tree-toggle-all": {
+        event.preventDefault();
+        const expand = target.dataset.mode !== "collapse";
+        $$(".tree-children").forEach((box) => { box.hidden = !expand; });
+        $$(".tree-node").forEach((node) => node.classList.toggle("open", expand));
+        $$(".tree-expand").forEach((btn) => btn.setAttribute("aria-expanded", String(expand)));
+        break;
+      }
+
+      case "structure-node": {
+        event.preventDefault();
+        const node = state.structureNodes?.[target.dataset.nodeId];
+        if (!node) break;
+        openSheetShell({ kicker: treeKindLabel(node.kind), title: node.label || "这一层在做什么" });
+        const holder = $("#sheet-scroll");
+        if (holder) {
+          holder.innerHTML = `
+            <div class="sheet-content">
+              <p class="tree-sheet-text">${esc(node.text)}</p>
+              ${node.role ? `<div class="tree-sheet-row"><span class="mono">作用</span><p>${esc(node.role)}</p></div>` : ""}
+              ${node.gloss ? `<div class="tree-sheet-row"><span class="mono">大意</span><p>${esc(node.gloss)}</p></div>` : ""}
+              ${node.note ? `<div class="tree-sheet-row"><span class="mono">阅读提示</span><p>${esc(node.note)}</p></div>` : ""}
+              ${node.children?.length ? `<div class="tree-sheet-row"><span class="mono">包含</span><p>${node.children.length} 个更小的结构，回到句子里展开查看。</p></div>` : ""}
+            </div>`;
+        }
         break;
       }
 
@@ -5379,6 +5829,15 @@
       const profile = activeProfile(state.draft);
       if (profile) profile.name = target.value;
       scheduleSettingsCommit();
+      return;
+    }
+    if (target.matches("[data-example-style]")) {
+      const id = target.dataset.exampleStyle;
+      const next = exampleStyleOverrides();
+      const value = String(target.value || "").trim();
+      if (value) next[id] = value;
+      else delete next[id];
+      saveExampleStyles(next);
       return;
     }
     if (target.matches("[data-setting]") && state.draft) {

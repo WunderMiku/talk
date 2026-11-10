@@ -192,3 +192,20 @@ python3 -m http.server 8080     # 或任意静态服务器
 - 宽屏下同根词卡片仍是固定宽度，右侧会留白。
 - 吸顶栏是半透明 + 模糊，滚动时下面的内容会透出来，视觉上偶尔显得脏。
 - 隐身模式下 IndexedDB 可能被立即回收，缓存自然失效。
+
+## 例句、文化与句子拆解
+
+词条与句子都遵循「模型生成、前端只渲染」的原则，新增内容一律是可选字段，旧缓存不必清空。
+
+| 字段 | 归属 | 说明 |
+| --- | --- | --- |
+| `examplesByTheme` | word | 每套主题 1–2 条例句；缺失主题在渲染后一次性补齐并写回缓存 |
+| `culture` | word | `note` / `region` / `tags`，没有可靠背景时为 null |
+| `summary` | sentence | 一句话主旨 |
+| `tree` | sentence | 句法树，节点 `kind` 只允许 main / clause / phrase / modifier，默认只展开主干 |
+| `sentences` | sentence | 多句分别拆解 |
+| `level` / `sentenceIndex` / `externalExample` | keyWord | 学习阶段、所在句、本句用法不典型时的补充例句 |
+
+- 主题的例句风格存在 `talk.exampleStyles.v1`，默认值来自 `TALK_THEME` 的 `exampleStyle`，设置里可按主题改写。
+- `SENTENCE_LEVELS` 是唯一的阶段表（中考 3 / 高考 4 / CET4 5 / CET6 6 / 考研 7 / 雅思 7 / 托福 8），设置里选择后写进 `talk.prefs.v1`。
+- 单词缓存 `talk.words.v1` 的 `WORD_CACHE_SCHEMA` 升到 3，但读取时接受 schema ≥ 2，旧记录在下次写入时就地升级；句子不落 IndexedDB，只在内存中缓存。
