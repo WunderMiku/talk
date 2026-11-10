@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "156";
+  const APP_VERSION = "157";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4739,6 +4739,8 @@
       ? Math.max(detailTokens, SENTENCE_MAX_TOKENS[detail] || SENTENCE_MAX_TOKENS.standard)
       : detailTokens;
     let content = "";
+    const startedAt = Date.now();
+    diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     try {
       // Do not combine streaming with response_format by default: some
       // OpenAI-compatible gateways silently return one buffered JSON response
@@ -4781,6 +4783,7 @@
     try {
       parsed = parseJsonObject(content);
     } catch (parseError) {
+      diagLog("error", "model.parse", parseError?.message || String(parseError), { type, detail, chars: content.length });
       // A truncated answer is the most common cause here: retry once with a
       // larger ceiling instead of showing a raw JSON error to the reader.
       if (!/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
