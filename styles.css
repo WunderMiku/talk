@@ -2411,7 +2411,7 @@ textarea:focus-visible,
   position: absolute;
   inset: 0;
   z-index: 1;
-  background: rgba(20, 21, 17, 0.4);
+  background: rgba(20, 21, 17, 0.62);
   opacity: 0;
   transition: opacity 0.38s ease;
   backdrop-filter: blur(5px);
@@ -2422,13 +2422,14 @@ textarea:focus-visible,
   opacity: 1;
 }
 
+
 /* A full-screen backdrop blur is one of the most expensive things a phone GPU
    can be asked to do: it re-blurs the whole page every frame of the sheet
    animation. The scrim alone reads the same on a small screen, so the blur is
    kept only where there is room to pay for it. */
 @media (max-width: 720px), (prefers-reduced-transparency: reduce) {
   .sheet-backdrop {
-    background: rgba(20, 21, 17, 0.46);
+    background: rgba(20, 21, 17, 0.6);
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
@@ -2473,17 +2474,6 @@ textarea:focus-visible,
 
 .sheet-scroll {
   contain: layout paint;
-}
-
-.sheet::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 100%;
-  height: 84px;
-  background: linear-gradient(to top, rgba(20, 21, 17, 0.62), rgba(20, 21, 17, 0));
-  pointer-events: none;
 }
 
 .sheet-handle {

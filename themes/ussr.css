@@ -255,12 +255,7 @@
   color: #d23b2f;
 }
 
-[data-theme="constructivist"] .translation-detail {
-  border: 2px solid #171512;
-  border-radius: 0;
-}
-
-[data-theme="constructivist"] .settings-tabs {
+[data-theme="constructivist"] [data-theme="constructivist"] .settings-tabs {
   gap: 0;
   padding: 0;
   border-bottom: 2px solid #171512;
