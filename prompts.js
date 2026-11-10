@@ -123,14 +123,15 @@ Few-shot（只示意字段和语气，不要照抄内容）：
    - deep：重点词 5 个；每个词近义词 4 个；反义词 3 个。
 2. 每个重点词至少给 1 个同根词、1 个例句；surface 必须原样出现在原句中。
 3. 原句逐字保留，不要改写、翻译或补全。
-3b. tree 只做拆句，不改写原句：主干一条 kind=main，从句/短语/修饰语作为 children 逐层挂上去；每一层的 text 必须是原句中的连续子串。默认展示时只会看到主干，因此主干要能独立读懂。
+3b. tree 只做拆句，不改写原句：主干一条 kind=main，从句/短语/修饰语作为 children 逐层挂上去。每一项的 text 必须是原句里逐字连续的一段，不得改写、缩写、拼接，也绝不能用省略号；main 的 text 是去掉所有修饰后的主干，同样不许用省略号代替被删部分，要能独立成句。默认展示只看到主干。
+3e. 非 main 节点必须补 anchor：写在父级 text 里原样出现的词或短语，渲染时这一层就插在它后面；实在挂不住就留空。嵌套从句的父级 text 要包含子级 text 的原文（逐字连续）。
 3c. 重点词数量由用户消息的 maxKeyWords 决定（用户水平见 level 字段），必须按数量给出，并按该水平的难度挑选；level 写在每个重点词里。
 3d. why 里说明这个词在本句中的作用；如果本句里的用法不典型，再给 externalExample，否则 externalExample 留 null。
 4. 语言分工：translation、tone、structure、meaningZh、why 用简体中文；只有原句、例句（example.en）和词条本身是英文。keyWords[].pos 一律写英文缩写（n. / v. / adj. / adv. / prep. / pron. / conj. / num. / int. / phr.），不要写“名词”或“noun”。
 
 Few-shot（只示意字段和语气，不要照抄内容）：
 用户：{"task":"sentence","detail":"fast","text":"Hope is not a prediction."}
-助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"n.","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}tree 的每一层只放真实出现在句子里的片段，text 必须逐字来自原句；main 的 text 要能独立成句（去掉所有修饰后的主干）。非 main 节点必须补 anchor：写在父级 text 里原样出现的词或短语，渲染时这一层就插在它后面；实在挂不住就留空。
+助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"n.","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}
 `,
   examples: `你是 Talk 的例句写手。用户会给出一个词，以及一组主题（id + 风格说明）。为每个主题各写 1 条例句，必须符合该主题的语气，同时保持自然、可读、长度适中（8–18 个词）。已有的例句不要重复。只返回一个合法 JSON 对象，不要 Markdown 或额外说明。
 

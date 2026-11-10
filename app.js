@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "153";
+  const APP_VERSION = "154";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3063,41 +3063,63 @@
     return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause depth-${Math.min(depth, 3)}" data-depth="${Math.min(depth, 3)}" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}</span></span></span>`;
   }
 
+  function tidyClauseText(text) {
+    return String(text || "")
+      .replace(/\s+([,.;:!?])/g, "$1")
+      .replace(/([,;:])(\s*[,;:])+/g, "$1")
+      .replace(/\s{2,}/g, " ")
+      .trim();
+  }
+
   function onionCompose(text, children, keyWords, depth = 1) {
     const source = String(text || "");
     const plain = (chunk) => annotateSentence(chunk, keyWords || []);
-    if (!Array.isArray(children) || !children.length) return plain(source);
-    const lowered = source.toLowerCase();
-    const marks = children.map((child) => {
-      const anchorText = String(child.anchor || "").trim().toLowerCase();
-      const at = anchorText ? lowered.indexOf(anchorText) : -1;
-      if (at < 0) return { child, at: -1 };
-      let cut = at + anchorText.length;
-      while (cut < source.length && /[.,;:!?]/.test(source[cut])) cut += 1;
-      return { child, at: cut };
+    const list = (Array.isArray(children) ? children : []).filter((child) => child && child.text && !/…|\.{2,}/.test(child.text));
+    if (!list.length) return plain(source);
+
+    const hits = [];
+    list.forEach((child) => {
+      const at = source.indexOf(child.text);
+      if (at >= 0) hits.push({ child, start: at, end: at + child.text.length });
     });
-    const placed = marks.filter((mark) => mark.at >= 0).sort((a, b) => a.at - b.at);
-    const trailing = marks.filter((mark) => mark.at < 0);
+    hits.sort((a, b) => a.start - b.start);
+
     let html = "";
     let cursor = 0;
-    placed.forEach((mark) => {
-      html += plain(source.slice(cursor, mark.at));
-      html += onionSlot(mark.child, keyWords, depth);
-      cursor = mark.at;
+    hits.forEach((hit) => {
+      let { start, end } = hit;
+      if (start < cursor) return;
+      const before = source.slice(0, start);
+      if (/,\s*$/.test(before)) start = before.replace(/,\s*$/, "").length;
+      const after = source.slice(end);
+      if (/^\s*,/.test(after)) end += after.match(/^\s*,/)[0].length;
+      html += plain(tidyClauseText(source.slice(cursor, start)));
+      html += " " + onionSlot(hit.child, keyWords, depth) + " ";
+      cursor = end;
     });
-    html += plain(source.slice(cursor));
-    trailing.forEach((mark) => { html += onionSlot(mark.child, keyWords, depth); });
+    html += plain(tidyClauseText(source.slice(cursor)));
+
+    const placed = new Set(hits.map((hit) => hit.child));
+    list.forEach((child) => {
+      if (placed.has(child)) return;
+      const anchorText = String(child.anchor || "").trim().toLowerCase();
+      if (!anchorText) { html += " " + onionSlot(child, keyWords, depth) + " "; return; }
+      const at = source.toLowerCase().indexOf(anchorText);
+      if (at < 0) { html += " " + onionSlot(child, keyWords, depth) + " "; return; }
+      html += `<span class="onion-anchor" data-anchor="${attr(child.anchor)}"></span>`;
+      html += " " + onionSlot(child, keyWords, depth) + " ";
+    });
     return html;
   }
 
   function onionLine(text, tree, keyWords) {
-    const nodes = Array.isArray(tree) ? tree.filter((node) => node && node.text) : [];
+    const nodes = Array.isArray(tree) ? tree.filter((node) => node && (node.text || node.children?.length)) : [];
     const main = nodes.find((node) => node.kind === "main") || nodes[0];
     if (!main) return annotateSentence(text, keyWords);
     const extras = nodes.filter((node) => node !== main);
     const children = (main.children || []).concat(extras);
-    if (!children.length) return annotateSentence(main.text || text, keyWords);
-    return onionCompose(main.text || text, children, keyWords);
+    if (!children.length) return annotateSentence(text, keyWords);
+    return onionCompose(text, children, keyWords, 1);
   }
 
   function onionSentenceBlock(part, index, keyWords) {
