@@ -1,0 +1,925 @@
+/* ==========================================================================
+   未许之地 · Bitterworld Bitter 44
+   A ticket-and-collage skin: cream paper, ink double rules, one red stamp,
+   dashed routes and route nodes. Nothing rounded, nothing floating.
+   ========================================================================== */
+
+[data-theme="bitterworld"] {
+  --paper: #f1e6cb;
+  --paper-2: #fbf3df;
+  --paper-3: #e8dbc0;
+  --ink: #191410;
+  --ink-soft: #33291f;
+  --muted: #7a6a52;
+  --muted-2: #94836a;
+  --line: #191410;
+  --line-soft: rgba(25, 20, 16, 0.22);
+  --red: #be3a28;
+  --red-deep: #98291b;
+  --teal: #2f8b84;
+  --teal-deep: #1d5f5a;
+  --mint: #a9d4c0;
+  --gold: #e7cf75;
+  --gold-deep: #cdb153;
+  --shadow: 4px 4px 0 rgba(25, 20, 16, 0.13);
+  --shadow-sm: 2px 2px 0 rgba(25, 20, 16, 0.12);
+  color-scheme: light;
+}
+
+[data-theme="bitterworld"] body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .ambient,
+[data-theme="bitterworld"] .grain {
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+}
+
+[data-theme="bitterworld"] *:not(svg):not(path):not(circle):not(rect):not(line) {
+  border-radius: 0 !important;
+}
+
+[data-theme="bitterworld"] ::selection {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+/* ---- stage / shell ------------------------------------------------------ */
+
+[data-theme="bitterworld"] .device {
+  background: #14100c;
+  border: 2px solid #14100c;
+  box-shadow: 12px 12px 0 rgba(25, 20, 16, 0.22);
+}
+
+[data-theme="bitterworld"] .app {
+  background: var(--paper);
+}
+
+[data-theme="bitterworld"] .screen {
+  background-color: var(--paper);
+  background-image:
+    radial-gradient(circle at 50% -6%, rgba(231, 207, 117, 0.30), transparent 55%),
+    radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.05) 1px, transparent 1.3px);
+  background-size: auto, 13px 13px;
+  background-position: center top, 0 0;
+}
+
+[data-theme="bitterworld"] .stage-meta,
+[data-theme="bitterworld"] .stage-hint,
+[data-theme="bitterworld"] .stage-mark {
+  color: var(--muted);
+  font-family: var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .stage-mark .dot {
+  background: var(--red);
+}
+
+/* ---- top bar + modules -------------------------------------------------- */
+
+[data-theme="bitterworld"] .topbar {
+  background: var(--paper);
+  border-bottom: 0;
+  box-shadow: inset 0 -2px 0 var(--ink), inset 0 -4px 0 var(--gold);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-theme="bitterworld"] .brand {
+  color: var(--ink);
+  font-weight: 860;
+  letter-spacing: -0.03em;
+}
+
+[data-theme="bitterworld"] .brand .dot {
+  color: var(--red);
+}
+
+[data-theme="bitterworld"] .icon-btn,
+[data-theme="bitterworld"] .topbar .round-btn,
+[data-theme="bitterworld"] .speak-btn {
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .icon-btn:hover,
+[data-theme="bitterworld"] .topbar .round-btn:hover,
+[data-theme="bitterworld"] .speak-btn:hover {
+  background: var(--ink);
+  color: var(--paper-2);
+  box-shadow: 1px 1px 0 rgba(25, 20, 16, 0.5);
+}
+
+[data-theme="bitterworld"] .module-bar {
+  background: var(--paper);
+  border-bottom: 2px solid var(--ink);
+}
+
+[data-theme="bitterworld"] .module-bar::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  height: 1px;
+  background: var(--gold);
+}
+
+[data-theme="bitterworld"] .module-bar-label,
+[data-theme="bitterworld"] .module-version {
+  color: var(--muted);
+  font-family: var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .module-switch {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="bitterworld"] .module-btn {
+  color: var(--ink);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+[data-theme="bitterworld"] .module-btn.active {
+  background: var(--ink);
+  color: var(--paper-2);
+}
+
+/* ---- type --------------------------------------------------------------- */
+
+[data-theme="bitterworld"] .eyebrow,
+[data-theme="bitterworld"] .recent-label,
+[data-theme="bitterworld"] .translator-eyebrow,
+[data-theme="bitterworld"] .workspace-kicker,
+[data-theme="bitterworld"] .section-kicker,
+[data-theme="bitterworld"] .daily-section-kicker {
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .eyebrow .spark,
+[data-theme="bitterworld"] .translator-eyebrow .spark {
+  color: var(--teal);
+}
+
+[data-theme="bitterworld"] .home-title,
+[data-theme="bitterworld"] .translator-title {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+  line-height: 0.92;
+}
+
+[data-theme="bitterworld"] .home-title em,
+[data-theme="bitterworld"] .translator-title em {
+  font-style: normal;
+  color: var(--red);
+  background: linear-gradient(transparent 66%, var(--gold) 66%);
+  padding: 0 3px;
+}
+
+[data-theme="bitterworld"] .home-lede,
+[data-theme="bitterworld"] .translator-lede {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.72;
+}
+
+[data-theme="bitterworld"] .theme-manifesto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 12px;
+  background: var(--teal-deep);
+  border: 1.5px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+  color: var(--mint);
+  font-family: var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .manifesto-ru {
+  color: #eafff6;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+[data-theme="bitterworld"] .manifesto-zh {
+  color: var(--gold);
+  font-size: 10px;
+}
+
+/* ---- ticket cards ------------------------------------------------------- */
+
+[data-theme="bitterworld"] .search-card,
+[data-theme="bitterworld"] .translator-input-shell,
+[data-theme="bitterworld"] .workspace-input-shell,
+[data-theme="bitterworld"] .meaning-card,
+[data-theme="bitterworld"] .family-card,
+[data-theme="bitterworld"] .relation-card,
+[data-theme="bitterworld"] .example-card,
+[data-theme="bitterworld"] .origin-card,
+[data-theme="bitterworld"] .memory-card,
+[data-theme="bitterworld"] .collocation,
+[data-theme="bitterworld"] .translation-card,
+[data-theme="bitterworld"] .notice-card {
+  position: relative;
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  box-shadow: var(--shadow);
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+
+[data-theme="bitterworld"] .search-card {
+  padding-left: 30px;
+}
+
+[data-theme="bitterworld"] .search-card::before,
+[data-theme="bitterworld"] .translator-input-shell::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background-image: linear-gradient(var(--line-soft) 55%, transparent 0);
+  background-size: 1px 7px;
+}
+
+[data-theme="bitterworld"] .search-card::after,
+[data-theme="bitterworld"] .translator-input-shell::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  background-image: radial-gradient(circle at 7px 15px, var(--paper) 3.4px, transparent 3.9px);
+  background-size: 100% 30px;
+  background-repeat: repeat-y;
+}
+
+[data-theme="bitterworld"] .search-top-label,
+[data-theme="bitterworld"] .search-field-label {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .search-input,
+[data-theme="bitterworld"] textarea.search-input {
+  color: var(--ink);
+  font-family: var(--sans);
+  font-weight: 600;
+}
+
+[data-theme="bitterworld"] .search-input::placeholder {
+  color: var(--muted-2);
+}
+
+[data-theme="bitterworld"] .search-submit {
+  background: var(--red);
+  color: #fff6e6;
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 var(--ink);
+  clip-path: polygon(0 0, calc(100% - 12px) 0, 100% 12px, 100% 100%, 0 100%);
+}
+
+[data-theme="bitterworld"] .search-submit:hover {
+  background: var(--red-deep);
+  transform: translate(2px, 2px);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+
+[data-theme="bitterworld"] .mode-switch,
+[data-theme="bitterworld"] .translator-mode-switch,
+[data-theme="bitterworld"] .cache-display-switch {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-3);
+  padding: 2px;
+}
+
+[data-theme="bitterworld"] .mode-btn,
+[data-theme="bitterworld"] .translator-mode-btn,
+[data-theme="bitterworld"] .cache-display-btn {
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+[data-theme="bitterworld"] .mode-btn.active,
+[data-theme="bitterworld"] .translator-mode-btn.active,
+[data-theme="bitterworld"] .cache-display-btn.active {
+  background: var(--ink);
+  color: var(--paper-2);
+}
+
+[data-theme="bitterworld"] .search-foot,
+[data-theme="bitterworld"] .search-meta,
+[data-theme="bitterworld"] .search-hint {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+}
+
+/* ---- chips as route nodes ---------------------------------------------- */
+
+[data-theme="bitterworld"] .chip,
+[data-theme="bitterworld"] .related-pill {
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="bitterworld"] .chip:hover,
+[data-theme="bitterworld"] .related-pill:hover {
+  background: var(--gold);
+}
+
+[data-theme="bitterworld"] .chip .dot,
+[data-theme="bitterworld"] .related-pill .dot {
+  background: var(--red);
+}
+
+/* ---- sections + daily --------------------------------------------------- */
+
+[data-theme="bitterworld"] .section-head h2 {
+  color: var(--ink);
+  font-weight: 860;
+  letter-spacing: -0.02em;
+}
+
+[data-theme="bitterworld"] .section-head .count,
+[data-theme="bitterworld"] .section-note {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .daily {
+  background: var(--teal-deep);
+  border: 1.5px solid var(--ink);
+  box-shadow: 6px 6px 0 rgba(25, 20, 16, 0.22);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 0 100%);
+  color: var(--mint);
+}
+
+[data-theme="bitterworld"] .daily::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(169, 212, 192, 0.35);
+  pointer-events: none;
+}
+
+[data-theme="bitterworld"] .daily-word {
+  color: #f4fff8;
+}
+
+[data-theme="bitterworld"] .daily-badge {
+  background: var(--red);
+  color: #fff6e6;
+  border: 1.5px solid #0f0c09;
+  box-shadow: 2px 2px 0 rgba(15, 12, 9, 0.5);
+  font-family: var(--mono);
+  letter-spacing: 0.1em;
+}
+
+[data-theme="bitterworld"] .daily-gloss,
+[data-theme="bitterworld"] .daily-meaning,
+[data-theme="bitterworld"] .daily-meta,
+[data-theme="bitterworld"] .daily-kicker,
+[data-theme="bitterworld"] .daily-phonetic {
+  color: var(--mint);
+}
+
+[data-theme="bitterworld"] .daily-arrow {
+  background: var(--gold);
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+}
+
+[data-theme="bitterworld"] .mood-refresh {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  box-shadow: var(--shadow-sm);
+  color: var(--ink);
+}
+
+/* ---- word page ---------------------------------------------------------- */
+
+[data-theme="bitterworld"] .result-page::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 6px;
+  background: linear-gradient(90deg, var(--teal) 0 34%, var(--gold) 34% 67%, var(--red) 67% 100%);
+  opacity: 0.9;
+}
+
+[data-theme="bitterworld"] .word-title {
+  color: var(--ink);
+  font-weight: 900;
+  letter-spacing: -0.045em;
+}
+
+[data-theme="bitterworld"] .word-phonetic,
+[data-theme="bitterworld"] .word-meta,
+[data-theme="bitterworld"] .result-kicker {
+  color: var(--muted);
+  font-family: var(--mono);
+}
+
+[data-theme="bitterworld"] .kicker-pill {
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+[data-theme="bitterworld"] .kicker-pill.accent {
+  background: var(--red);
+  color: #fff6e6;
+}
+
+[data-theme="bitterworld"] .pos-tab {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  font-family: var(--mono);
+}
+
+[data-theme="bitterworld"] .pos-tab.active {
+  background: var(--teal);
+  color: #f4fff8;
+  border-color: var(--ink);
+}
+
+[data-theme="bitterworld"] .word-gloss-tag {
+  border: 1.5px dashed var(--red);
+  color: var(--red-deep);
+  font-family: var(--mono);
+  letter-spacing: 0.1em;
+}
+
+[data-theme="bitterworld"] .block-index {
+  background: var(--ink);
+  color: var(--gold);
+  font-family: var(--mono);
+  box-shadow: 2px 2px 0 rgba(25, 20, 16, 0.35);
+}
+
+[data-theme="bitterworld"] .block-head .rule {
+  background: var(--ink);
+  height: 2px;
+}
+
+[data-theme="bitterworld"] .meaning-card {
+  background: var(--paper-2);
+}
+
+[data-theme="bitterworld"] .meaning-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 5px;
+  background: var(--teal);
+}
+
+[data-theme="bitterworld"] .meaning-pager-arrow {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .meaning-pager-arrow:hover {
+  background: var(--ink);
+  color: var(--paper-2);
+}
+
+[data-theme="bitterworld"] .family-card .family-pos,
+[data-theme="bitterworld"] .example-tag,
+[data-theme="bitterworld"] .relation-tag {
+  background: var(--paper-3);
+  border: 1px solid var(--line-soft);
+  color: var(--ink-soft);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .family-card:hover,
+[data-theme="bitterworld"] .example-card:hover,
+[data-theme="bitterworld"] .translation-card:hover {
+  background: #fff9e9;
+  transform: translate(-1px, -1px);
+  box-shadow: 6px 6px 0 rgba(25, 20, 16, 0.2);
+}
+
+[data-theme="bitterworld"] .rel-chip {
+  background: var(--paper-2);
+  border: 1px dashed var(--line-soft);
+  color: var(--ink-soft);
+}
+
+[data-theme="bitterworld"] .rel-chip:hover {
+  border-color: var(--red);
+  color: var(--red-deep);
+}
+
+[data-theme="bitterworld"] .relation-card.syn {
+  border-left: 5px solid var(--teal);
+}
+
+[data-theme="bitterworld"] .relation-card.ant {
+  border-left: 5px solid var(--red);
+}
+
+[data-theme="bitterworld"] .example-card mark,
+[data-theme="bitterworld"] .meaning-card mark {
+  background: var(--gold);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .memory-label {
+  color: var(--teal-deep);
+  border-bottom: 2px solid var(--teal);
+  font-family: var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .origin-timeline::before,
+[data-theme="bitterworld"] .origin-stage::before {
+  background: var(--line-soft);
+}
+
+[data-theme="bitterworld"] .origin-stage::after {
+  background: var(--red);
+}
+
+/* ---- translator --------------------------------------------------------- */
+
+[data-theme="bitterworld"] .translator-styles {
+  position: relative;
+  gap: 8px;
+}
+
+[data-theme="bitterworld"] .translator-styles::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 50%;
+  height: 1px;
+  background-image: linear-gradient(90deg, var(--line-soft) 60%, transparent 0);
+  background-size: 9px 1px;
+  z-index: 0;
+}
+
+[data-theme="bitterworld"] .translator-style-chip {
+  position: relative;
+  z-index: 1;
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 0 100%);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .translator-style-chip .translator-style-emoji,
+[data-theme="bitterworld"] .translator-style-check {
+  display: none;
+}
+
+[data-theme="bitterworld"] .translator-style-chip::before {
+  content: "";
+  position: absolute;
+  left: 8px;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  background: var(--teal);
+  transform: rotate(45deg);
+}
+
+[data-theme="bitterworld"] .translator-style-chip:hover {
+  background: #fff9e9;
+}
+
+[data-theme="bitterworld"] .translator-style-chip.selected {
+  background: var(--red);
+  color: #fff6e6;
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+[data-theme="bitterworld"] .translator-style-chip.selected::before {
+  background: var(--gold);
+}
+
+[data-theme="bitterworld"] .translator-style-chip.selected strong,
+[data-theme="bitterworld"] .translator-style-chip.selected span {
+  color: #fff6e6;
+}
+
+[data-theme="bitterworld"] .translation-result-head {
+  border-bottom: 1px solid var(--line-soft);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .translation-cache-label {
+  border: 1px solid var(--red);
+  color: var(--red-deep);
+  padding: 1px 6px;
+  margin-left: 8px;
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+
+[data-theme="bitterworld"] .translation-empty,
+[data-theme="bitterworld"] .translator-empty {
+  border: 1.5px dashed var(--line-soft);
+  background: rgba(255, 249, 233, 0.5);
+  color: var(--muted);
+}
+
+[data-theme="bitterworld"] .translator-example-chip {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ---- sheets + settings -------------------------------------------------- */
+
+[data-theme="bitterworld"] .sheet,
+[data-theme="bitterworld"] .translation-workspace,
+[data-theme="bitterworld"] .word-layer {
+  background: var(--paper);
+  border-top: 2px solid var(--ink);
+  box-shadow: 0 -3px 0 var(--gold), 0 -30px 80px -30px rgba(23, 24, 19, 0.55);
+}
+
+[data-theme="bitterworld"] .sheet-handle {
+  background: var(--ink);
+  opacity: 0.35;
+}
+
+[data-theme="bitterworld"] .sheet-head {
+  border-bottom: 1px solid var(--line-soft);
+}
+
+[data-theme="bitterworld"] .sheet-head .mono {
+  color: var(--red);
+  letter-spacing: 0.16em;
+}
+
+[data-theme="bitterworld"] .sheet-title {
+  color: var(--ink);
+  font-weight: 860;
+  letter-spacing: -0.02em;
+}
+
+[data-theme="bitterworld"] .settings-tabs {
+  border-bottom: 2px solid var(--ink);
+  gap: 0;
+}
+
+[data-theme="bitterworld"] .settings-tab {
+  color: var(--muted);
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .settings-tab.active {
+  background: var(--ink);
+  color: var(--gold);
+}
+
+[data-theme="bitterworld"] .model-profile-chip,
+[data-theme="bitterworld"] .model-profile-add,
+[data-theme="bitterworld"] .theme-option,
+[data-theme="bitterworld"] .theme-picker-item,
+[data-theme="bitterworld"] .tts-engine-switch,
+[data-theme="bitterworld"] .detail-switch,
+[data-theme="bitterworld"] .theme-switch,
+[data-theme="bitterworld"] .cache-display-switch,
+[data-theme="bitterworld"] .cache-settings-summary,
+[data-theme="bitterworld"] .theme-cache-setting,
+[data-theme="bitterworld"] .notice-card {
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="bitterworld"] .model-profile-chip.active,
+[data-theme="bitterworld"] .theme-option.active,
+[data-theme="bitterworld"] .theme-picker-item.active {
+  background: var(--gold);
+  border-color: var(--ink);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+[data-theme="bitterworld"] .theme-option.active,
+[data-theme="bitterworld"] .theme-option.active span,
+[data-theme="bitterworld"] .model-profile-chip.active small,
+[data-theme="bitterworld"] .model-profile-chip.active span,
+[data-theme="bitterworld"] .theme-picker-item.active .theme-picker-copy small,
+[data-theme="bitterworld"] .theme-picker-item.active .theme-picker-count,
+[data-theme="bitterworld"] .theme-picker-item.active .theme-picker-index {
+  color: var(--ink-soft);
+}
+
+[data-theme="bitterworld"] .field input,
+[data-theme="bitterworld"] .field textarea,
+[data-theme="bitterworld"] .field select {
+  background: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .field input:focus,
+[data-theme="bitterworld"] .field textarea:focus,
+[data-theme="bitterworld"] .field select:focus {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(190, 58, 40, 0.14);
+}
+
+[data-theme="bitterworld"] .primary-btn,
+[data-theme="bitterworld"] .sheet-action {
+  background: var(--ink);
+  color: var(--paper-2);
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(25, 20, 16, 0.28);
+}
+
+[data-theme="bitterworld"] .ghost-btn,
+[data-theme="bitterworld"] .link-btn {
+  color: var(--red-deep);
+  border-color: var(--line-soft);
+}
+
+[data-theme="bitterworld"] .danger-btn {
+  color: var(--red-deep);
+  border-color: var(--red);
+}
+
+/* ---- theme salon -------------------------------------------------------- */
+
+[data-theme="bitterworld"] .theme-poster {
+  background: var(--paper-2);
+  border: 2px solid var(--ink);
+  box-shadow: 8px 8px 0 rgba(25, 20, 16, 0.2);
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .poster-masthead {
+  background: var(--teal-deep);
+  color: var(--mint);
+  border-bottom: 2px solid var(--ink);
+}
+
+[data-theme="bitterworld"] .poster-brand-mark,
+[data-theme="bitterworld"] .poster-edition {
+  color: var(--gold);
+  font-family: var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .poster-title {
+  color: var(--ink);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+[data-theme="bitterworld"] .poster-kicker,
+[data-theme="bitterworld"] .poster-lead-label,
+[data-theme="bitterworld"] .poster-col-index {
+  color: var(--red);
+  font-family: var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+[data-theme="bitterworld"] .poster-lead-word,
+[data-theme="bitterworld"] .poster-col-word {
+  color: var(--ink);
+  font-weight: 860;
+  letter-spacing: -0.03em;
+}
+
+[data-theme="bitterworld"] .poster-rule {
+  background: var(--ink);
+}
+
+[data-theme="bitterworld"] .poster-scene {
+  background: var(--paper-3);
+  border-left: 4px solid var(--red);
+  color: var(--ink-soft);
+}
+
+[data-theme="bitterworld"] .poster-single,
+[data-theme="bitterworld"] .poster-picker,
+[data-theme="bitterworld"] .poster-nav button {
+  border: 1.5px solid var(--ink);
+  background: var(--paper-2);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+
+[data-theme="bitterworld"] .poster-single:hover:not(:disabled),
+[data-theme="bitterworld"] .poster-picker:hover,
+[data-theme="bitterworld"] .poster-nav button:hover:not(:disabled) {
+  background: var(--gold);
+}
+
+[data-theme="bitterworld"] .poster-nav button:disabled {
+  opacity: 0.4;
+}
+
+/* ---- loading ------------------------------------------------------------ */
+
+[data-theme="bitterworld"] .skeleton,
+[data-theme="bitterworld"] .skeleton-line,
+[data-theme="bitterworld"] .skeleton-card {
+  background-color: var(--paper-3);
+}
+
+[data-theme="bitterworld"] .loading-query {
+  color: var(--ink);
+}
+
+[data-theme="bitterworld"] .loading-kicker {
+  color: var(--red);
+  font-family: var(--mono);
+  letter-spacing: 0.18em;
+}
+
+[data-theme="bitterworld"] .toast {
+  background: var(--ink);
+  color: var(--gold);
+  border: 1.5px solid var(--ink);
+  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* ---- wide layout -------------------------------------------------------- */
+
+@media (orientation: landscape) and (min-width: 720px) {
+  [data-theme="bitterworld"] .module-bar {
+    border-right: 2px solid var(--ink);
+    border-bottom: 0;
+  }
+
+  [data-theme="bitterworld"] .module-bar::before {
+    inset: 0 auto 0 0;
+    width: 4px;
+    height: auto;
+    background: linear-gradient(180deg, var(--teal) 0 34%, var(--gold) 34% 67%, var(--red) 67% 100%);
+  }
+
+  [data-theme="bitterworld"] .module-btn {
+    text-align: left;
+  }
+
+  [data-theme="bitterworld"] .module-btn.active {
+    box-shadow: 3px 3px 0 rgba(25, 20, 16, 0.35);
+  }
+}

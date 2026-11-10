@@ -1,0 +1,368 @@
+{
+  "generatedAt": "2026-11-09T09:34:17.697Z",
+  "file": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+  "fps": 30,
+  "frames": 576,
+  "durationSeconds": 19.2,
+  "verdict": "warn",
+  "summary": {
+    "fail": 0,
+    "warn": 5,
+    "pass": 11
+  },
+  "shots": [
+    {
+      "id": "shot-1",
+      "from": 0,
+      "to": 3,
+      "seconds": 3,
+      "freeze": 2,
+      "black": 0,
+      "blank": 0,
+      "flash": 0,
+      "margin": 4
+    },
+    {
+      "id": "shot-2",
+      "from": 3,
+      "to": 5.8,
+      "seconds": 2.8,
+      "freeze": 1.13,
+      "black": 0,
+      "blank": 0,
+      "flash": 0,
+      "margin": 0
+    },
+    {
+      "id": "shot-3",
+      "from": 5.8,
+      "to": 9.8,
+      "seconds": 4,
+      "freeze": 2.57,
+      "black": 0,
+      "blank": 0,
+      "flash": 0,
+      "margin": 0
+    },
+    {
+      "id": "shot-4",
+      "from": 9.8,
+      "to": 13.4,
+      "seconds": 3.6,
+      "freeze": 0,
+      "black": 0,
+      "blank": 0,
+      "flash": 0,
+      "margin": 0
+    },
+    {
+      "id": "shot-5",
+      "from": 13.4,
+      "to": 16.4,
+      "seconds": 3,
+      "freeze": 1.57,
+      "black": 0,
+      "blank": 0,
+      "flash": 0,
+      "margin": 1
+    },
+    {
+      "id": "shot-6",
+      "from": 16.4,
+      "to": 19.2,
+      "seconds": 2.8,
+      "freeze": 0,
+      "black": 0,
+      "blank": 0,
+      "flash": 0,
+      "margin": 4
+    }
+  ],
+  "checks": [
+    {
+      "level": "pass",
+      "id": "frames",
+      "message": "帧数 576 与时间轴一致"
+    },
+    {
+      "level": "pass",
+      "id": "black",
+      "message": "没有纯黑段"
+    },
+    {
+      "level": "info",
+      "id": "freeze",
+      "message": "画面静止 2s（1s–3s），像是设计停留",
+      "detail": "shot-1"
+    },
+    {
+      "level": "warn",
+      "id": "freeze",
+      "message": "画面静止 2.57s（7.23s–9.8s）",
+      "detail": "shot-3"
+    },
+    {
+      "level": "info",
+      "id": "freeze",
+      "message": "画面静止 1.57s（14.83s–16.4s），像是设计停留",
+      "detail": "shot-5"
+    },
+    {
+      "level": "pass",
+      "id": "flash",
+      "message": "没有单帧闪烁"
+    },
+    {
+      "level": "pass",
+      "id": "blank",
+      "message": "没有连续空白帧"
+    },
+    {
+      "level": "warn",
+      "id": "margin-left",
+      "message": "left 侧安全区有内容 2 段，最长起于 0s",
+      "detail": [
+        {
+          "from": 0,
+          "to": 2.97,
+          "frames": 90
+        },
+        {
+          "from": 16.4,
+          "to": 19.17,
+          "frames": 84
+        }
+      ]
+    },
+    {
+      "level": "warn",
+      "id": "margin-right",
+      "message": "right 侧安全区有内容 2 段，最长起于 0s",
+      "detail": [
+        {
+          "from": 0,
+          "to": 2.97,
+          "frames": 90
+        },
+        {
+          "from": 16.4,
+          "to": 19.17,
+          "frames": 84
+        }
+      ]
+    },
+    {
+      "level": "warn",
+      "id": "margin-top",
+      "message": "top 侧安全区有内容 2 段，最长起于 0s",
+      "detail": [
+        {
+          "from": 0,
+          "to": 2.97,
+          "frames": 90
+        },
+        {
+          "from": 16.4,
+          "to": 19.17,
+          "frames": 84
+        }
+      ]
+    },
+    {
+      "level": "warn",
+      "id": "margin-bottom",
+      "message": "bottom 侧安全区有内容 3 段，最长起于 0s",
+      "detail": [
+        {
+          "from": 0,
+          "to": 2.97,
+          "frames": 90
+        },
+        {
+          "from": 14.4,
+          "to": 14.5,
+          "frames": 4
+        },
+        {
+          "from": 16.4,
+          "to": 19.17,
+          "frames": 84
+        }
+      ]
+    },
+    {
+      "level": "pass",
+      "id": "banding",
+      "message": "没有检出色带阶梯（最长 5 段）"
+    },
+    {
+      "level": "pass",
+      "id": "aa",
+      "message": "斜边过渡像素占比 0.639"
+    },
+    {
+      "level": "pass",
+      "id": "font",
+      "message": "字体都有注册或字体文件"
+    },
+    {
+      "level": "pass",
+      "id": "audio-peak",
+      "message": "真峰值 -2 dBFS"
+    },
+    {
+      "level": "pass",
+      "id": "audio-level",
+      "message": "综合响度 -13.9 LUFS"
+    }
+  ],
+  "audio": {
+    "hasAudio": true,
+    "checked": true,
+    "integratedLufs": -13.9,
+    "truePeakDb": -2,
+    "silence": [
+      18.5472
+    ]
+  },
+  "pixels": {
+    "banding": {
+      "samples": [
+        {
+          "time": 3.83,
+          "y": 346,
+          "longest": 2,
+          "steps": 1,
+          "runs": 628
+        },
+        {
+          "time": 3.83,
+          "y": 960,
+          "longest": 0,
+          "steps": 0,
+          "runs": 601
+        },
+        {
+          "time": 3.83,
+          "y": 1574,
+          "longest": 0,
+          "steps": 0,
+          "runs": 525
+        },
+        {
+          "time": 10.07,
+          "y": 346,
+          "longest": 0,
+          "steps": 0,
+          "runs": 582
+        },
+        {
+          "time": 10.07,
+          "y": 960,
+          "longest": 5,
+          "steps": 4,
+          "runs": 544
+        },
+        {
+          "time": 10.07,
+          "y": 1574,
+          "longest": 5,
+          "steps": 13,
+          "runs": 481
+        },
+        {
+          "time": 16.3,
+          "y": 346,
+          "longest": 0,
+          "steps": 0,
+          "runs": 584
+        },
+        {
+          "time": 16.3,
+          "y": 960,
+          "longest": 3,
+          "steps": 4,
+          "runs": 516
+        },
+        {
+          "time": 16.3,
+          "y": 1574,
+          "longest": 0,
+          "steps": 0,
+          "runs": 634
+        }
+      ],
+      "worst": {
+        "time": 10.07,
+        "y": 960,
+        "longest": 5,
+        "steps": 4,
+        "runs": 544
+      }
+    },
+    "aa": {
+      "samples": [
+        {
+          "time": 3.83,
+          "midRatio": 0.6862640299305185
+        },
+        {
+          "time": 10.07,
+          "midRatio": 0.6590936851105411
+        },
+        {
+          "time": 16.3,
+          "midRatio": 0.5703342266268898
+        }
+      ],
+      "average": 0.639
+    },
+    "fonts": {
+      "families": [],
+      "missing": [],
+      "fontFiles": [
+        "google-inter-italic-opsz-wght-.ttf",
+        "google-inter-opsz-wght-.ttf",
+        "google-jetbrainsmono-italic-wght-.ttf",
+        "google-jetbrainsmono-wght-.ttf",
+        "notosanssc-vf.ttf",
+        "notoserifsc-vf.ttf",
+        "google-inter-italic-opsz-wght-.ttf",
+        "google-inter-opsz-wght-.ttf",
+        "google-jetbrainsmono-italic-wght-.ttf",
+        "google-jetbrainsmono-wght-.ttf",
+        "notosanssc-vf.ttf",
+        "notoserifsc-vf.ttf"
+      ],
+      "registered": [
+        "${json.stringify(face.family)"
+      ]
+    }
+  },
+  "freezeSegments": [
+    {
+      "from": 1,
+      "to": 3,
+      "seconds": 2
+    },
+    {
+      "from": 7.23,
+      "to": 9.8,
+      "seconds": 2.57
+    },
+    {
+      "from": 14.83,
+      "to": 16.4,
+      "seconds": 1.57
+    }
+  ],
+  "settings": {
+    "freezeSeconds": 1.2,
+    "flashDelta": 18,
+    "emptyDelta": 18,
+    "emptyFrames": 8,
+    "marginRatio": 0.035,
+    "marginDark": 170,
+    "blackPixThreshold": 0.1
+  }
+}

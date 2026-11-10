@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "kind": "raster",
+  "fps": 30,
+  "width": 1080,
+  "height": 1920,
+  "source": "source.mp4",
+  "sourceOffset": 0,
+  "frames": [],
+  "duration": 19.3
+}

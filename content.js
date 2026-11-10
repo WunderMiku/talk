@@ -341,3 +341,74 @@ window.TALK_CONTENT.themeCopy.endfield = {
     ]
   }
 };
+
+window.TALK_CONTENT.themeCopy.bitterworld = {
+  modules: {
+    dictionary: "词册",
+    translator: "译站"
+  },
+  home: {
+    eyebrow: "BITTERWORLD · 未许之地",
+    titleLead: "把词，",
+    titleAccent: "摊开。",
+    lede: "每个词都是一张票根：从哪来、经过谁、能换到什么。查一个词，就是读完这张票。",
+    manifesto: {
+      ru: "BITTERWORLD BITTER 44",
+      zh: "每一张票，都有去处"
+    },
+    searchKicker: "查票",
+    searchPlaceholder: "输入一个词，或一整句要查的话…",
+    recentLabel: "最近检票",
+    modes: {
+      auto: "自动",
+      word: "词",
+      sentence: "句"
+    },
+    dailySectionKicker: "每日一张",
+    dailySectionTitle: "今日票根",
+    moodSectionKicker: "按主题装订",
+    moodSectionTitle: "票册巡览",
+    footerLeft: "语言是一张票，不是一堵墙",
+    footerRight: "逐张检票，逐页归档"
+  },
+  translator: {
+    kicker: "译站 · 中 / EN",
+    titleLead: "一句，",
+    titleAccent: "五种口吻。",
+    lede: "同一句话，五种说法。语气不是装饰，是你选择站在哪个检票口说话。",
+    inputPlaceholder: "把要换一种说法的句子放进来…",
+    empty: "写下你的句子。它会换到五种口吻。",
+    workspaceKicker: "译站",
+    workspaceTitle: "译站"
+  },
+  themeSalon: {
+    kicker: "主题档案 · 票册",
+    brand: "BITTERWORLD",
+    masthead: "TICKET ARCHIVE",
+    editionLabel: "票册",
+    leadLabel: "LEAD",
+    cta: "换一张",
+    singleCta: "再印一版",
+    pickerCta: "翻册",
+    pickerKicker: "票册库",
+    pickerTitle: "从票册里挑一张",
+    printing: "正在印刷",
+    cacheUnit: "张在册",
+    libraryLabel: "库存",
+    libraryUnit: "张",
+    noCache: "本地票根",
+    loading: "正在印刷…",
+    local: "常设票册",
+    sceneLabel: "现场",
+    footerRight: "点一张票根，继续读下去"
+  },
+  settings: {
+    kicker: "BITTERWORLD / DESK",
+    title: "登记处",
+    tabs: [
+      ["model", "接口"],
+      ["tts", "音频"],
+      ["data", "票册"]
+    ]
+  }
+};

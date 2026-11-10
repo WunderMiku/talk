@@ -51,6 +51,15 @@
       css: "themes/endfield.css",
       copyKey: "endfield",
       description: "工业终端：纸白底、切角与唯一一种信号黄"
+    },
+    bitterworld: {
+      id: "bitterworld",
+      label: "未许之地",
+      themeColor: "#f1e6cb",
+      accent: "#be3a28",
+      css: "themes/bitterworld.css",
+      copyKey: "bitterworld",
+      description: "票根拼贴：米纸、墨线、检票章与一条虚线路线"
     }
   };
 

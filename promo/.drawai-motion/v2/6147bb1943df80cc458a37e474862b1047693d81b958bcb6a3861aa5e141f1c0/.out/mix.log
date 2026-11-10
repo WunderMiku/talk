@@ -1,0 +1,58 @@
+Input #0, mov,mp4,m4a,3gp,3g2,mj2, from '/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    encoder         : Lavf61.7.100
+    comment         : Made with Remotion 4.0.484
+  Duration: 00:00:19.24, start: 0.000000, bitrate: 4691 kb/s
+  Stream #0:0[0x1](und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709/unknown/unknown, progressive), 1080x1920 [SAR 1:1 DAR 9:16], 4374 kb/s, 30 fps, 30 tbr, 90k tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+      encoder         : Lavc61.19.100 libx264
+    Side data:
+      ICC Profile
+  Stream #0:1[0x2](und): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 317 kb/s (default)
+    Metadata:
+      handler_name    : SoundHandler
+      vendor_id       : [0][0][0][0]
+Stream mapping:
+  Stream #0:0 -> #0:0 (copy)
+  Stream #0:1 -> #0:1 (aac (native) -> aac (native))
+Output #0, mp4, to '/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mixing.mp4':
+  Metadata:
+    major_brand     : isom
+    minor_version   : 512
+    compatible_brands: isomiso2avc1mp41
+    comment         : Made with Remotion 4.0.484
+    encoder         : Lavf60.16.100
+  Stream #0:0(und): Video: h264 (High) (avc1 / 0x31637661), yuv420p(tv, bt709/unknown/unknown, progressive), 1080x1920 [SAR 1:1 DAR 9:16], q=2-31, 4374 kb/s, 30 fps, 30 tbr, 90k tbn (default)
+    Metadata:
+      handler_name    : VideoHandler
+      vendor_id       : [0][0][0][0]
+      encoder         : Lavc61.19.100 libx264
+    Side data:
+      ICC Profile
+  Stream #0:1(und): Audio: aac (LC) (mp4a / 0x6134706D), 48000 Hz, stereo, fltp, 192 kb/s (default)
+    Metadata:
+      handler_name    : SoundHandler
+      vendor_id       : [0][0][0][0]
+      encoder         : Lavc60.31.102 aac
+size=       0kB time=00:00:02.96 bitrate=   0.1kbits/s speed=52.3x    size=    2048kB time=00:00:07.40 bitrate=2267.2kbits/s speed=13.3x    size=    3584kB time=00:00:13.20 bitrate=2224.3kbits/s speed=12.4x    size=    9984kB time=00:00:18.80 bitrate=4350.5kbits/s speed=  12x    [mp4 @ 0x5500207c40] Starting second pass: moving the moov atom to the beginning of the file
+[out#0/mp4 @ 0x55000b7a30] video:10252kB audio:488kB subtitle:0kB other streams:0kB global headers:0kB muxing overhead: 0.207635%
+size=   10762kB time=00:00:19.27 bitrate=4573.1kbits/s speed=10.2x    
+[Parsed_loudnorm_0 @ 0x55000ae8c0] 
+Input Integrated:    -25.1 LUFS
+Input True Peak:      -7.2 dBTP
+Input LRA:             3.0 LU
+Input Threshold:     -35.1 LUFS
+
+Output Integrated:   -14.0 LUFS
+Output True Peak:     -1.0 dBTP
+Output LRA:            2.1 LU
+Output Threshold:    -24.0 LUFS
+
+Normalization Type:   Dynamic
+Target Offset:        +0.0 LU
+[aac @ 0x5500204a00] Qavg: 844.808

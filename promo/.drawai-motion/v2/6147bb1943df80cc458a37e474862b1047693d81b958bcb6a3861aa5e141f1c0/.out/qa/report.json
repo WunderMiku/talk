@@ -1,0 +1,112 @@
+{
+  "status": "render-checks-passed",
+  "visualReview": "manual-required",
+  "audio": "mixed:10",
+  "frames": [
+    {
+      "shotId": "shot-1",
+      "frame": 22,
+      "filename": "shot-1-22.png",
+      "fraction": 0.25,
+      "sha256": "01341c49d8c1c12c1a046a90b73cd912f4115f74908b3fcc301fe64cd994b6b8"
+    },
+    {
+      "shotId": "shot-1",
+      "frame": 62,
+      "filename": "shot-1-62.png",
+      "fraction": 0.7,
+      "sha256": "af93267b6fdc1707bc6e75e4529574815cce5d3494a34f689fcb9c4a94464810"
+    },
+    {
+      "shotId": "shot-2",
+      "frame": 111,
+      "filename": "shot-2-111.png",
+      "fraction": 0.25,
+      "sha256": "f5e880b3aa78d81d3501f41decb33d60e2973330123e1962b50a894aca784342"
+    },
+    {
+      "shotId": "shot-2",
+      "frame": 148,
+      "filename": "shot-2-148.png",
+      "fraction": 0.7,
+      "sha256": "a7303379dc767724bb1881ad4cf13b27a72895e12793d43c92b00a370ba6f34f"
+    },
+    {
+      "shotId": "shot-3",
+      "frame": 204,
+      "filename": "shot-3-204.png",
+      "fraction": 0.25,
+      "sha256": "75bda064f43c7fae17cd60589fc33f2169ee253cbdf4c7eef83b052f9cae9c8b"
+    },
+    {
+      "shotId": "shot-3",
+      "frame": 258,
+      "filename": "shot-3-258.png",
+      "fraction": 0.7,
+      "sha256": "48335dc215054c8908f99cc6582ca8f014faeed170deba4a314dfe1ef2132b4c"
+    },
+    {
+      "shotId": "shot-4",
+      "frame": 321,
+      "filename": "shot-4-321.png",
+      "fraction": 0.25,
+      "sha256": "fa11e2c340e7401016a1ecc5fd2f020520dcc74c3f1dacfe08dbc28c14fe479f"
+    },
+    {
+      "shotId": "shot-4",
+      "frame": 369,
+      "filename": "shot-4-369.png",
+      "fraction": 0.7,
+      "sha256": "ba7b523a00a185a8d2a9126706323189a74ad6071dd88a4d303b45f054c308ba"
+    },
+    {
+      "shotId": "shot-5",
+      "frame": 424,
+      "filename": "shot-5-424.png",
+      "fraction": 0.25,
+      "sha256": "ec27fd6cfba4202a0ee6c577e8d221af7340f5f1f1e1a66defb2c53dd99c4f7c"
+    },
+    {
+      "shotId": "shot-5",
+      "frame": 464,
+      "filename": "shot-5-464.png",
+      "fraction": 0.7,
+      "sha256": "9e0693f92ec5cd206be0dc62ea4a0c5cc8184d862ba0fe6c6997fa90beec8327"
+    },
+    {
+      "shotId": "shot-6",
+      "frame": 513,
+      "filename": "shot-6-513.png",
+      "fraction": 0.25,
+      "sha256": "e58ad24e60bc55e92a0b4eb644c185fe9d4f3834d80b6e65b5217a68b137e9e3"
+    },
+    {
+      "shotId": "shot-6",
+      "frame": 550,
+      "filename": "shot-6-550.png",
+      "fraction": 0.7,
+      "sha256": "04aa89692649ffa49845de2e3cfc1b66515df8dd07c1aa8b0aae10605cb9dee4"
+    }
+  ],
+  "warnings": [
+    "色彩标签只写了 colorspace：要 primaries/trc 齐全（严格 QC）请用 render.scale=2，那一趟重编码会一并补齐"
+  ],
+  "render": {
+    "codec": "h264",
+    "crf": 14,
+    "preset": "slow",
+    "pixelFormat": "yuv420p",
+    "colorSpace": "bt709",
+    "scale": 1,
+    "concurrency": 2,
+    "audioBitrate": "320k",
+    "sampleRate": 48000,
+    "timeoutMs": 1800000,
+    "samples": 1,
+    "shutter": 0.5,
+    "estimatedCost": 1,
+    "pixels": 2073600,
+    "warnings": []
+  },
+  "colorTags": "仅 colorspace=bt709（primaries/trc 为 unknown；母版级标签请设 render.scale=2）"
+}

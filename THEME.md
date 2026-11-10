@@ -16,7 +16,7 @@ in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); this file only covers themes.
 | `app.js` | Product logic and rendering |
 
 Load order in `index.html`: `styles.css` → `theme.css` → `themes/ussr.css` →
-`themes/rhine.css` → `themes/endfield.css`, then `data.js`, `theme.js`, `content.js`, `prompts.js`,
+`themes/rhine.css` → `themes/endfield.css` → `themes/bitterworld.css`, then `data.js`, `theme.js`, `content.js`, `prompts.js`,
 `vendor/idb.js`, `app.js`. Theme files therefore win over both base component
 rules and the token defaults.
 
@@ -50,7 +50,7 @@ The theme selector in **设置 → 数据** is generated from the registry, so n
 change is needed. Selection is stored in `talk.theme.v1`; `theme.js` applies it
 before the app renders and updates the browser `theme-color` meta tag.
 
-## The four themes
+## The five themes
 
 USSR carries one piece of art beyond type and colour: a red silhouette of The
 Motherland Calls, traced from the 80th anniversary emblem and set into the
@@ -62,6 +62,7 @@ bottom corner as a multiply-blended watermark.
 | `constructivist` | USSR | red/black poster, diagonal blocks | hard cuts, stamps |
 | `rhine` | Rhine Lab | lab index, cool and clinical | hairlines, ticks, numbering |
 | `endfield` | Endfield | industrial field terminal | square, cut corners, one signal yellow |
+| `bitterworld` | 未许之地 | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
 
 Endfield is the most opinionated one, so it is the best example of what a theme
 may own: it flattens every radius with a single `[data-theme="endfield"] *`

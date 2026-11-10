@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "items": [
+    {
+      "id": "drawai-paper",
+      "file": "builtin/paper.svg",
+      "bytes": 404,
+      "sha256": "23a6a026640430b9eec59db7d84f128f65875415e251c5aa4e6dcee5c9174567",
+      "kind": "vector",
+      "caption": "暖色纸张纹理，可平铺",
+      "source": "DrawAI 原创程序生成（MIT）"
+    },
+    {
+      "id": "drawai-grain",
+      "file": "builtin/grain.svg",
+      "bytes": 310,
+      "sha256": "84fe1a80826c494a33616efb3e6bd3a163976a8e06b382adb4f44ba7ab740405",
+      "kind": "vector",
+      "caption": "灰度颗粒叠层，建议低不透明度混合",
+      "source": "DrawAI 原创程序生成（MIT）"
+    },
+    {
+      "id": "drawai-grid",
+      "file": "builtin/grid.svg",
+      "bytes": 249,
+      "sha256": "91ac61964def2a396c9906fd2f7257a35717232f34e4e38272c9a4fdd2c4e5e3",
+      "kind": "vector",
+      "caption": "透明白色网格，可平铺",
+      "source": "DrawAI 原创程序生成（MIT）"
+    },
+    {
+      "id": "drawai-whoosh",
+      "file": "builtin/whoosh.wav",
+      "bytes": 52964,
+      "sha256": "4442c0fb4171ebc07c7776ffae64e1c09a31367bf7eaafcccb138c5426b8bd92",
+      "kind": "audio",
+      "caption": "合成的短扫过声",
+      "source": "DrawAI 原创程序生成（MIT）",
+      "seconds": 0.6
+    },
+    {
+      "id": "drawai-impact",
+      "file": "builtin/impact.wav",
+      "bytes": 35324,
+      "sha256": "8ad49e47c401724a565e0baa64d985a18c3933d5978a8bdf55437cfa11a02252",
+      "kind": "audio",
+      "caption": "合成的短低频落点声",
+      "source": "DrawAI 原创程序生成（MIT）",
+      "seconds": 0.4
+    }
+  ]
+}

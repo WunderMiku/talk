@@ -137,6 +137,7 @@ theme.css               基础 token（Paper）
 themes/ussr.css         构成主义主题覆盖
 themes/rhine.css        Rhine Lab 主题覆盖
 themes/endfield.css     Endfield 主题覆盖
+themes/bitterworld.css  未许之地主题覆盖
 theme.js                主题注册表
 content.js              基础文案 + 各主题的语气改写
 prompts.js              静态模型提示词（与主题无关）

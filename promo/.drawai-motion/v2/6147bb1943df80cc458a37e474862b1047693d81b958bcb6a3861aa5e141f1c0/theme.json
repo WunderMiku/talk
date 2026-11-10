@@ -1,0 +1,13 @@
+{
+  "name": "custom",
+  "tokens": {
+    "page": "#F6F1E7",
+    "surface": "#FFFDF6",
+    "field": "#F1EADA",
+    "text": "#141414",
+    "muted": "#6D6353",
+    "accent": "#D6F54B",
+    "border": "#141414"
+  },
+  "at": "2026-11-09T09:18:29.832Z"
+}

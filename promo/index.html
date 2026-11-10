@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>talk. promo</title>
+<style>
+  :root{
+    --navy:#0b1220;
+    --blue:#4d6bfe;
+    --sky:#9db4ff;
+    --paper:#f6f1e7;
+    --cream:#f4efe4;
+    --ink:#141414;
+    --lime:#d6f54b;
+    --red:#d8402f;
+    --mono:"Noto Sans Mono CJK SC","DejaVu Sans Mono",monospace;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:1080px;height:1920px;overflow:hidden;background:#000}
+  #stage{background:#f6f1e7;position:relative;width:1080px;height:1920px;overflow:hidden;
+    font-family:"Noto Sans CJK SC","Noto Sans SC",sans-serif;color:var(--ink)}
+  .scene{position:absolute;inset:0;opacity:0;will-change:opacity,transform}
+  .bg{position:absolute;inset:0}
+  .navy{background:radial-gradient(1200px 900px at 80% 8%, #1a2a52 0%, var(--navy) 55%, #05080f 100%)}
+  .paperbg{background:var(--paper)}
+  .creambg{background:var(--cream)}
+  .hatch{position:absolute;inset:0;opacity:.05;
+    background-image:repeating-linear-gradient(45deg, rgba(20,20,20,.6) 0 1px, transparent 1px 14px)}
+  .grain{position:absolute;inset:0;opacity:.05;mix-blend-mode:overlay;
+    background-image:radial-gradient(rgba(255,255,255,.8) .6px, transparent .6px);
+    background-size:3px 3px}
+  .mono{font-family:var(--mono);letter-spacing:.14em;text-transform:uppercase;font-weight:600}
+  .wrap{position:absolute;left:96px;right:96px}
+
+  /* ---------- S1 hook ---------- */
+  #s1 .kicker{top:300px;font-size:26px;color:var(--sky)}
+  #s1 h1{top:360px;font-size:126px;line-height:1.14;font-weight:900;color:#f7f9ff;letter-spacing:-.02em}
+  #s1 h1 b{color:var(--blue);font-weight:900}
+  #s1 .mark{position:relative;display:inline-block;isolation:isolate}
+  #s1 .mark i{position:absolute;left:-6px;right:-6px;bottom:8px;height:34px;background:var(--lime);z-index:-1;transform-origin:left}
+  #s1 .sub{top:860px;font-size:34px;line-height:1.6;color:#b9c6e6;font-weight:500}
+  #s1 .fish{position:absolute;right:60px;bottom:120px;width:520px;height:520px;opacity:.95}
+  .bubble{position:absolute;border-radius:50%;background:rgba(157,180,255,.5)}
+
+  /* ---------- S2 problem ---------- */
+  #s2 .tag{top:280px;font-size:26px;color:#8a7f6a}
+  #s2 h2{top:340px;font-size:112px;line-height:1.12;font-weight:900;letter-spacing:-.02em}
+  #s2 .apps{position:absolute;left:96px;top:760px;display:flex;gap:26px}
+  #s2 .app{width:250px;height:150px;border:2px solid rgba(20,20,20,.55);background:#fffdf6;
+    display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700}
+  #s2 .strike{position:absolute;left:90px;top:920px;height:5px;background:var(--red);transform-origin:left}
+  #s2 .note{position:absolute;left:96px;top:1090px;font-size:44px;line-height:1.55;color:#4a4438;font-weight:600}
+  #s2 .note em{font-style:normal;background:var(--red);color:#fff;padding:0 10px}
+
+  /* ---------- S3/S4 phone ---------- */
+  .phone{position:absolute;left:250px;top:430px;width:580px;height:1240px;border-radius:64px;
+    background:#0c0c0c;padding:14px;box-shadow:0 60px 120px rgba(10,14,30,.35)}
+  .screen{position:relative;width:552px;height:1212px;border-radius:52px;overflow:hidden;background:#000}
+  .screen img{position:absolute;left:0;top:0;width:100%;display:block}
+  .phone .glow{position:absolute;inset:-40px;border-radius:80px;background:radial-gradient(closest-side, rgba(77,107,254,.35), transparent 70%);z-index:-1}
+  #s3 .caption,#s4 .caption{position:absolute;left:96px;right:96px;top:1760px;text-align:center;font-size:40px;font-weight:700;color:#2c2820}
+  #s3 .caption span{background:var(--lime);padding:2px 10px}
+  #s3 .caption b,#s4 .caption b{background:var(--lime);padding:0 8px}
+  #s1 h1 .mark{background:linear-gradient(180deg,transparent 60%,var(--lime) 60% 94%,transparent 94%);padding:0 4px}
+  #s3 .tag{position:absolute;left:96px;top:470px;font-size:26px;color:#8a7f6a}
+  #s3 #typedRow{position:absolute;left:92px;top:610px;font-size:112px;font-weight:900;letter-spacing:-.03em;color:var(--ink)}
+  #s3 #typedRow .caret{display:inline-block;width:5px;height:92px;background:var(--red);margin-left:8px;vertical-align:-6px}
+  #s3 #phonetic{position:absolute;left:100px;top:790px;font-size:30px;color:#6d6353;letter-spacing:.08em}
+  #s3 #gloss{position:absolute;left:100px;top:860px;font-size:46px;font-weight:700;color:#2c2820}
+  #s3 #gen{position:absolute;left:100px;top:1000px;width:600px}
+  #s3 #gen .bar{height:13px;background:#ddd1b8;margin-bottom:18px;width:0}
+  #s3 #gen .lbl{margin-top:26px;font-size:22px;color:#8a7f6a}
+  #s4 .label{position:absolute;left:70px;padding:8px 16px;background:var(--ink);color:var(--lime);font-size:24px;font-weight:800}
+  #s4 .rail{position:absolute;right:40px;top:520px;writing-mode:vertical-rl;font-size:24px;color:#a9967a}
+
+  /* ---------- S5 features ---------- */
+  #s5 .title{position:absolute;left:96px;top:170px;font-size:34px;color:#7c6f58}
+  #s5 h2{position:absolute;left:96px;top:220px;font-size:92px;font-weight:900;letter-spacing:-.02em}
+  .card{position:absolute;width:404px;padding:12px;background:#fffdf6;border:2px solid rgba(20,20,20,.75);box-shadow:14px 16px 0 rgba(20,20,20,.12)}
+  .card img{width:100%;height:520px;object-fit:cover;object-position:top center;display:block}
+  .card b{display:block;margin-top:12px;font-size:28px}
+  #s5 .c1{left:80px;top:500px}
+  #s5 .c2{left:572px;top:556px}
+  #s5 .c3{left:316px;top:1236px}
+
+  /* ---------- S6 end ---------- */
+  #s6 .logo{position:absolute;left:96px;top:640px;font-size:220px;font-weight:900;color:#f7f9ff;letter-spacing:-.04em}
+  #s6 .logo i{color:var(--lime);font-style:normal}
+  #s6 .line{position:absolute;left:100px;top:960px;font-size:52px;color:#c9d4ef;font-weight:600}
+  #s6 .pill{position:absolute;left:96px;top:1140px;padding:22px 34px;border:2px solid rgba(255,255,255,.35);color:#e8eefc;font-size:30px;font-family:var(--mono);letter-spacing:.06em}
+  #s6 .foot{position:absolute;left:96px;right:96px;bottom:150px;display:flex;justify-content:space-between;color:#8194bb;font-size:24px;font-family:var(--mono);letter-spacing:.12em}
+  #s6 .whale{position:absolute;right:80px;top:560px;width:360px;opacity:.9}
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- S1 -->
+  <section class="scene" id="s1">
+    <div class="bg navy"></div><div class="grain"></div>
+    <div class="wrap kicker mono">DeepSeek · 蓝色大肥鱼</div>
+    <h1 class="wrap">这里<span class="mark"><i></i>没有词典</span>，<br>只有一条<br>会查词的鱼。</h1>
+    <p class="wrap sub">每个词条，都由大肥鱼现场写出。<br>不查库，不抄释义，不糊弄。</p>
+    <svg class="fish" viewBox="0 0 300 300" aria-hidden="true">
+      <g id="whaleG">
+        <path d="M150 300 L150 226 C126 222 94 208 64 184 C102 186 134 198 150 214 C166 198 198 186 236 184 C206 208 174 222 150 226 Z" fill="#4d6bfe"/>
+      </g>
+      <g id="bubbles" fill="rgba(157,180,255,.55)"></g>
+    </svg>
+  </section>
+
+  <!-- S2 -->
+  <section class="scene" id="s2">
+    <div class="bg creambg"></div><div class="hatch"></div>
+    <div class="wrap tag mono">The problem</div>
+    <h2 class="wrap">词典是别人<br>写好的。</h2>
+    <div class="apps">
+      <div class="app">预置词条</div>
+      <div class="app">固定释义</div>
+      <div class="app">几年不更新</div>
+    </div>
+    <div class="strike" id="strike"></div>
+    <p class="note">可你的问题，<br>它<em>从来没写过</em>。</p>
+  </section>
+
+  <!-- S3 -->
+  <section class="scene" id="s3">
+    <div class="bg paperbg"></div><div class="hatch"></div>
+    <div class="wrap tag mono">AI 正在生成词条</div>
+    <div id="typedRow"><span id="typed"></span><span class="caret" id="caret"></span></div>
+    <div id="phonetic">/ ˌser.ənˈdɪp.ə.ti / · n.</div>
+    <div id="gloss">意外发现美好事物的运气</div>
+    <div id="gen">
+      <div class="bar" id="bar1"></div>
+      <div class="bar" id="bar2"></div>
+      <div class="bar" id="bar3"></div>
+      <div class="lbl mono">同根词 · 例句 · 记忆钩子 · 生成中</div>
+    </div>
+    <div class="caption">释义 · 音标 · 例句 · 同根词，<b>一次写完</b>。</div>
+  </section>
+
+  <!-- S4 -->
+  <section class="scene" id="s4">
+    <div class="bg paperbg"></div><div class="hatch"></div>
+    <div class="phone">
+      <div class="glow"></div>
+      <div class="screen"><img id="wordImg" class="scroll" src="assets/word-paper.jpg" alt=""></div>
+    </div>
+    <div class="label" id="lab1">01 词义</div>
+    <div class="label" id="lab2">02 同根词</div>
+    <div class="label" id="lab3">03 例句 · 近反义</div>
+    <div class="caption">每一条都是现写的，<b>不是抄的</b>。</div>
+    <div class="rail mono">TALK · 查词</div>
+  </section>
+
+  <!-- S5 -->
+  <section class="scene" id="s5">
+    <div class="bg creambg"></div><div class="hatch"></div>
+    <div class="title mono">Everything in one place</div>
+    <h2>而且不止查词。</h2>
+    <div class="card c1" id="card1"><img src="assets/translator.jpg" alt=""><b>五种语气翻译</b></div>
+    <div class="card c2" id="card2"><img src="assets/theme-salon.jpg" alt=""><b>四套主题</b></div>
+    <div class="card c3" id="card3"><img src="assets/settings-data.jpg" alt=""><b>本地缓存 · 离线可查</b></div>
+  </section>
+
+  <!-- S6 -->
+  <section class="scene" id="s6">
+    <div class="bg navy"></div><div class="grain"></div>
+    <div class="logo">talk<i>.</i></div>
+    <div class="line">不是词典，是会写词条的 AI。</div>
+    <div class="pill">wundermiku.github.io/talk</div>
+    <svg class="whale" viewBox="0 0 300 300"><g><path d="M150 300 L150 226 C126 222 94 208 64 184 C102 186 134 198 150 214 C166 198 198 186 236 184 C206 208 174 222 150 226 Z" fill="#3b5aa6"/></g></svg>
+    <div class="foot"><span>TALK · 英语查词</span><span>TOOLING · PLAYWRIGHT + FFMPEG</span></div>
+  </section>
+
+</div>
+
+<script>
+const S = {
+  s1:[0.0,3.0], s2:[3.0,5.8], s3:[5.8,9.8], s4:[9.8,13.4], s5:[13.4,16.2], s6:[16.2,19.2]
+};
+const D = 19.2;
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
+const seg=(t,a,b)=>clamp((t-a)/(b-a));
+const out=p=>1-Math.pow(1-p,3);
+const io=p=>p<.5?2*p*p:1-Math.pow(-2*p+2,2)/2;
+
+const el=id=>document.getElementById(id);
+const bubbles = el('bubbles');
+const bubbleEls=[];
+[[70,60,14],[40,120,9],[96,150,6],[30,58,8]].forEach(([x,y,r])=>{
+  const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+  c.setAttribute('cx',x);c.setAttribute('cy',y);c.setAttribute('r',r);
+  bubbles.appendChild(c);bubbleEls.push(c);
+});
+
+function sceneVis(t, id, idx){
+  const [a,b]=S[id];
+  const fade=0.45;
+  let o = clamp((t-(a-0.2))/fade);
+  if (b < D-0.1) o *= clamp((b+0.15-t)/fade);
+  const el0=el(id);
+  el0.style.opacity=o.toFixed(3);
+  const drift=(1-io(clamp((t-a)/0.9)))*44;
+  el0.style.transform=`translateY(${drift.toFixed(2)}px)`;
+}
+
+const typedWords='serendipity';
+const typedEl=el('typed');
+
+function render(t){
+  Object.keys(S).forEach((id,i)=>sceneVis(t,id,i));
+
+  // S1
+  {
+    const p=seg(t,S.s1[0],S.s1[0]+1.0);
+    const g=el('whaleG');
+    g.style.transformOrigin='150px 268px';
+    const rise=io(p);
+    g.style.transform=`translateY(${(1-rise)*90}px) scale(${0.86+0.14*rise})`;
+    g.style.opacity=rise.toFixed(2);
+    bubbleEls.forEach((c,i)=>{
+      const q=clamp((t-0.5-i*0.22)/1.6);
+      c.setAttribute('opacity',(q*(1-q*0.4)).toFixed(2));
+      c.setAttribute('transform',`translate(0 ${(-60*q).toFixed(1)})`);
+    });
+  }
+
+  // S2
+  {
+    const p=seg(t,S.s2[0]+0.4,S.s2[0]+1.5);
+    el('strike').style.width=(p*760).toFixed(1)+'px';
+    el('strike').style.transform=`rotate(-2deg)`;
+    el('strike').style.left='96px';
+  }
+
+  // S3 typing
+  {
+    const start=S.s3[0]-0.15, per=0.07;
+    const n=clamp(Math.floor((t-start)/per),0,typedWords.length);
+    typedEl.textContent=typedWords.slice(0,n);
+    el('caret').style.opacity=(Math.floor(t*3)%2===0)?'1':'0';
+    const done=seg(t,start+typedWords.length*per+0.05,start+typedWords.length*per+0.55);
+    const ph=el('phonetic'), gl=el('gloss');
+    ph.style.opacity=done.toFixed(2); gl.style.opacity=done.toFixed(2);
+    ph.style.transform=`translateY(${((1-done)*14).toFixed(1)}px)`;
+    gl.style.transform=`translateY(${((1-done)*18).toFixed(1)}px)`;
+    [[1,520,0.10],[2,430,0.26],[3,560,0.42]].forEach(([i,w,at])=>{
+      const q=seg(t,start+typedWords.length*per+at,start+typedWords.length*per+at+0.45);
+      el('bar'+i).style.width=(w*q).toFixed(0)+'px';
+    });
+    el('gen').style.opacity=seg(t,start+typedWords.length*per+0.05,start+typedWords.length*per+0.4).toFixed(2);
+  }
+
+  // S4 scroll
+  {
+    const p=seg(t,S.s4[0]+0.15,S.s4[1]-0.15);
+    const dist=460;
+    el('wordImg').style.transform=`translateY(${(-dist*io(p)).toFixed(1)}px)`;
+    const seq=[[ 'lab1',0.05],['lab2',0.34],['lab3',0.62]];
+    seq.forEach(([id,at],i)=>{
+      const q=seg(t,S.s4[0]+0.2+at*(S.s4[1]-S.s4[0]-0.4),S.s4[0]+0.55+at*(S.s4[1]-S.s4[0]-0.4));
+      const e=el(id);
+      e.style.opacity=q.toFixed(2);
+      e.style.top=(520+i*300+ (1-q)*26).toFixed(0)+'px';
+    });
+  }
+
+  // S5 cards
+  {
+    const c=[['card1',0.05],['card2',0.28],['card3',0.5]];
+    c.forEach(([id,at],i)=>{
+      const q=seg(t,S.s5[0]+0.15+at,S.s5[0]+0.85+at);
+      const e=el(id); const eo=out(q);
+      e.style.opacity=q.toFixed(2);
+      e.style.transform=`translateY(${((1-eo)*90).toFixed(1)}px) rotate(${(1-eo)*(i?2:-2)}deg)`;
+    });
+  }
+
+  // S6
+  {
+    const p=seg(t,S.s6[0]+0.1,S.s6[0]+1.1);
+    el('s6').querySelector('.logo').style.transform=`translateY(${((1-out(p))*60).toFixed(1)}px)`;
+    el('s6').querySelector('.logo').style.opacity=out(p).toFixed(2);
+  }
+}
+window.render=render;
+window.TOTAL=D;
+render(0);
+</script>
+</body>
+</html>

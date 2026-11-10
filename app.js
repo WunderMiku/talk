@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "136";
+  const APP_VERSION = "137";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -750,7 +750,7 @@
 
   function sanitizeHistory(items) {
     return items
-      .filter((item) => item && (item.type === "word" || item.type === "sentence") && item.query)
+      .filter((item) => item && (item.type === "word" || item.type === "sentence" || item.type === "translation") && item.query)
       .map((item) => ({
         type: item.type,
         query: String(item.query),
@@ -1950,6 +1950,7 @@
     if (cached) {
       state.lastTranslationResult = cached;
       renderTranslatorResult(cached);
+      addHistory("translation", text);
       return;
     }
     if (!hasModelConfig()) {
@@ -1963,6 +1964,7 @@
       state.lastTranslationResult = result;
       translationCachePut(cacheKey, result);
       renderTranslatorResult(result);
+      addHistory("translation", text);
     } catch (error) {
       if (token !== state.translatorSeq) return;
       renderTranslatorError(error?.name === "AbortError" ? "请求超过 60 秒" : String(error?.message || error));
@@ -3980,10 +3982,10 @@
           <div class="history-list">
             ${items.map((item) => `
               <button class="history-item" type="button" data-action="history-item" data-query="${attr(item.query)}" data-type="${attr(item.type)}">
-                <span class="history-icon ${item.type === "sentence" ? "sentence" : ""}">${item.type === "sentence" ? icon("sentence") : icon("book")}</span>
+                <span class="history-icon ${item.type === "sentence" ? "sentence" : item.type === "translation" ? "translation" : ""}">${item.type === "sentence" ? icon("sentence") : item.type === "translation" ? icon("sparkle") : icon("book")}</span>
                 <span class="history-copy">
                   <strong>${esc(shorten(item.query, 44))}</strong>
-                  <span>${item.type === "sentence" ? "句子" : "单词"} · ${esc(timeAgo(item.at))}</span>
+                  <span>${item.type === "sentence" ? "句子" : item.type === "translation" ? "翻译" : "单词"} · ${esc(timeAgo(item.at))}</span>
                 </span>
               </button>`).join("")}
           </div>
@@ -5169,6 +5171,17 @@
       case "history-item":
         event.preventDefault();
         closeSheet({ immediate: true });
+        if (target.dataset.type === "translation") {
+          const text = String(target.dataset.query || "").trim();
+          navigate({ name: "translate" });
+          const input = $("#translator-input");
+          if (input && text) {
+            input.value = text;
+            updateTranslatorLanguage();
+            runTranslation(text);
+          }
+          break;
+        }
         runSearch(target.dataset.query || "", target.dataset.type || "auto");
         break;
 

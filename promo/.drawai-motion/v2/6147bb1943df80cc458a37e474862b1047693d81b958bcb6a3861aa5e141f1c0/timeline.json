@@ -1,0 +1,177 @@
+{
+  "version": 1,
+  "width": 1080,
+  "height": 1920,
+  "fps": 30,
+  "durationInFrames": 576,
+  "shots": [
+    {
+      "id": "shot-1",
+      "file": "scene-0.tsx",
+      "startFrame": 0,
+      "durationFrames": 90
+    },
+    {
+      "id": "shot-2",
+      "file": "scene-1.tsx",
+      "startFrame": 90,
+      "durationFrames": 84
+    },
+    {
+      "id": "shot-3",
+      "file": "scene-2.tsx",
+      "startFrame": 174,
+      "durationFrames": 120
+    },
+    {
+      "id": "shot-4",
+      "file": "scene-3.tsx",
+      "startFrame": 294,
+      "durationFrames": 108
+    },
+    {
+      "id": "shot-5",
+      "file": "scene-4.tsx",
+      "startFrame": 402,
+      "durationFrames": 90
+    },
+    {
+      "id": "shot-6",
+      "file": "scene-5.tsx",
+      "startFrame": 492,
+      "durationFrames": 84
+    }
+  ],
+  "audio": [
+    {
+      "id": "cue-555a7985",
+      "file": "sfx/fs-625530.mp3",
+      "role": "bgm",
+      "from": 0,
+      "durationInFrames": 576,
+      "gainDb": -13,
+      "fadeIn": 3,
+      "fadeOut": 24,
+      "trimStart": 0,
+      "loop": false,
+      "duck": true
+    },
+    {
+      "id": "cue-a5c31016",
+      "file": "builtin/whoosh.wav",
+      "role": "sfx",
+      "from": 90,
+      "durationInFrames": 18,
+      "gainDb": -14,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-1c68f985",
+      "file": "builtin/whoosh.wav",
+      "role": "sfx",
+      "from": 174,
+      "durationInFrames": 18,
+      "gainDb": -14,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-17df58c4",
+      "file": "sfx/fs-571513.mp3",
+      "role": "sfx",
+      "from": 220,
+      "durationInFrames": 26,
+      "gainDb": 10,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-130a8029",
+      "file": "sfx/fs-571513.mp3",
+      "role": "sfx",
+      "from": 236,
+      "durationInFrames": 26,
+      "gainDb": 10,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-9cfcf510",
+      "file": "sfx/fs-571513.mp3",
+      "role": "sfx",
+      "from": 252,
+      "durationInFrames": 26,
+      "gainDb": 11,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-7a284cce",
+      "file": "sfx/fs-571513.mp3",
+      "role": "sfx",
+      "from": 272,
+      "durationInFrames": 26,
+      "gainDb": 12,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-966065f3",
+      "file": "builtin/whoosh.wav",
+      "role": "sfx",
+      "from": 294,
+      "durationInFrames": 18,
+      "gainDb": -14,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-6ae5fc6f",
+      "file": "builtin/whoosh.wav",
+      "role": "sfx",
+      "from": 402,
+      "durationInFrames": 18,
+      "gainDb": -14,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    },
+    {
+      "id": "cue-938b8f1b",
+      "file": "builtin/impact.wav",
+      "role": "sfx",
+      "from": 486,
+      "durationInFrames": 12,
+      "gainDb": -9,
+      "fadeIn": 0,
+      "fadeOut": 0,
+      "trimStart": 0,
+      "loop": false,
+      "duck": false
+    }
+  ]
+}

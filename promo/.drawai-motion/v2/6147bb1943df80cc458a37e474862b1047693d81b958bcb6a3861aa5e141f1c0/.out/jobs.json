@@ -1,0 +1,292 @@
+[
+  {
+    "id": "job-mw91zogx-1",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "done",
+    "phase": "done",
+    "progress": 1,
+    "createdAt": "2026-11-09T09:23:04.737Z",
+    "endedAt": "2026-11-09T09:24:37.651Z",
+    "output": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+    "error": null,
+    "message": "",
+    "frames": null,
+    "mix": {
+      "applied": true,
+      "before": {
+        "integratedLufs": -22.8,
+        "truePeakDb": -10.6
+      },
+      "after": {
+        "integratedLufs": -13.9,
+        "truePeakDb": -2
+      },
+      "settings": {
+        "normalize": true,
+        "lufs": -14,
+        "truePeak": -1,
+        "lra": 11
+      },
+      "measured": {
+        "input_i": "-22.95",
+        "input_tp": "-10.64",
+        "input_lra": "3.20",
+        "input_thresh": "-33.19",
+        "output_i": "-13.94",
+        "output_tp": "-1.90",
+        "output_lra": "0.80",
+        "output_thresh": "-24.08",
+        "normalization_type": "dynamic",
+        "target_offset": "-0.06"
+      },
+      "limitDb": -2
+    },
+    "mixError": null
+  },
+  {
+    "id": "job-mw923yp9-2",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "done",
+    "phase": "done",
+    "progress": 1,
+    "createdAt": "2026-11-09T09:26:24.621Z",
+    "endedAt": "2026-11-09T09:28:04.559Z",
+    "output": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+    "error": null,
+    "message": "",
+    "frames": null,
+    "mix": {
+      "applied": true,
+      "before": {
+        "integratedLufs": -22.8,
+        "truePeakDb": -10.6
+      },
+      "after": {
+        "integratedLufs": -13.9,
+        "truePeakDb": -2
+      },
+      "settings": {
+        "normalize": true,
+        "lufs": -14,
+        "truePeak": -1,
+        "lra": 11
+      },
+      "measured": {
+        "input_i": "-22.95",
+        "input_tp": "-10.64",
+        "input_lra": "3.20",
+        "input_thresh": "-33.19",
+        "output_i": "-13.94",
+        "output_tp": "-1.90",
+        "output_lra": "0.80",
+        "output_thresh": "-24.08",
+        "normalization_type": "dynamic",
+        "target_offset": "-0.06"
+      },
+      "limitDb": -2
+    },
+    "mixError": null
+  },
+  {
+    "id": "job-mw926sj0-3",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "done",
+    "phase": "done",
+    "progress": 1,
+    "createdAt": "2026-11-09T09:28:36.588Z",
+    "endedAt": "2026-11-09T09:30:13.758Z",
+    "output": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+    "error": null,
+    "message": "",
+    "frames": null,
+    "mix": {
+      "applied": true,
+      "before": {
+        "integratedLufs": -22.8,
+        "truePeakDb": -10.6
+      },
+      "after": {
+        "integratedLufs": -13.9,
+        "truePeakDb": -2
+      },
+      "settings": {
+        "normalize": true,
+        "lufs": -14,
+        "truePeak": -1,
+        "lra": 11
+      },
+      "measured": {
+        "input_i": "-22.95",
+        "input_tp": "-10.64",
+        "input_lra": "3.20",
+        "input_thresh": "-33.19",
+        "output_i": "-13.94",
+        "output_tp": "-1.90",
+        "output_lra": "0.80",
+        "output_thresh": "-24.08",
+        "normalization_type": "dynamic",
+        "target_offset": "-0.06"
+      },
+      "limitDb": -2
+    },
+    "mixError": null
+  },
+  {
+    "id": "job-mw92akt5-4",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "done",
+    "phase": "done",
+    "progress": 1,
+    "createdAt": "2026-11-09T09:31:33.209Z",
+    "endedAt": "2026-11-09T09:33:15.010Z",
+    "output": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+    "error": null,
+    "message": "",
+    "frames": null,
+    "mix": {
+      "applied": true,
+      "before": {
+        "integratedLufs": -22.8,
+        "truePeakDb": -10.6
+      },
+      "after": {
+        "integratedLufs": -13.9,
+        "truePeakDb": -2
+      },
+      "settings": {
+        "normalize": true,
+        "lufs": -14,
+        "truePeak": -1,
+        "lra": 11
+      },
+      "measured": {
+        "input_i": "-22.95",
+        "input_tp": "-10.64",
+        "input_lra": "3.20",
+        "input_thresh": "-33.19",
+        "output_i": "-13.94",
+        "output_tp": "-1.90",
+        "output_lra": "0.80",
+        "output_thresh": "-24.08",
+        "normalization_type": "dynamic",
+        "target_offset": "-0.06"
+      },
+      "limitDb": -2
+    },
+    "mixError": null
+  },
+  {
+    "id": "job-mw92otw8-5",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "done",
+    "phase": "done",
+    "progress": 1,
+    "createdAt": "2026-11-09T09:42:38.168Z",
+    "endedAt": "2026-11-09T09:44:17.378Z",
+    "output": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+    "error": null,
+    "message": "",
+    "frames": null,
+    "mix": {
+      "applied": true,
+      "before": {
+        "integratedLufs": -27.1,
+        "truePeakDb": -7.3
+      },
+      "after": {
+        "integratedLufs": -14,
+        "truePeakDb": -1.9
+      },
+      "settings": {
+        "normalize": true,
+        "lufs": -14,
+        "truePeak": -1,
+        "lra": 11
+      },
+      "measured": {
+        "input_i": "-27.34",
+        "input_tp": "-7.31",
+        "input_lra": "4.50",
+        "input_thresh": "-37.45",
+        "output_i": "-14.24",
+        "output_tp": "-1.00",
+        "output_lra": "2.30",
+        "output_thresh": "-24.30",
+        "normalization_type": "dynamic",
+        "target_offset": "0.24"
+      },
+      "limitDb": -2
+    },
+    "mixError": null
+  },
+  {
+    "id": "job-mw92vqtx-6",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "failed",
+    "phase": "failed",
+    "progress": 0.338,
+    "createdAt": "2026-11-09T09:48:00.789Z",
+    "endedAt": "2026-11-09T09:48:54.513Z",
+    "output": null,
+    "error": "renderMedia() got cancelled",
+    "message": ""
+  },
+  {
+    "id": "job-mw92xpi1-7",
+    "kind": "film",
+    "dir": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0",
+    "nodeId": "n1",
+    "status": "done",
+    "phase": "done",
+    "progress": 1,
+    "createdAt": "2026-11-09T09:49:32.377Z",
+    "endedAt": "2026-11-09T09:51:21.054Z",
+    "output": "/root/workspace/promo/.drawai-motion/v2/6147bb1943df80cc458a37e474862b1047693d81b958bcb6a3861aa5e141f1c0/.out/film.mp4",
+    "error": null,
+    "message": "",
+    "frames": null,
+    "mix": {
+      "applied": true,
+      "before": {
+        "integratedLufs": -24.9,
+        "truePeakDb": -7.2
+      },
+      "after": {
+        "integratedLufs": -14,
+        "truePeakDb": -1.9
+      },
+      "settings": {
+        "normalize": true,
+        "lufs": -14,
+        "truePeak": -1,
+        "lra": 11
+      },
+      "measured": {
+        "input_i": "-25.10",
+        "input_tp": "-7.22",
+        "input_lra": "3.00",
+        "input_thresh": "-35.10",
+        "output_i": "-14.13",
+        "output_tp": "-1.00",
+        "output_lra": "2.00",
+        "output_thresh": "-24.13",
+        "normalization_type": "dynamic",
+        "target_offset": "0.13"
+      },
+      "limitDb": -2
+    },
+    "mixError": null
+  }
+]
