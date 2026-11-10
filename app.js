@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "160";
+  const APP_VERSION = "161";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3161,16 +3161,17 @@
       segments.push({ kind: "slot", node: child, suffix: "", html: onionSlot(child, keyWords, child.__depth || depth) });
     });
 
+    const flow = segments.filter((segment) => segment.kind === "slot" || segment.html !== "");
     let html = "";
-    for (let i = 0; i < segments.length; i += 1) {
-      const segment = segments[i];
+    for (let i = 0; i < flow.length; i += 1) {
+      const segment = flow[i];
       if (segment.kind === "text") { html += segment.html; continue; }
       const run = [segment];
-      while (i + 1 < segments.length && segments[i + 1].kind === "slot") { i += 1; run.push(segments[i]); }
+      while (i + 1 < flow.length && flow[i + 1].kind === "slot") { i += 1; run.push(flow[i]); }
       const padBefore = /[\s]$/.test(html) || !html ? "" : " ";
-      const padAfter = /^\s/.test(segments[i + 1]?.html || "") ? "" : " ";
+      const padAfter = /^\s/.test(flow[i + 1]?.html || "") ? "" : " ";
       const body = run.map((item) => item.html).join("");
-      html += padBefore + (run.length > 1 ? `<span class="onion-cluster">${body}</span>` : body) + padAfter;
+      html += padBefore + body + padAfter;
     }
     return html;
   }
