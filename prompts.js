@@ -89,6 +89,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
       "kind": "main | clause | phrase | modifier",
       "label": "这一段是什么，如「主句」「定语从句」",
       "text": "原句里对应的英文片段，逐字保留",
+      "anchor": "非 main 节点必填：这层修饰挂在父级 text 里哪个词后面（用父级 text 里原样出现的词或短语；挂不住就留空）",
       "role": "中文：它在句中做什么",
       "gloss": "中文：这一段的翻译大意",
       "note": "中文：为什么这样拆，有什么阅读提示",
@@ -129,7 +130,8 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 
 Few-shot（只示意字段和语气，不要照抄内容）：
 用户：{"task":"sentence","detail":"fast","text":"Hope is not a prediction."}
-助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"n.","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}`,
+助手：{"kind":"sentence","text":"Hope is not a prediction.","translation":"希望不是预言。","tone":"克制 · 笃定","structure":"用否定定义希望，把抽象概念落在选择上。","keyWords":[{"word":"prediction","surface":"prediction","phonetic":"/prɪˈdɪk.ʃən/","pos":"n.","meaning":"a statement about the future","meaningZh":"预言","why":"否定希望是预言，强调希望不是对结果的推算。","family":[],"synonyms":[],"antonyms":[],"example":{"en":"The prediction was wrong.","zh":"那个预言错了。"}}]}tree 的每一层只放真实出现在句子里的片段，text 必须逐字来自原句；main 的 text 要能独立成句（去掉所有修饰后的主干）。非 main 节点必须补 anchor：写在父级 text 里原样出现的词或短语，渲染时这一层就插在它后面；实在挂不住就留空。
+`,
   examples: `你是 Talk 的例句写手。用户会给出一个词，以及一组主题（id + 风格说明）。为每个主题各写 1 条例句，必须符合该主题的语气，同时保持自然、可读、长度适中（8–18 个词）。已有的例句不要重复。只返回一个合法 JSON 对象，不要 Markdown 或额外说明。
 
 输出结构：

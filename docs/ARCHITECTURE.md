@@ -210,3 +210,12 @@ python3 -m http.server 8080     # 或任意静态服务器
 - 主题的例句风格存在 `talk.exampleStyles.v1`，默认值来自 `TALK_THEME` 的 `exampleStyle`，设置里可按主题改写。
 - `SENTENCE_LEVELS` 是唯一的阶段表（中考 3 / 高考 4 / CET4 5 / CET6 6 / 考研 7 / 雅思 7 / 托福 8），设置里选择后写进 `talk.prefs.v1`。
 - 单词缓存 `talk.words.v1` 的 `WORD_CACHE_SCHEMA` 升到 3，但读取时接受 schema ≥ 2，旧记录在下次写入时就地升级；句子不落 IndexedDB，只在内存中缓存。
+
+
+## 句子拆解（洋葱式折叠）
+
+句子页不在正文里堆语法标签，而是把整句渲染成一行连续文字：主干直接显示，每层修饰在锚点词后留一个 `[+]`。点开后，该层以 `onion-clause` 内联插回原句（字号小一档、颜色更淡、虚线框），再点这一层就打开知识点卡片（作用 / 大意 / 阅读提示）。
+
+- 数据：`sentence.tree` 的每个非 main 节点带 `anchor`（父级 text 里的词），前端按锚点把子节点插回父级文本，再递归渲染。
+- 结构：`onionCompose()` 组合文本与插槽，`onionSlot()` 生成 `[+]` 与可展开片段，`openInsightSheet()` 渲染卡片。
+- 动效：纯 CSS。展开时 `onion-clause` 做透明度 + 字距过渡，避免 `clip-path` 影响行盒；折叠为即时隐藏，不阻塞布局。

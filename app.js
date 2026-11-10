@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "151";
+  const APP_VERSION = "152";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2942,6 +2942,8 @@
       return {
         id: String(node.id || `n${depth}-${index}`),
         kind,
+        depth,
+        anchor: String(node.anchor || node.attachAfter || "").trim(),
         label: String(node.label || node.role || "").trim(),
         text,
         role: String(node.role || node.function || "").trim(),
@@ -3027,6 +3029,83 @@
     </ul>`;
   }
 
+  function openInsightSheet(node) {
+    const kind = treeKindLabel(node.kind);
+    const depthLabel = Number(node.depth) > 0 ? `第 ${Number(node.depth) + 1} 层` : "";
+    openSheetShell({ kicker: [kind, depthLabel].filter(Boolean).join(" · "), title: node.label || "这一层在做什么" });
+    const holder = $("#sheet-scroll");
+    if (!holder) return;
+    const rows = [
+      { label: "作用", value: node.role, key: true },
+      { label: "大意", value: node.gloss },
+      { label: "阅读提示", value: node.note }
+    ].filter((row) => row.value);
+    holder.innerHTML = `
+      <div class="insight-sheet">
+        <p class="insight-clause">${esc(node.text || "")}</p>
+        <div class="insight-rows">
+          ${rows.map((row) => `
+            <div class="insight-row ${row.key ? "is-key" : ""}">
+              <span class="insight-label">${row.label}</span>
+              <p class="insight-value">${esc(row.value)}</p>
+            </div>`).join("")}
+        </div>
+        ${node.children?.length ? `
+          <div class="insight-nested">
+            <span class="insight-label">里面还有</span>
+            <ul>${node.children.map((child) => `<li>${esc(child.label || child.text || "")}</li>`).join("")}</ul>
+          </div>` : ""}
+      </div>`;
+  }
+
+  function onionSlot(node, keyWords) {
+    const inner = onionCompose(node.text || "", Array.isArray(node.children) ? node.children : [], keyWords);
+    return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}</span></span></span>`;
+  }
+
+  function onionCompose(text, children, keyWords) {
+    const source = String(text || "");
+    const plain = (chunk) => annotateSentence(chunk, keyWords || []);
+    if (!Array.isArray(children) || !children.length) return plain(source);
+    const lowered = source.toLowerCase();
+    const marks = children.map((child) => {
+      const anchorText = String(child.anchor || "").trim().toLowerCase();
+      const at = anchorText ? lowered.indexOf(anchorText) : -1;
+      if (at < 0) return { child, at: -1 };
+      let cut = at + anchorText.length;
+      while (cut < source.length && /[.,;:!?]/.test(source[cut])) cut += 1;
+      return { child, at: cut };
+    });
+    const placed = marks.filter((mark) => mark.at >= 0).sort((a, b) => a.at - b.at);
+    const trailing = marks.filter((mark) => mark.at < 0);
+    let html = "";
+    let cursor = 0;
+    placed.forEach((mark) => {
+      html += plain(source.slice(cursor, mark.at));
+      html += onionSlot(mark.child, keyWords);
+      cursor = mark.at;
+    });
+    html += plain(source.slice(cursor));
+    trailing.forEach((mark) => { html += onionSlot(mark.child, keyWords); });
+    return html;
+  }
+
+  function onionLine(text, tree, keyWords) {
+    const nodes = Array.isArray(tree) ? tree.filter((node) => node && node.text) : [];
+    const main = nodes.find((node) => node.kind === "main") || nodes[0];
+    if (!main) return annotateSentence(text, keyWords);
+    const extras = nodes.filter((node) => node !== main);
+    const children = (main.children || []).concat(extras);
+    if (!children.length) return annotateSentence(main.text || text, keyWords);
+    return onionCompose(main.text || text, children, keyWords);
+  }
+
+  function onionSentenceBlock(part, index, keyWords) {
+    const tree = Array.isArray(part.tree) ? part.tree : [];
+    const count = tree.reduce((total, node) => total + 1 + (node.children?.length || 0), 0);
+    return `<div class="onion-block" data-onion-block="${index}"><p class="sentence-text onion-line">${onionLine(part.text || "", tree, keyWords)}</p>${count > 1 ? `<div class="onion-tools"><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="expand">全部展开</button><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="collapse">收起到主干</button></div>` : ""}</div>`;
+  }
+
   function sentencePage(sentence) {
     let blockNo = 0;
     const nextNo = () => String(++blockNo).padStart(2, "0");
@@ -3034,6 +3113,7 @@
       ? sentence.sentences
       : [{ text: sentence.text, translation: sentence.translation, summary: sentence.summary || "", tree: sentence.tree || [] }];
     const tree = sentence.tree?.length ? sentence.tree : (parts[0]?.tree || []);
+    const renderParts = parts.map((part, index) => ({ ...part, tree: (part.tree && part.tree.length) ? part.tree : (index === 0 ? tree : []) }));
     state.structureNodes = registerTreeNodes(tree.concat(...parts.map((part) => part.tree || [])), {});
     const bookmark = `sentence:${sentence.id}`;
     return `
@@ -3044,7 +3124,7 @@
             <span class="kicker-pill accent">句子</span>
             <span class="kicker-pill">${sentence.keyWords.length} 个重点词</span>
           </div>
-          <p class="sentence-text reveal" style="--d:0.6">${annotateSentence(sentence.text, sentence.keyWords)}</p>
+          <div class="onion reveal" style="--d:0.6">${renderParts.map((part, index) => onionSentenceBlock(part, index, sentence.keyWords)).join("")}</div>
           <div class="sentence-source reveal" style="--d:1">
             <span>${esc(sentence.source || "Talk corpus")}</span>
             <span class="wave"></span>
@@ -3078,26 +3158,6 @@
           ${blockHead(nextNo(), "浓缩主旨", "一句话记住")}
           <div class="summary-card">${esc(sentence.summary)}</div>
         </section>` : ""}
-
-        ${tree.length ? `
-        <section class="block reveal" style="--d:1.45">
-          ${blockHead(nextNo(), "句子结构", "点开看每一层")}
-          <div class="tree-toolbar">
-            <span class="mono">默认只看主干</span>
-            <button class="link-btn" type="button" data-action="tree-toggle-all" data-mode="expand">全部展开</button>
-            <button class="link-btn" type="button" data-action="tree-toggle-all" data-mode="collapse">收起到主干</button>
-          </div>
-          ${structureTreeHtml(tree)}
-          ${parts.length > 1 ? parts.slice(0).map((part, index) => part.tree?.length ? `
-            <div class="tree-part">
-              <span class="mono">第 ${index + 1} 句 · ${esc(shorten(part.text, 40))}</span>
-              ${structureTreeHtml(part.tree)}
-            </div>` : "").join("") : ""}
-        </section>` : (sentence.structure ? `
-        <section class="block reveal" style="--d:1.45">
-          ${blockHead(nextNo(), "句子结构", "连接模型后可展开")}
-          <div class="insight"><p>${esc(sentence.structure)}</p></div>
-        </section>` : "")}
 
         <section class="block reveal" style="--d:1.5">
           ${blockHead(nextNo(), "值得注意的词", "点击展开")}
@@ -5379,22 +5439,38 @@
         break;
       }
 
-      case "structure-node": {
+      case "onion-toggle": {
+        event.preventDefault();
+        event.stopPropagation();
+        const slot = target.closest(".onion-slot");
+        if (!slot) break;
+        const open = !slot.classList.contains("is-open");
+        slot.classList.toggle("is-open", open);
+        target.setAttribute("aria-expanded", open ? "true" : "false");
+        target.textContent = open ? "−" : "+";
+        break;
+      }
+
+      case "onion-toggle-all": {
+        event.preventDefault();
+        const mode = target.dataset.mode === "collapse" ? "collapse" : "expand";
+        $$(".onion-slot").forEach((slot) => {
+          const open = mode === "expand";
+          slot.classList.toggle("is-open", open);
+          const mark = $(".onion-mark", slot);
+          if (mark) {
+            mark.setAttribute("aria-expanded", open ? "true" : "false");
+            mark.textContent = open ? "−" : "+";
+          }
+        });
+        break;
+      }
+
+      case "onion-open": {
         event.preventDefault();
         const node = state.structureNodes?.[target.dataset.nodeId];
         if (!node) break;
-        openSheetShell({ kicker: treeKindLabel(node.kind), title: node.label || "这一层在做什么" });
-        const holder = $("#sheet-scroll");
-        if (holder) {
-          holder.innerHTML = `
-            <div class="sheet-content">
-              <p class="tree-sheet-text">${esc(node.text)}</p>
-              ${node.role ? `<div class="tree-sheet-row"><span class="mono">作用</span><p>${esc(node.role)}</p></div>` : ""}
-              ${node.gloss ? `<div class="tree-sheet-row"><span class="mono">大意</span><p>${esc(node.gloss)}</p></div>` : ""}
-              ${node.note ? `<div class="tree-sheet-row"><span class="mono">阅读提示</span><p>${esc(node.note)}</p></div>` : ""}
-              ${node.children?.length ? `<div class="tree-sheet-row"><span class="mono">包含</span><p>${node.children.length} 个更小的结构，回到句子里展开查看。</p></div>` : ""}
-            </div>`;
-        }
+        openInsightSheet(node);
         break;
       }
 

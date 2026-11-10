@@ -7828,3 +7828,95 @@ textarea:focus-visible,
   font-size: 12px;
   padding: 8px 10px;
 }
+
+/* Onion sentence: clauses sit inline and unfold where they belong */
+.onion-line { margin: 0; }
+.onion-slot { display: inline; }
+.onion-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.05em;
+  height: 1.05em;
+  margin: 0 0.2em 0 0.42em;
+  padding: 0;
+  border: 1px dashed var(--line-strong);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.38em;
+  line-height: 1;
+  vertical-align: 0.34em;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+.onion-mark:hover { color: var(--ink); border-color: var(--ink); }
+.onion-slot.is-open > .onion-mark { color: var(--ink); border-color: var(--ink); font-size: 0.34em; }
+.onion-wrap { display: none; }
+.onion-slot.is-open > .onion-wrap { display: inline; }
+.onion-clause {
+  display: inline;
+  margin: 0 0.3em;
+  padding: 0.04em 0.42em 0.1em;
+  border: 1px dashed var(--line);
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 0.8em;
+  line-height: 1.55;
+  cursor: pointer;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: onion-reveal 0.4s cubic-bezier(0.22, 0.8, 0.24, 1) both;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+}
+.onion-clause:hover { color: var(--ink); border-color: var(--line-strong); background: var(--field); }
+@keyframes onion-reveal {
+  from { opacity: 0; letter-spacing: -0.06em; }
+  to { opacity: 1; letter-spacing: 0; }
+}
+.onion-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+  margin-top: 12px;
+}
+.onion-tools .link-btn { font-size: 12px; }
+
+/* Insight sheet: one clear hierarchy — clause, then labelled notes */
+.insight-sheet { display: flex; flex-direction: column; gap: 22px; }
+.insight-clause {
+  margin: 0;
+  padding: 0 0 0 14px;
+  border-left: 3px solid var(--line-strong);
+  font-size: clamp(18px, 4.8vw, 22px);
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--ink);
+}
+.insight-rows { border-top: 1px solid var(--line); }
+.insight-row {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 16px;
+  padding: 15px 0;
+  border-bottom: 1px solid var(--line);
+}
+.insight-label {
+  padding-top: 3px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.insight-value { margin: 0; font-size: 15px; line-height: 1.75; color: var(--ink); }
+.insight-row.is-key .insight-value { font-weight: 600; }
+.insight-nested ul { margin: 10px 0 0; padding-left: 18px; color: var(--ink); }
+.insight-nested li { margin: 6px 0; font-size: 14px; line-height: 1.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .onion-wrap, .onion-mark, .onion-clause { transition: none; }
+}
