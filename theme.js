@@ -54,7 +54,7 @@
     },
     bitterworld: {
       id: "bitterworld",
-      label: "未许之地",
+      label: "Bitterworld",
       themeColor: "#f1e6cb",
       accent: "#be3a28",
       css: "themes/bitterworld.css",

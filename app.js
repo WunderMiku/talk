@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "144";
+  const APP_VERSION = "145";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3819,8 +3819,27 @@
       <p class="settings-intro">本机数据与阅读偏好。修改会自动保存。</p>
       <div class="theme-setting">
         <span class="settings-subhead">外观主题</span>
-        <div class="theme-switch" role="group" aria-label="外观主题">
-          ${Object.values(window.TALK_THEME.themes).map((theme) => `<button class="theme-option ${window.TALK_THEME.current().id === theme.id ? "active" : ""}" type="button" data-action="theme" data-theme="${attr(theme.id)}" title="${attr(theme.description || theme.label)}" aria-pressed="${window.TALK_THEME.current().id === theme.id}">${esc(theme.label)}</button>`).join("")}
+        <div class="theme-list" role="list" aria-label="外观主题">
+          ${Object.values(window.TALK_THEME.themes).map((theme) => {
+            const active = window.TALK_THEME.current().id === theme.id;
+            return `<div class="theme-row${active ? " is-active open" : ""}" role="listitem" data-theme-row="${attr(theme.id)}">
+              <button class="theme-row-head" type="button" data-action="theme-toggle" data-theme="${attr(theme.id)}" aria-expanded="${active}">
+                <span class="theme-swatch" aria-hidden="true"><i style="background:${attr(theme.themeColor || "#f3f0e7")}"></i><i style="background:${attr(theme.accent || "#171813")}"></i></span>
+                <span class="theme-row-copy"><strong>${esc(theme.label)}</strong><small>${esc(theme.description || "")}</small></span>
+                <span class="theme-row-state">${active ? "使用中" : ""}</span>
+                <span class="theme-row-chevron" aria-hidden="true">▾</span>
+              </button>
+              <div class="theme-row-body">
+                <div class="theme-row-inner">
+                  <div class="theme-row-actions">
+                    ${active
+                      ? '<span class="theme-row-current">当前正在使用</span>'
+                      : `<button class="btn btn-secondary theme-apply" type="button" data-action="theme" data-theme="${attr(theme.id)}">使用这套主题</button>`}
+                  </div>
+                </div>
+              </div>
+            </div>`;
+          }).join("")}
         </div>
       </div>
       <label class="pref-toggle">
@@ -4967,6 +4986,21 @@
           ? state.translatorStyles.filter((id) => id !== styleId)
           : [...state.translatorStyles, styleId];
         updateTranslatorStyleControls();
+        break;
+      }
+
+      case "theme-toggle": {
+        event.preventDefault();
+        const row = target.closest(".theme-row");
+        if (!row) break;
+        const willOpen = !row.classList.contains("open");
+        $$(".theme-row.open").forEach((other) => {
+          other.classList.remove("open");
+          const head = other.querySelector(".theme-row-head");
+          if (head) head.setAttribute("aria-expanded", "false");
+        });
+        row.classList.toggle("open", willOpen);
+        target.setAttribute("aria-expanded", String(willOpen));
         break;
       }
 
