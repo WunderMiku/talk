@@ -8039,8 +8039,6 @@ textarea:focus-visible,
 .onion-clause.depth-3 { color: color-mix(in srgb, var(--ink) 28%, transparent); font-size: 0.86em; }
 .onion-clause:hover { color: color-mix(in srgb, var(--ink) 78%, transparent); }
 .onion-clause .kw { border-bottom-width: 1.5px; }
-.onion-slot.is-stacked > .onion-mark { opacity: 0; pointer-events: none; }
-.onion-slot.is-open + .onion-slot > .onion-mark { display: none; }
 .onion-mark { font-size: 0.75em; }
 /* a small, quiet control that still reads as tappable */
 .onion-mark {
@@ -8076,3 +8074,21 @@ textarea:focus-visible,
   display: inline;
   font-size: 0.95em;
 }
+.onion-cluster {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.06em;
+  margin: 0 0.12em;
+  vertical-align: middle;
+}
+.onion-cluster .onion-mark { margin: 0; }
+/* open clauses: the toggle rides at the right edge of the block instead of owning a line */
+.onion-block[data-fold="block"] .onion-slot.is-open { display: block; }
+.onion-block[data-fold="block"] .onion-slot.is-open > .onion-mark {
+  float: right;
+  margin: 0.35em 0.2em 0 0.6em;
+}
+.onion-block[data-fold="block"] .onion-slot.is-open .onion-wrap { display: block; }
+.onion-block[data-fold="inline"] .onion-slot.is-open .onion-wrap { margin-left: 0.18em; }
+.onion-block[data-fold="block"] .onion-slot.is-open .onion-wrap { margin-left: 0; }

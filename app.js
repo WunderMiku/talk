@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "159";
+  const APP_VERSION = "160";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3133,40 +3133,64 @@
     });
     hits.sort((a, b) => a.start - b.start);
 
-    let html = "";
+    const segments = [];
     let cursor = 0;
+    const nested = new Set();
     hits.forEach((hit) => {
       let { start, end } = hit;
-      if (start < cursor) return;
+      if (start < cursor) { nested.add(hit.child); return; }
       const before = source.slice(0, start);
       if (/,\s*$/.test(before)) start = before.replace(/,\s*$/, "").length;
-      const after = source.slice(end);
-      if (/^\s*,/.test(after)) end += after.match(/^\s*,/)[0].length;
-      const chunk = tidyClauseText(source.slice(cursor, start));
-      html += plain(chunk);
       const rest = source.slice(end);
-      const tail = rest.match(/^\s*([.,;:!?]+)\s*$/);
-      const suffix = tail ? tail[1] : "";
-      const nextChar = rest.trimStart().charAt(0);
-      const padBefore = /[\s]$/.test(html) || !html ? "" : " ";
-      const padAfter = nextChar && /[.,;:!?]/.test(nextChar) ? "" : " ";
-      const slotHtml = onionSlot(hit.child, keyWords, depth, suffix);
-      html += (padBefore === "" ? slotHtml.replace('class="onion-slot"', 'class="onion-slot is-stacked"') : padBefore + slotHtml) + padAfter;
+      if (/^\s*,/.test(rest)) end += rest.match(/^\s*,/)[0].length;
+      segments.push({ kind: "text", html: plain(tidyClauseText(source.slice(cursor, start))) });
+      const tail = source.slice(end).match(/^\s*([.,;:!?]+)\s*$/);
+      segments.push({
+        kind: "slot",
+        node: hit.child,
+        suffix: tail ? tail[1] : "",
+        html: onionSlot(hit.child, keyWords, hit.child.__depth || depth, tail ? tail[1] : "")
+      });
       cursor = end + (tail ? tail[0].length : 0);
     });
-    html += plain(tidyClauseText(source.slice(cursor)));
+    segments.push({ kind: "text", html: plain(tidyClauseText(source.slice(cursor))) });
 
     const placed = new Set(hits.map((hit) => hit.child));
     list.forEach((child) => {
-      if (placed.has(child)) return;
-      const anchorText = String(child.anchor || "").trim().toLowerCase();
-      if (!anchorText) { html += " " + onionSlot(child, keyWords, depth) + " "; return; }
-      const at = source.toLowerCase().indexOf(anchorText);
-      if (at < 0) { html += " " + onionSlot(child, keyWords, depth) + " "; return; }
-      html += `<span class="onion-anchor" data-anchor="${attr(child.anchor)}"></span>`;
-      html += " " + onionSlot(child, keyWords, depth) + " ";
+      if (placed.has(child) || nested.has(child)) return;
+      segments.push({ kind: "slot", node: child, suffix: "", html: onionSlot(child, keyWords, child.__depth || depth) });
     });
+
+    let html = "";
+    for (let i = 0; i < segments.length; i += 1) {
+      const segment = segments[i];
+      if (segment.kind === "text") { html += segment.html; continue; }
+      const run = [segment];
+      while (i + 1 < segments.length && segments[i + 1].kind === "slot") { i += 1; run.push(segments[i]); }
+      const padBefore = /[\s]$/.test(html) || !html ? "" : " ";
+      const padAfter = /^\s/.test(segments[i + 1]?.html || "") ? "" : " ";
+      const body = run.map((item) => item.html).join("");
+      html += padBefore + (run.length > 1 ? `<span class="onion-cluster">${body}</span>` : body) + padAfter;
+    }
     return html;
+  }
+
+  function hoistDetached(nodes, depth = 1, out = []) {
+    (Array.isArray(nodes) ? nodes : []).forEach((node) => {
+      if (!node || !node.text) return;
+      node.__depth = depth;
+      const kids = Array.isArray(node.children) ? node.children : [];
+      const inside = [];
+      const detached = [];
+      kids.forEach((child) => {
+        if (!child || !child.text) return;
+        (String(node.text).includes(child.text) ? inside : detached).push(child);
+      });
+      node.children = inside;
+      out.push(node);
+      hoistDetached(detached, depth + 1, out);
+    });
+    return out;
   }
 
   function onionLine(text, tree, keyWords) {
@@ -3174,7 +3198,7 @@
     const main = nodes.find((node) => node.kind === "main") || nodes[0];
     if (!main) return annotateSentence(text, keyWords);
     const extras = nodes.filter((node) => node !== main);
-    const children = (main.children || []).concat(extras);
+    const children = hoistDetached((main.children || []).concat(extras), 1);
     if (!children.length) return annotateSentence(text, keyWords);
     return onionCompose(text, children, keyWords, 1);
   }
@@ -5592,13 +5616,7 @@
         slot.classList.toggle("is-open", open);
         target.setAttribute("aria-expanded", open ? "true" : "false");
         target.textContent = open ? "−" : "+";
-        if (open) {
-          let next = target.closest(".onion-slot")?.nextElementSibling;
-          while (next && next.classList.contains("is-stacked")) {
-            next.classList.remove("is-stacked");
-            next = next.nextElementSibling;
-          }
-        }
+
         break;
       }
 
