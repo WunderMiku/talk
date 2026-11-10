@@ -195,12 +195,13 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 ## 例句、文化与句子拆解
 
+词条的文化背景写进已有的 `note`（提示词要求优先写典故、地域用法与语域），不另开字段。
+
 词条与句子都遵循「模型生成、前端只渲染」的原则，新增内容一律是可选字段，旧缓存不必清空。
 
 | 字段 | 归属 | 说明 |
 | --- | --- | --- |
 | `examplesByTheme` | word | 每套主题 1–2 条例句；缺失主题在渲染后一次性补齐并写回缓存 |
-| `culture` | word | `note` / `region` / `tags`，没有可靠背景时为 null |
 | `summary` | sentence | 一句话主旨 |
 | `tree` | sentence | 句法树，节点 `kind` 只允许 main / clause / phrase / modifier，默认只展开主干 |
 | `sentences` | sentence | 多句分别拆解 |

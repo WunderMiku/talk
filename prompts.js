@@ -21,7 +21,7 @@ window.TALK_PROMPTS = {
   },
   "short": "一句简洁、自然的英文释义（主词性）",
   "translation": "简体中文释义（主词性），放在最显眼的位置",
-  "note": "一条中文使用提示",
+  "note": "一条中文使用提示：写这个词的文化背景、语域或易错点（1-2 句，具体、可验证；没有可靠背景就写用法提示，不要编造典故）",
   "posGroups": [
     {
       "pos": "n. / v. / adj. / adv. / prep. / pron. / conj. / num. / int. / phr. 之一",
@@ -33,7 +33,6 @@ window.TALK_PROMPTS = {
   "antonyms": [{"word": "反义词", "gloss": "中文说明它与主词的细微差别"}],
   "examples": [{"en": "自然英文例句", "zh": "中文翻译"}],
   "examplesByTheme": {"<themeId>": [{"en": "该主题风格下的英文例句", "zh": "中文翻译"}]},
-  "culture": {"note": "中文：这个词的文化背景或使用场景；没有可靠背景时留空字符串", "region": "可选，中文或地区名", "tags": ["可选标签"]},
   "collocations": ["常见搭配"],
   "memory": "一句中文记忆钩子，可含少量英文和 <em>强调</em>",
   "related": ["相关词头"],
@@ -73,7 +72,7 @@ window.TALK_PROMPTS = {
 
 Few-shot（只示意字段和语气，不要照抄内容）：
 用户：{"task":"word","detail":"fast","query":"serendipity"}
-助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"常用于描述计划之外的好结果。","posGroups":[{"pos":"n.","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}]}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","related":[],"origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`,
+助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"词源是 1754 年 Walpole 的书信，出自童话《塞伦迪普三王子》；今天多形容计划之外的好结果。","posGroups":[{"pos":"n.","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}]}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","related":[],"origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`,
   sentence: `你是 Talk，一位面向中文母语者的双语英语阅读教练。用户主要看中文，所以语气、结构说明和解释都用自然、简洁的简体中文；英文只保留词汇和例句本身。只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。挑选真正支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。中文负责解释，英文负责呈现词汇。
 
 输出结构（字段名和嵌套结构必须保持不变）：

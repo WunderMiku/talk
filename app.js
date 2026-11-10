@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "149";
+  const APP_VERSION = "150";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2577,22 +2577,6 @@
     return Object.keys(out).length ? out : null;
   }
 
-  function normalizeCulture(value) {
-    if (!value) return null;
-    if (typeof value === "string") {
-      const note = value.trim();
-      return note ? { note, region: "", tags: [] } : null;
-    }
-    if (typeof value !== "object") return null;
-    const note = String(value.note || value.text || value.background || "").trim();
-    if (!note) return null;
-    return {
-      note,
-      region: String(value.region || value.area || "").trim(),
-      tags: normalizeStrings(value.tags)
-    };
-  }
-
   function exampleForTheme(word, themeId = window.TALK_THEME?.current?.().id) {
     if (!word) return [];
     const themed = word.examplesByTheme?.[themeId];
@@ -2643,7 +2627,6 @@
       antonyms: normalizeRelations(raw.antonyms),
       examples: normalizeExamples(raw.examples),
       examplesByTheme: normalizeExamplesByTheme(raw.examplesByTheme || raw.examples_by_theme),
-      culture: normalizeCulture(raw.culture || raw.culturalNote || raw.cultural),
       collocations: normalizeStrings(raw.collocations),
       related: normalizeStrings(raw.related),
       origin: normalizeOrigin(raw.origin || raw.etymology),
@@ -2927,14 +2910,7 @@
           </div>
         </section>` : ""}
 
-        ${word.culture?.note ? `
-        <section class="block reveal" style="--d:2.9">
-          ${blockHead("✳", "文化背景", esc(word.culture.region || "语境"))}
-          <div class="culture-card">
-            <p>${esc(word.culture.note)}</p>
-            ${(word.culture.tags || []).length ? `<div class="culture-tags">${word.culture.tags.map((tag) => `<span>${esc(tag)}</span>`).join("")}</div>` : ""}
-          </div>
-        </section>` : ""}
+
 
         <div class="page-actions reveal" style="--d:3.2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
@@ -4917,7 +4893,6 @@
       antonyms: normalizeRelations(base.antonyms),
       examples: normalizeExamples(base.examples),
       examplesByTheme: normalizeExamplesByTheme(base.examplesByTheme || base.examples_by_theme),
-      culture: normalizeCulture(base.culture || base.culturalNote || base.cultural),
       collocations: normalizeStrings(base.collocations),
       memory: String(base.memory || base.memoryHook || ""),
       related: normalizeStrings(base.related),

@@ -7712,22 +7712,6 @@ textarea:focus-visible,
   color: var(--muted-2);
 }
 
-.culture-card {
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: var(--card);
-  padding: 18px 18px 16px;
-}
-.culture-card p { margin: 0; font-size: 14px; line-height: 1.75; color: var(--ink-soft); }
-.culture-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.culture-tags span {
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  padding: 3px 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-}
 
 .summary-card {
   border-left: 3px solid var(--lime-deep);
