@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "152";
+  const APP_VERSION = "153";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3058,12 +3058,12 @@
       </div>`;
   }
 
-  function onionSlot(node, keyWords) {
-    const inner = onionCompose(node.text || "", Array.isArray(node.children) ? node.children : [], keyWords);
-    return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}</span></span></span>`;
+  function onionSlot(node, keyWords, depth = 1) {
+    const inner = onionCompose(node.text || "", Array.isArray(node.children) ? node.children : [], keyWords, depth + 1);
+    return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause depth-${Math.min(depth, 3)}" data-depth="${Math.min(depth, 3)}" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}</span></span></span>`;
   }
 
-  function onionCompose(text, children, keyWords) {
+  function onionCompose(text, children, keyWords, depth = 1) {
     const source = String(text || "");
     const plain = (chunk) => annotateSentence(chunk, keyWords || []);
     if (!Array.isArray(children) || !children.length) return plain(source);
@@ -3082,11 +3082,11 @@
     let cursor = 0;
     placed.forEach((mark) => {
       html += plain(source.slice(cursor, mark.at));
-      html += onionSlot(mark.child, keyWords);
+      html += onionSlot(mark.child, keyWords, depth);
       cursor = mark.at;
     });
     html += plain(source.slice(cursor));
-    trailing.forEach((mark) => { html += onionSlot(mark.child, keyWords); });
+    trailing.forEach((mark) => { html += onionSlot(mark.child, keyWords, depth); });
     return html;
   }
 
