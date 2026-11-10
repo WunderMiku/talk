@@ -61,11 +61,11 @@
 [data-theme="bitterworld"] .screen {
   background-color: var(--paper);
   background-image:
-    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22900%22%20height%3D%22900%22%20viewBox%3D%220%200%20900%20900%22%3E%3Cdefs%3E%0A%3ClinearGradient%20id%3D%22sky%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2363bdb6%22%20stop-opacity%3D%220.55%22%2F%3E%0A%20%3Cstop%20offset%3D%220.5%22%20stop-color%3D%22%23a7d3c5%22%20stop-opacity%3D%220.30%22%2F%3E%0A%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%220%22%2F%3E%0A%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22fade%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%220%22%2F%3E%0A%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%221%22%2F%3E%0A%3C%2FlinearGradient%3E%0A%3Cpattern%20id%3D%22halftone%22%20width%3D%227%22%20height%3D%227%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%3Ccircle%20cx%3D%221.6%22%20cy%3D%221.6%22%20r%3D%221.1%22%20fill%3D%22%23191410%22%20fill-opacity%3D%220.10%22%2F%3E%0A%3C%2Fpattern%3E%0A%3Cpattern%20id%3D%22ribbon%22%20width%3D%2252%22%20height%3D%2252%22%20patternUnits%3D%22userSpaceOnUse%22%20patternTransform%3D%22rotate%28-16%29%22%3E%0A%20%3Crect%20width%3D%2252%22%20height%3D%2210%22%20fill%3D%22%23e7cf75%22%20fill-opacity%3D%220.35%22%2F%3E%0A%20%3Crect%20y%3D%2222%22%20width%3D%2252%22%20height%3D%223%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.30%22%2F%3E%0A%3C%2Fpattern%3E%0A%3C%2Fdefs%3E%3Crect%20width%3D%22900%22%20height%3D%22560%22%20fill%3D%22url%28%23sky%29%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22250%22%20width%3D%22900%22%20height%3D%22150%22%20fill%3D%22url%28%23halftone%29%22%2F%3E%3Cg%20opacity%3D%220.55%22%3E%3Cpath%20d%3D%22M-60%20210%20L980%20110%20L980%20158%20L-60%20258%20Z%22%20fill%3D%22url%28%23ribbon%29%22%2F%3E%3C%2Fg%3E%3Cellipse%20cx%3D%22140%22%20cy%3D%22120%22%20rx%3D%2296%22%20ry%3D%2226%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22620%22%20cy%3D%2296%22%20rx%3D%22110%22%20ry%3D%2224%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22760%22%20cy%3D%22140%22%20rx%3D%2270%22%20ry%3D%2218%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cg%20transform%3D%22rotate%28-3%20450%20300%29%22%20fill%3D%22none%22%20stroke%3D%22%23191410%22%20stroke-opacity%3D%220.13%22%20stroke-width%3D%222.2%22%3E%3Ctext%20x%3D%2230%22%20y%3D%22292%22%20font-family%3D%22Inter%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%20font-size%3D%22118%22%20font-weight%3D%22900%22%20letter-spacing%3D%225%22%3EUNREALIZED%3C%2Ftext%3E%3Ctext%20x%3D%22250%22%20y%3D%22342%22%20font-family%3D%22Inter%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22700%22%20letter-spacing%3D%2212%22%3EREALITIES%3C%2Ftext%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28690%20430%29%20rotate%28-8%29%22%20fill%3D%22%23191410%22%20fill-opacity%3D%220.07%22%3E%3Cellipse%20cx%3D%220%22%20cy%3D%220%22%20rx%3D%22104%22%20ry%3D%2234%22%2F%3E%3Cpath%20d%3D%22M104%200%20L158%2020%20L158%20-20%20Z%22%2F%3E%3Cpath%20d%3D%22M-34%2032%20L-34%2060%20L72%2060%20L72%2032%20Z%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M90%20413%20L92.38%20417.62%20L97%20420%20L92.38%20422.38%20L90%20427%20L87.62%20422.38%20L83%20420%20L87.62%20417.62%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M820%20294%20L822.04%20297.96%20L826%20300%20L822.04%20302.04%20L820%20306%20L817.96%20302.04%20L814%20300%20L817.96%20297.96%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M160%20535%20L161.7%20538.3%20L165%20540%20L161.7%20541.7%20L160%20545%20L158.3%20541.7%20L155%20540%20L158.3%20538.3%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22380%22%20width%3D%22900%22%20height%3D%22520%22%20fill%3D%22url%28%23fade%29%22%2F%3E%3C%2Fsvg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22900%22%20height%3D%22620%22%20viewBox%3D%220%200%20900%20620%22%3E%3Cdefs%3E%0A%3ClinearGradient%20id%3D%22sky%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2363bdb6%22%20stop-opacity%3D%220.55%22%2F%3E%0A%20%3Cstop%20offset%3D%220.55%22%20stop-color%3D%22%23a7d3c5%22%20stop-opacity%3D%220.26%22%2F%3E%0A%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%220%22%2F%3E%0A%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22fade%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%220%22%2F%3E%0A%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%221%22%2F%3E%0A%3C%2FlinearGradient%3E%0A%3Cpattern%20id%3D%22halftone%22%20width%3D%227%22%20height%3D%227%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%3Ccircle%20cx%3D%221.6%22%20cy%3D%221.6%22%20r%3D%221.1%22%20fill%3D%22%23191410%22%20fill-opacity%3D%220.10%22%2F%3E%0A%3C%2Fpattern%3E%0A%3Cpattern%20id%3D%22ribbon%22%20width%3D%2252%22%20height%3D%2252%22%20patternUnits%3D%22userSpaceOnUse%22%20patternTransform%3D%22rotate%28-16%29%22%3E%0A%20%3Crect%20width%3D%2252%22%20height%3D%2210%22%20fill%3D%22%23e7cf75%22%20fill-opacity%3D%220.38%22%2F%3E%0A%20%3Crect%20y%3D%2222%22%20width%3D%2252%22%20height%3D%223%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.32%22%2F%3E%0A%3C%2Fpattern%3E%0A%3C%2Fdefs%3E%3Crect%20width%3D%22900%22%20height%3D%22520%22%20fill%3D%22url%28%23sky%29%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22240%22%20width%3D%22900%22%20height%3D%22150%22%20fill%3D%22url%28%23halftone%29%22%2F%3E%3Cg%20opacity%3D%220.55%22%3E%3Cpath%20d%3D%22M-60%20200%20L980%20100%20L980%20150%20L-60%20250%20Z%22%20fill%3D%22url%28%23ribbon%29%22%2F%3E%3C%2Fg%3E%3Cellipse%20cx%3D%22140%22%20cy%3D%22110%22%20rx%3D%2296%22%20ry%3D%2226%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22620%22%20cy%3D%2288%22%20rx%3D%22110%22%20ry%3D%2224%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22770%22%20cy%3D%22132%22%20rx%3D%2270%22%20ry%3D%2218%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22360%22%20cy%3D%22150%22%20rx%3D%2270%22%20ry%3D%2216%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cg%20transform%3D%22translate%28640%20300%29%20rotate%28-7%29%22%20fill%3D%22%23191410%22%20fill-opacity%3D%220.09%22%3E%3Cellipse%20cx%3D%220%22%20cy%3D%220%22%20rx%3D%22128%22%20ry%3D%2242%22%2F%3E%3Cpath%20d%3D%22M128%200%20L196%2024%20L196%20-24%20Z%22%2F%3E%3Cpath%20d%3D%22M-40%2040%20L-40%2076%20L92%2076%20L92%2040%20Z%22%2F%3E%3Ccircle%20cx%3D%22-70%22%20cy%3D%2248%22%20r%3D%2220%22%2F%3E%3Ccircle%20cx%3D%2220%22%20cy%3D%2248%22%20r%3D%2214%22%2F%3E%3Cpath%20d%3D%22M-6%20-42%20L-6%20-78%20L44%20-78%20L44%20-42%20Z%22%2F%3E%3C%2Fg%3E%3Cg%20stroke%3D%22%23be3a28%22%20stroke-opacity%3D%220.45%22%20stroke-width%3D%222%22%20stroke-dasharray%3D%227%206%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M40%20480%20C%20180%20430%2C%20300%20520%2C%20430%20470%20S%20700%20520%2C%20860%20440%22%2F%3E%3C%2Fg%3E%3Crect%20x%3D%2235%22%20y%3D%22475%22%20width%3D%2210%22%20height%3D%2210%22%20transform%3D%22rotate%2845%2040%20480%29%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.55%22%2F%3E%3Crect%20x%3D%22225%22%20y%3D%22457%22%20width%3D%2210%22%20height%3D%2210%22%20transform%3D%22rotate%2845%20230%20462%29%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.55%22%2F%3E%3Crect%20x%3D%22425%22%20y%3D%22465%22%20width%3D%2210%22%20height%3D%2210%22%20transform%3D%22rotate%2845%20430%20470%29%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.55%22%2F%3E%3Crect%20x%3D%22635%22%20y%3D%22487%22%20width%3D%2210%22%20height%3D%2210%22%20transform%3D%22rotate%2845%20640%20492%29%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.55%22%2F%3E%3Crect%20x%3D%22855%22%20y%3D%22435%22%20width%3D%2210%22%20height%3D%2210%22%20transform%3D%22rotate%2845%20860%20440%29%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.55%22%2F%3E%3Cpath%20d%3D%22M90%20403%20L92.38%20407.62%20L97%20410%20L92.38%20412.38%20L90%20417%20L87.62%20412.38%20L83%20410%20L87.62%20407.62%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M820%20244%20L822.04%20247.96%20L826%20250%20L822.04%20252.04%20L820%20256%20L817.96%20252.04%20L814%20250%20L817.96%20247.96%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M170%20325%20L171.7%20328.3%20L175%20330%20L171.7%20331.7%20L170%20335%20L168.3%20331.7%20L165%20330%20L168.3%20328.3%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M700%20195%20L701.7%20198.3%20L705%20200%20L701.7%20201.7%20L700%20205%20L698.3%20201.7%20L695%20200%20L698.3%20198.3%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22330%22%20width%3D%22900%22%20height%3D%22290%22%20fill%3D%22url%28%23fade%29%22%2F%3E%3C%2Fsvg%3E"),
     radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.055) 1px, transparent 1.3px),
     linear-gradient(180deg, #efe3c4 0%, var(--paper) 38%);
   background-repeat: no-repeat, repeat, no-repeat;
-  background-size: 100% 430px, 13px 13px, 100% 100%;
+  background-size: 100% 460px, 13px 13px, 100% 100%;
   background-position: center top, 0 0, 0 0;
 }
 
@@ -1015,4 +1015,124 @@
 [data-theme="bitterworld"] .sheet {
   background-image: radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.05) 1px, transparent 1.2px);
   background-size: 9px 9px;
+}
+
+
+/* ---- bolder collage furniture ------------------------------------------- */
+
+/* Vertical ticket edge on the right gutter */
+[data-theme="bitterworld"] .app::after {
+  content: "BITTERWORLD · 0044";
+  position: absolute;
+  right: 3px;
+  top: 96px;
+  z-index: 3;
+  transform: rotate(180deg);
+  writing-mode: vertical-rl;
+  font-family: var(--mono);
+  font-size: 7px;
+  letter-spacing: 0.3em;
+  color: var(--red);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Stitched outline on pills and chips */
+[data-theme="bitterworld"] .chip,
+[data-theme="bitterworld"] .related-pill,
+[data-theme="bitterworld"] .kicker-pill {
+  outline: 1px dashed rgba(25, 20, 16, 0.35);
+  outline-offset: -4px;
+}
+
+/* Torn bottom edge for the daily ticket */
+[data-theme="bitterworld"] .daily {
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%,
+    96% 97.2%, 92% 100%, 88% 97%, 84% 100%, 80% 97.4%, 76% 100%, 72% 97%, 68% 100%,
+    64% 97.4%, 60% 100%, 56% 97%, 52% 100%, 48% 97.4%, 44% 100%, 40% 97%, 36% 100%,
+    32% 97.4%, 28% 100%, 24% 97%, 20% 100%, 16% 97.4%, 12% 100%, 8% 97%, 4% 100%, 0 97.4%);
+}
+
+/* Tape strips across the poster corners */
+[data-theme="bitterworld"] .theme-poster::before,
+[data-theme="bitterworld"] .theme-poster::after {
+  content: "";
+  position: absolute;
+  width: 92px;
+  height: 26px;
+  background: rgba(231, 207, 117, 0.78);
+  border-left: 1px solid rgba(25, 20, 16, 0.18);
+  border-right: 1px solid rgba(25, 20, 16, 0.18);
+  box-shadow: 0 1px 0 rgba(25, 20, 16, 0.12);
+  z-index: 4;
+  pointer-events: none;
+}
+
+[data-theme="bitterworld"] .theme-poster::before {
+  left: -26px;
+  top: 54px;
+  transform: rotate(-38deg);
+}
+
+[data-theme="bitterworld"] .theme-poster::after {
+  right: -26px;
+  bottom: 42px;
+  transform: rotate(-38deg);
+}
+
+/* Registration cross + perforation dots inside the search ticket */
+[data-theme="bitterworld"] .search-card {
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.035) 1px, transparent 1.15px),
+    radial-gradient(circle at 100% 0, rgba(190, 58, 40, 0.10) 0 64px, transparent 65px);
+  background-size: 8px 8px, auto;
+}
+
+/* Big pale section numerals in the right gutter */
+[data-theme="bitterworld"] .section-head {
+  overflow: visible;
+}
+
+[data-theme="bitterworld"] .section-head::after {
+  content: "✳";
+  position: absolute;
+  right: -8px;
+  top: -14px;
+  font-size: 22px;
+  color: var(--red);
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Slight paper rotation for family cards, like pasted cut-outs */
+[data-theme="bitterworld"] .family-card:nth-child(2n) {
+  transform: rotate(-0.5deg);
+}
+
+[data-theme="bitterworld"] .family-card:nth-child(3n) {
+  transform: rotate(0.6deg);
+}
+
+/* Stamp on the word hero */
+[data-theme="bitterworld"] .result-hero::after {
+  content: "CHECKED";
+  position: absolute;
+  right: 10px;
+  top: 46px;
+  padding: 3px 7px;
+  border: 2px solid rgba(190, 58, 40, 0.55);
+  color: rgba(190, 58, 40, 0.6);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  transform: rotate(-9deg);
+  pointer-events: none;
+}
+
+/* Opaque paper behind the etymology note so the route line never runs through it */
+[data-theme="bitterworld"] .hero-note,
+[data-theme="bitterworld"] .word-note,
+[data-theme="bitterworld"] .block-note {
+  background-color: rgba(251, 243, 223, 0.92);
 }
