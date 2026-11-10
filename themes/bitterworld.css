@@ -61,10 +61,12 @@
 [data-theme="bitterworld"] .screen {
   background-color: var(--paper);
   background-image:
-    radial-gradient(circle at 50% -6%, rgba(231, 207, 117, 0.30), transparent 55%),
-    radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.05) 1px, transparent 1.3px);
-  background-size: auto, 13px 13px;
-  background-position: center top, 0 0;
+    url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22900%22%20height%3D%22900%22%20viewBox%3D%220%200%20900%20900%22%3E%3Cdefs%3E%0A%3ClinearGradient%20id%3D%22sky%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%2363bdb6%22%20stop-opacity%3D%220.55%22%2F%3E%0A%20%3Cstop%20offset%3D%220.5%22%20stop-color%3D%22%23a7d3c5%22%20stop-opacity%3D%220.30%22%2F%3E%0A%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%220%22%2F%3E%0A%3C%2FlinearGradient%3E%0A%3ClinearGradient%20id%3D%22fade%22%20x1%3D%220%22%20y1%3D%220%22%20x2%3D%220%22%20y2%3D%221%22%3E%0A%20%3Cstop%20offset%3D%220%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%220%22%2F%3E%0A%20%3Cstop%20offset%3D%221%22%20stop-color%3D%22%23f1e6cb%22%20stop-opacity%3D%221%22%2F%3E%0A%3C%2FlinearGradient%3E%0A%3Cpattern%20id%3D%22halftone%22%20width%3D%227%22%20height%3D%227%22%20patternUnits%3D%22userSpaceOnUse%22%3E%0A%20%3Ccircle%20cx%3D%221.6%22%20cy%3D%221.6%22%20r%3D%221.1%22%20fill%3D%22%23191410%22%20fill-opacity%3D%220.10%22%2F%3E%0A%3C%2Fpattern%3E%0A%3Cpattern%20id%3D%22ribbon%22%20width%3D%2252%22%20height%3D%2252%22%20patternUnits%3D%22userSpaceOnUse%22%20patternTransform%3D%22rotate%28-16%29%22%3E%0A%20%3Crect%20width%3D%2252%22%20height%3D%2210%22%20fill%3D%22%23e7cf75%22%20fill-opacity%3D%220.35%22%2F%3E%0A%20%3Crect%20y%3D%2222%22%20width%3D%2252%22%20height%3D%223%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.30%22%2F%3E%0A%3C%2Fpattern%3E%0A%3C%2Fdefs%3E%3Crect%20width%3D%22900%22%20height%3D%22560%22%20fill%3D%22url%28%23sky%29%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22250%22%20width%3D%22900%22%20height%3D%22150%22%20fill%3D%22url%28%23halftone%29%22%2F%3E%3Cg%20opacity%3D%220.55%22%3E%3Cpath%20d%3D%22M-60%20210%20L980%20110%20L980%20158%20L-60%20258%20Z%22%20fill%3D%22url%28%23ribbon%29%22%2F%3E%3C%2Fg%3E%3Cellipse%20cx%3D%22140%22%20cy%3D%22120%22%20rx%3D%2296%22%20ry%3D%2226%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22620%22%20cy%3D%2296%22%20rx%3D%22110%22%20ry%3D%2224%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cellipse%20cx%3D%22760%22%20cy%3D%22140%22%20rx%3D%2270%22%20ry%3D%2218%22%20fill%3D%22%23fffdf6%22%20fill-opacity%3D%220.5%22%2F%3E%3Cg%20transform%3D%22rotate%28-3%20450%20300%29%22%20fill%3D%22none%22%20stroke%3D%22%23191410%22%20stroke-opacity%3D%220.13%22%20stroke-width%3D%222.2%22%3E%3Ctext%20x%3D%2230%22%20y%3D%22292%22%20font-family%3D%22Inter%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%20font-size%3D%22118%22%20font-weight%3D%22900%22%20letter-spacing%3D%225%22%3EUNREALIZED%3C%2Ftext%3E%3Ctext%20x%3D%22250%22%20y%3D%22342%22%20font-family%3D%22Inter%2C%20Helvetica%2C%20Arial%2C%20sans-serif%22%20font-size%3D%2228%22%20font-weight%3D%22700%22%20letter-spacing%3D%2212%22%3EREALITIES%3C%2Ftext%3E%3C%2Fg%3E%3Cg%20transform%3D%22translate%28690%20430%29%20rotate%28-8%29%22%20fill%3D%22%23191410%22%20fill-opacity%3D%220.07%22%3E%3Cellipse%20cx%3D%220%22%20cy%3D%220%22%20rx%3D%22104%22%20ry%3D%2234%22%2F%3E%3Cpath%20d%3D%22M104%200%20L158%2020%20L158%20-20%20Z%22%2F%3E%3Cpath%20d%3D%22M-34%2032%20L-34%2060%20L72%2060%20L72%2032%20Z%22%2F%3E%3C%2Fg%3E%3Cpath%20d%3D%22M90%20413%20L92.38%20417.62%20L97%20420%20L92.38%20422.38%20L90%20427%20L87.62%20422.38%20L83%20420%20L87.62%20417.62%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M820%20294%20L822.04%20297.96%20L826%20300%20L822.04%20302.04%20L820%20306%20L817.96%20302.04%20L814%20300%20L817.96%20297.96%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Cpath%20d%3D%22M160%20535%20L161.7%20538.3%20L165%20540%20L161.7%20541.7%20L160%20545%20L158.3%20541.7%20L155%20540%20L158.3%20538.3%20Z%22%20fill%3D%22%23be3a28%22%20fill-opacity%3D%220.4%22%2F%3E%3Crect%20x%3D%220%22%20y%3D%22380%22%20width%3D%22900%22%20height%3D%22520%22%20fill%3D%22url%28%23fade%29%22%2F%3E%3C%2Fsvg%3E"),
+    radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.055) 1px, transparent 1.3px),
+    linear-gradient(180deg, #efe3c4 0%, var(--paper) 38%);
+  background-repeat: no-repeat, repeat, no-repeat;
+  background-size: 100% 430px, 13px 13px, 100% 100%;
+  background-position: center top, 0 0, 0 0;
 }
 
 [data-theme="bitterworld"] .stage-meta,
@@ -242,7 +244,9 @@
 [data-theme="bitterworld"] .translation-card,
 [data-theme="bitterworld"] .notice-card {
   position: relative;
-  background: var(--paper-2);
+  background-color: var(--paper-2);
+  background-image: radial-gradient(circle, rgba(25, 20, 16, 0.035) 1px, transparent 1.15px);
+  background-size: 8px 8px;
   border: 1.5px solid var(--ink);
   box-shadow: var(--shadow);
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
@@ -922,4 +926,93 @@
   [data-theme="bitterworld"] .module-btn.active {
     box-shadow: 3px 3px 0 rgba(25, 20, 16, 0.35);
   }
+}
+
+
+/* ---- collage layers ----------------------------------------------------- */
+
+[data-theme="bitterworld"] .daily {
+  background-color: var(--teal-deep);
+  background-image:
+    repeating-conic-gradient(from 0deg at 50% 42%, rgba(255, 246, 230, 0.05) 0 1.2deg, transparent 1.2deg 16deg),
+    radial-gradient(circle at 30% 10%, rgba(169, 212, 192, 0.35), transparent 55%);
+  background-size: auto, auto;
+}
+
+[data-theme="bitterworld"] .theme-poster {
+  background-color: var(--paper-2);
+  background-image:
+    radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.06) 1px, transparent 1.2px);
+  background-size: 7px 7px;
+}
+
+[data-theme="bitterworld"] .poster-masthead {
+  background-color: var(--teal-deep);
+  background-image:
+    repeating-linear-gradient(115deg, rgba(231, 207, 117, 0.22) 0 10px, transparent 10px 26px);
+}
+
+[data-theme="bitterworld"] .home-hero,
+[data-theme="bitterworld"] .translator-hero {
+  position: relative;
+}
+
+[data-theme="bitterworld"] .home-hero > *,
+[data-theme="bitterworld"] .translator-hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+[data-theme="bitterworld"] .home-title,
+[data-theme="bitterworld"] .translator-title {
+  text-shadow: 2px 2px 0 rgba(25, 20, 16, 0.08);
+}
+
+[data-theme="bitterworld"] .theme-manifesto {
+  background-color: var(--teal-deep);
+  background-image: linear-gradient(180deg, rgba(255, 246, 230, 0.10), rgba(0, 0, 0, 0.10));
+}
+
+[data-theme="bitterworld"] .section-head {
+  position: relative;
+}
+
+[data-theme="bitterworld"] .section-head::before {
+  content: "";
+  position: absolute;
+  left: -22px;
+  right: -22px;
+  bottom: -6px;
+  height: 6px;
+  background-image: repeating-linear-gradient(90deg, var(--ink) 0 6px, transparent 6px 14px);
+  opacity: 0.14;
+}
+
+[data-theme="bitterworld"] .chip,
+[data-theme="bitterworld"] .related-pill {
+  background-image: radial-gradient(circle, rgba(25, 20, 16, 0.045) 1px, transparent 1.1px);
+  background-size: 5px 5px;
+}
+
+[data-theme="bitterworld"] .search-submit {
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255, 246, 230, 0.14) 0 6px, transparent 6px 14px);
+}
+
+[data-theme="bitterworld"] .translator-style-chip.selected {
+  background-image:
+    repeating-linear-gradient(135deg, rgba(255, 246, 230, 0.16) 0 5px, transparent 5px 12px);
+}
+
+[data-theme="bitterworld"] .word-title {
+  text-shadow: 3px 3px 0 rgba(47, 139, 132, 0.14);
+}
+
+[data-theme="bitterworld"] .result-page {
+  background-image: radial-gradient(circle at 90% 6%, rgba(79, 168, 163, 0.16), transparent 46%);
+}
+
+[data-theme="bitterworld"] .sheet {
+  background-image: radial-gradient(circle at 1px 1px, rgba(25, 20, 16, 0.05) 1px, transparent 1.2px);
+  background-size: 9px 9px;
 }
