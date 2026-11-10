@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "143";
+  const APP_VERSION = "144";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3968,14 +3968,26 @@
   }
 
   function openHistorySheet() {
-    openSheetShell({ kicker: "查询足迹", title: "最近查询" });
+    const translating = state.module === "translator";
+    openSheetShell({
+      kicker: translating ? "翻译足迹" : "查询足迹",
+      title: translating ? "最近翻译" : "最近查询"
+    });
     renderHistoryContent();
+  }
+
+  function historyForCurrentModule() {
+    const translating = state.module === "translator";
+    return state.history.filter((item) =>
+      translating ? item.type === "translation" : item.type !== "translation"
+    );
   }
 
   function renderHistoryContent() {
     const holder = $("#sheet-scroll");
     if (!holder) return;
-    const items = state.history;
+    const items = historyForCurrentModule();
+    const translating = state.module === "translator";
     holder.innerHTML = `
       <div class="sheet-content">
         ${items.length ? `
@@ -3990,9 +4002,9 @@
               </button>`).join("")}
           </div>
           <div class="settings-actions">
-            <button class="btn btn-secondary" type="button" data-action="clear-history">${icon("trash")} 清空记录</button>
+            <button class="btn btn-secondary" type="button" data-action="clear-history" data-scope="${translating ? "translation" : "dictionary"}">${icon("trash")} ${translating ? "清空翻译记录" : "清空词典记录"}</button>
           </div>` : `
-          <div class="history-empty">还没有查询记录。<br />查一个词，它会在这里等你。</div>`}
+          <div class="history-empty">${translating ? "还没有翻译记录。<br />译一句，它会在这里等你。" : "还没有查询记录。<br />查一个词，它会在这里等你。"}</div>`}
       </div>`;
   }
 
@@ -5185,13 +5197,23 @@
         runSearch(target.dataset.query || "", target.dataset.type || "auto");
         break;
 
-      case "clear-history":
+      case "clear-history": {
         event.preventDefault();
-        state.history = [];
+        const scope = target.dataset.scope || "all";
+        if (scope === "all") {
+          state.history = [];
+          toast("记录已清空");
+        } else if (scope === "translation") {
+          state.history = state.history.filter((item) => item.type !== "translation");
+          toast("翻译记录已清空");
+        } else {
+          state.history = state.history.filter((item) => item.type === "translation");
+          toast("词典记录已清空");
+        }
         persistHistory();
         renderHistoryContent();
-        toast("记录已清空");
         break;
+      }
 
       case "clear-theme-cache":
         event.preventDefault();
