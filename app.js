@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "158";
+  const APP_VERSION = "159";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -30,7 +30,7 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel", "foldMode"];
   const EXAMPLE_STYLE_KEY = "talk.exampleStyles.v1";
   // One table drives the prompt, the settings picker and the on-page slicing.
   const SENTENCE_LEVELS = [
@@ -3107,9 +3107,9 @@
       </div>`;
   }
 
-  function onionSlot(node, keyWords, depth = 1) {
+  function onionSlot(node, keyWords, depth = 1, suffix = "") {
     const inner = onionCompose(node.text || "", Array.isArray(node.children) ? node.children : [], keyWords, depth + 1);
-    return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause depth-${Math.min(depth, 3)}" data-depth="${Math.min(depth, 3)}" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}</span></span></span>`;
+    return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause depth-${Math.min(depth, 3)}" data-depth="${Math.min(depth, 3)}" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}${esc(suffix)}</span></span></span>`;
   }
 
   function tidyClauseText(text) {
@@ -3145,12 +3145,14 @@
       const chunk = tidyClauseText(source.slice(cursor, start));
       html += plain(chunk);
       const rest = source.slice(end);
+      const tail = rest.match(/^\s*([.,;:!?]+)\s*$/);
+      const suffix = tail ? tail[1] : "";
       const nextChar = rest.trimStart().charAt(0);
       const padBefore = /[\s]$/.test(html) || !html ? "" : " ";
       const padAfter = nextChar && /[.,;:!?]/.test(nextChar) ? "" : " ";
-      const slotHtml = onionSlot(hit.child, keyWords, depth);
+      const slotHtml = onionSlot(hit.child, keyWords, depth, suffix);
       html += (padBefore === "" ? slotHtml.replace('class="onion-slot"', 'class="onion-slot is-stacked"') : padBefore + slotHtml) + padAfter;
-      cursor = end;
+      cursor = end + (tail ? tail[0].length : 0);
     });
     html += plain(tidyClauseText(source.slice(cursor)));
 
@@ -3180,7 +3182,7 @@
   function onionSentenceBlock(part, index, keyWords) {
     const tree = Array.isArray(part.tree) ? part.tree : [];
     const count = tree.reduce((total, node) => total + 1 + (node.children?.length || 0), 0);
-    return `<div class="onion-block" data-onion-block="${index}"><p class="sentence-text onion-line">${onionLine(part.text || "", tree, keyWords)}</p>${count > 1 ? `<div class="onion-tools"><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="expand">全部展开</button><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="collapse">收起到主干</button></div>` : ""}</div>`;
+    return `<div class="onion-block" data-onion-block="${index}" data-fold="${state.settings?.foldMode === "inline" ? "inline" : "block"}"><p class="sentence-text onion-line">${onionLine(part.text || "", tree, keyWords)}</p>${count > 1 ? `<div class="onion-tools"><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="expand">全部展开</button><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="collapse">收起到主干</button></div>` : ""}</div>`;
   }
 
   function sentencePage(sentence) {
@@ -4282,6 +4284,14 @@
             <button class="level-chip${draft.sentenceLevel === level.id ? " active" : ""}" type="button"
               data-action="sentence-level" data-level="${attr(level.id)}" aria-pressed="${draft.sentenceLevel === level.id}"
               title="${attr(level.hint)}">${esc(level.label)}</button>`).join("")}
+        </div>
+      </div>
+      <div class="setting-group">
+        <span class="settings-subhead">从句展开方式</span>
+        <p class="settings-note">缩进块：展开后另起一行、左缩进；句内插入：按原位置插回句中。</p>
+        <div class="level-row">
+          <button class="level-chip${(draft.foldMode || "block") === "block" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="block" aria-pressed="${(draft.foldMode || "block") === "block"}">缩进块</button>
+          <button class="level-chip${draft.foldMode === "inline" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="inline" aria-pressed="${draft.foldMode === "inline"}">句内插入</button>
         </div>
       </div>
       <div class="setting-group">
@@ -5509,6 +5519,20 @@
           chip.classList.toggle("active", active);
           chip.setAttribute("aria-pressed", String(active));
         });
+        break;
+      }
+
+      case "fold-mode": {
+        event.preventDefault();
+        const mode = target.dataset.mode === "inline" ? "inline" : "block";
+        if (state.draft) state.draft.foldMode = mode;
+        scheduleSettingsCommit();
+        $$('[data-action="fold-mode"]').forEach((chip) => {
+          const active = chip.dataset.mode === mode;
+          chip.classList.toggle("active", active);
+          chip.setAttribute("aria-pressed", String(active));
+        });
+        if (state.route?.name === "sentence") refreshThemedPage();
         break;
       }
 

@@ -8065,3 +8065,14 @@ textarea:focus-visible,
 .onion-mark:hover,
 .onion-mark:focus-visible { background: var(--accent-wash); color: var(--accent-ink); }
 .onion-slot.is-open > .onion-mark { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
+/* the other fold style: put the clause back in the sentence */
+.onion-block[data-fold="inline"] .onion-slot.is-open .onion-wrap {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border-left: 0;
+}
+.onion-block[data-fold="inline"] .onion-slot.is-open .onion-clause {
+  display: inline;
+  font-size: 0.95em;
+}
