@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "155";
+  const APP_VERSION = "156";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -43,6 +43,53 @@
     { id: "toefl", label: "托福", maxKeyWords: 8, hint: "托福学术句与抽象概念" }
   ];
   const SENTENCE_LEVEL_DEFAULT = "gaokao";
+  // --- diagnostics -------------------------------------------------------
+  // Keep a small, redacted trail of what the model layer actually did so a
+  // reader can paste it back when something breaks. Never store prompts whole:
+  // only shapes, sizes and error text.
+  const DIAG_KEY = "talk.diagnostics.v1";
+  const DIAG_LIMIT = 120;
+  function redact(value) {
+    let text = typeof value === "string" ? value : JSON.stringify(value || "");
+    text = String(text)
+      .replace(/sk-[A-Za-z0-9_-]{6,}/g, "sk-***")
+      .replace(/Bearer\s+[A-Za-z0-9._-]{6,}/gi, "Bearer ***")
+      .replace(/("?(?:apiKey|authorization|token)"?\s*[:=]\s*")([^"]{4,})(")/gi, "$1***$3")
+      .replace(/[A-Za-z0-9_-]{32,}/g, "***");
+    return text.length > 600 ? text.slice(0, 600) + "…" : text;
+  }
+  function diagLog(level, code, message, meta = {}) {
+    try {
+      const entry = {
+        at: new Date().toISOString().slice(5, 23),
+        level,
+        code,
+        message: redact(String(message || "")).slice(0, 400),
+        meta: redact(meta).slice(0, 600)
+      };
+      const list = JSON.parse(localStorage.getItem(DIAG_KEY) || "[]");
+      list.push(entry);
+      while (list.length > DIAG_LIMIT) list.shift();
+      localStorage.setItem(DIAG_KEY, JSON.stringify(list));
+    } catch (_) { /* never let logging break the app */ }
+  }
+  function diagText() {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(DIAG_KEY) || "[]"); } catch (_) { list = []; }
+    const head = [
+      `talk ${typeof APP_VERSION !== "undefined" ? APP_VERSION : "?"} · ${navigator.userAgent}`,
+      `time ${new Date().toISOString()}`,
+      `model ${redact(state.settings?.model || "")} · ${redact(state.settings?.baseUrl || "")}`
+    ].join("\n");
+    const body = list.map((e) => `${e.at} ${e.level.toUpperCase()} ${e.code} · ${e.message}${e.meta && e.meta !== "{}" ? " · " + e.meta : ""}`).join("\n");
+    return head + "\n" + body;
+  }
+  window.addEventListener("error", (event) => diagLog("error", "window", event.message || "script error", { source: event.filename, line: event.lineno }));
+  window.addEventListener("unhandledrejection", (event) => diagLog("error", "promise", event.reason?.message || String(event.reason || "")));
+
+  // Sentences now carry a summary, a parse tree and level-tagged key words,
+  // which no longer fits in the old per-detail ceiling.
+  const SENTENCE_MAX_TOKENS = { fast: 1800, standard: 2800, deep: 3800 };
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   // Bumped when the shape of a cached entry changes (POS spelled out, English
@@ -2006,6 +2053,8 @@
     ];
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
+    const startedAt = Date.now();
+    diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     try {
       let content = "";
       try {
@@ -3353,6 +3402,7 @@
         <div class="state-actions reveal" style="--d:1.1">
           <button class="btn btn-primary" type="button" data-action="retry">${icon("refresh")} 重试</button>
           <button class="btn btn-secondary" type="button" data-action="settings">${icon("settings")} 模型设置</button>
+          <button class="btn btn-secondary" type="button" data-action="copy-diagnostics">${icon("copy")} 复制诊断</button>
           ${hasDemo(route.query, route.type) ? `<button class="btn btn-secondary" type="button" data-action="demo">使用演示词条</button>` : ""}
         </div>
       </main>`;
@@ -4274,6 +4324,15 @@
         <div id="theme-cache-stats"><p class="api-note">正在读取主题缓存…</p></div>
         <button class="link-btn" type="button" data-action="clear-theme-cache">清空主题库</button>
       </div>
+      <div class="diag-card">
+        <span class="settings-subhead">运行日志</span>
+        <p class="api-note">只记录请求类型、字符数与错误文本；密钥、令牌和长串已脱敏。出问题时复制它发给开发者。</p>
+        <pre class="diag-preview" id="diag-preview">${esc(diagText().split("\n").slice(-9).join("\n"))}</pre>
+        <div class="cache-actions">
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="copy-diagnostics">${icon("copy")} 复制诊断</button>
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-diagnostics">清空日志</button>
+        </div>
+      </div>
       <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
       <p class="api-note">词条缓存优先从 IndexedDB 读取，未命中才请求模型；发音只缓存 Qwen 语音生成的音频。</p>`;
   }
@@ -4675,7 +4734,10 @@
     ];
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
-    const maxTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
+    const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
+    const maxTokens = type === "sentence"
+      ? Math.max(detailTokens, SENTENCE_MAX_TOKENS[detail] || SENTENCE_MAX_TOKENS.standard)
+      : detailTokens;
     let content = "";
     try {
       // Do not combine streaming with response_format by default: some
@@ -4687,6 +4749,7 @@
         }
       });
     } catch (error) {
+      diagLog("error", "model.fail", error?.message || String(error), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
       // Older/limited gateways may reject streaming. Retry once non-streaming
       // only when no content has been received.
       if (!content && error?.name !== "AbortError") {
@@ -4713,7 +4776,32 @@
       window.clearTimeout(timer);
     }
     if (!content) throw new Error("模型返回了空消息。");
-    const parsed = parseJsonObject(content);
+    diagLog("info", "model.content", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
+    let parsed;
+    try {
+      parsed = parseJsonObject(content);
+    } catch (parseError) {
+      // A truncated answer is the most common cause here: retry once with a
+      // larger ceiling instead of showing a raw JSON error to the reader.
+      if (!/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
+      const retryTokens = Math.min(6000, Math.round(maxTokens * 1.7));
+      const retry = await postChat(endpoint, cfg, messages, controller.signal, true, retryTokens);
+      if (!retry.ok) throw parseError;
+      const retryJson = await retry.json();
+      const retryMessage = retryJson?.choices?.[0]?.message;
+      let retryContent = retryMessage?.content;
+      if (Array.isArray(retryContent)) {
+        retryContent = retryContent.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+      }
+      if (!retryContent) throw parseError;
+      try {
+        parsed = parseJsonObject(retryContent);
+      } catch (_) {
+        diagLog("error", "model.truncated", "json truncated", { type, detail, chars: retryContent.length, tokens: retryTokens });
+        throw new Error(`模型返回的 JSON 被截断（约 ${retryContent.length} 字符），可以重试或把生成深度调到「深入」。`);
+      }
+    }
+    diagLog("info", "model.ok", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
     if (type === "word") {
       const data = normalizeModelWord(parsed, query);
       data.source = "model";
@@ -5772,6 +5860,21 @@
         break;
       }
 
+      case "copy-diagnostics": {
+        const text = diagText();
+        try {
+          await navigator.clipboard.writeText(text);
+          toast("诊断日志已复制（已脱敏）");
+        } catch (_) {
+          toast("复制失败，可在设置里手动查看");
+        }
+        break;
+      }
+      case "clear-diagnostics":
+        localStorage.removeItem("talk.diagnostics.v1");
+        renderSettingsContent();
+        toast("运行日志已清空");
+        break;
       case "clear-theme-cache":
         event.preventDefault();
         await clearThemeStore();
