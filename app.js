@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "165";
+  const APP_VERSION = "166";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2079,7 +2079,6 @@
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     try {
       let content = "";
-    let retryLength = null;
       try {
         content = await postChatStream(endpoint, cfg, messages, controller.signal, false, 1600);
       } catch (error) {
@@ -4899,6 +4898,7 @@
     if (!content) throw new Error("模型返回了空消息。");
     diagLog("info", "model.content", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
     let parsed;
+    let retryLength = null;
     try {
       parsed = parseJsonObject(content);
     } catch (parseError) {
@@ -4971,6 +4971,19 @@
     const decoder = new TextDecoder();
     let buffer = "";
     let content = "";
+    const consumeFrame = (frame) => {
+      const line = frame.split("\n").find((row) => row.startsWith("data:"));
+      if (!line) return;
+      const data = line.slice(5).trim();
+      if (!data || data === "[DONE]") return;
+      try {
+        const text = googleText(JSON.parse(data));
+        if (text) {
+          content += text;
+          if (typeof onDelta === "function") onDelta(content);
+        }
+      } catch (_) { /* partial frames are skipped */ }
+    };
     for (;;) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -4980,19 +4993,13 @@
         const frame = buffer.slice(0, index);
         buffer = buffer.slice(index + 2);
         index = buffer.indexOf("\n\n");
-        const line = frame.split("\n").find((row) => row.startsWith("data:"));
-        if (!line) continue;
-        const data = line.slice(5).trim();
-        if (!data || data === "[DONE]") continue;
-        try {
-          const text = googleText(JSON.parse(data));
-          if (text) {
-            content += text;
-            if (typeof onDelta === "function") onDelta(content);
-          }
-        } catch (_) { /* partial frames are skipped */ }
+        consumeFrame(frame);
       }
     }
+    // The final event often arrives without the trailing blank line; dropping
+    // it cuts the closing braces off the JSON, which looks like model failure.
+    buffer += decoder.decode();
+    if (buffer.trim()) consumeFrame(buffer);
     return content;
   }
 
