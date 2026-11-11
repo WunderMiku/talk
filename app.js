@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "168";
+  const APP_VERSION = "169";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4037,7 +4037,6 @@
     const body = $("#sheet-scroll", overlayRoot);
     if (!body) return;
     body.innerHTML = `
-      <p class="sheet-lead">先选一个协议模板，再填地址、模型名与密钥；保存后它就是你自己的配置，之后只在这份列表里切换。</p>
       <div class="template-list">
         ${PROVIDER_TEMPLATES.map((template) => `
           <button class="template-row" type="button" data-action="new-from-template" data-template="${attr(template.id)}">
@@ -4361,7 +4360,7 @@
 
   function modelSettingsHtml(draft) {
     return `
-      <p class="settings-intro">从模板新建一份自己的配置，再填地址、模型与密钥；Talk 支持 OpenAI 兼容接口与 Google Gemini 两种协议。</p>
+      <p class="settings-intro">选模板新建配置，再填地址与密钥。</p>
       <div class="model-profile-head">
         <span class="settings-subhead">模型配置</span>
         <span class="mono">${draft.profiles.length} 个</span>
