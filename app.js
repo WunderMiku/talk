@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "164";
+  const APP_VERSION = "165";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -89,7 +89,13 @@
 
   // Sentences now carry a summary, a parse tree and level-tagged key words,
   // which no longer fits in the old per-detail ceiling.
-  const SENTENCE_MAX_TOKENS = { fast: 4000, standard: 6000, deep: 8000 };
+  const SENTENCE_MAX_TOKENS = { fast: 6000, standard: 12000, deep: 20000 };
+  // The depth option shapes the prompt; these ceilings only stop a runaway reply.
+  const SENTENCE_DEPTH_BRIEF = {
+    fast: "需要多少写多少即可，但偏向精简：tree 一般 3–5 个节点，重点词 2–4 个，每层解释一句话。",
+    standard: "按内容需要完整展开：tree 一般 6–9 个节点，重点词按等级上限，解释具体但不铺陈。",
+    deep: "尽量讲透：tree 可到 12–14 个节点，重点词到上限，补语域、易错点与阅读提示，但不要重复。"
+  };
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   // Bumped when the shape of a cached entry changes (POS spelled out, English
@@ -4731,6 +4737,14 @@
      Model API
      ============================================================ */
 
+  function outputCeiling(cfg) {
+    const provider = String(cfg?.provider || "").toLowerCase();
+    if (provider === "google") return 32000;
+    if (provider === "openai") return 16000;
+    if (provider === "deepseek") return 8192;
+    return 20000;
+  }
+
   function isGoogleProvider(cfg) {
     return String(cfg?.provider || "").toLowerCase() === "google";
   }
@@ -4819,6 +4833,7 @@
       level: level.id,
       maxKeyWords: level.maxKeyWords,
       levelHint: level.hint,
+      length: SENTENCE_DEPTH_BRIEF[detail] || SENTENCE_DEPTH_BRIEF.standard,
       text: String(query)
     });
   }
@@ -4838,9 +4853,10 @@
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
     const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
-    const maxTokens = type === "sentence"
+    const wanted = type === "sentence"
       ? Math.max(detailTokens, SENTENCE_MAX_TOKENS[detail] || SENTENCE_MAX_TOKENS.standard)
       : detailTokens;
+    const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";
     const startedAt = Date.now();
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
@@ -4890,7 +4906,7 @@
       // A truncated answer is the most common cause here: retry once with a
       // larger ceiling instead of showing a raw JSON error to the reader.
       if (!/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
-      const retryTokens = Math.min(8000, Math.round(maxTokens * 1.8));
+      const retryTokens = Math.min(outputCeiling(cfg), Math.round(maxTokens * 1.5));
       const retryMessages = messages.concat([{
         role: "user",
         content: "上一次输出在中途被截断了。请更精简地重写：tree 最多 8 个节点，keyWords 不超过 8 个，不要重复解释，务必输出完整闭合的 JSON。"

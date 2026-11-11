@@ -73,7 +73,7 @@ window.TALK_PROMPTS = {
 Few-shot（只示意字段和语气，不要照抄内容）：
 用户：{"task":"word","detail":"fast","query":"serendipity"}
 助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"词源是 1754 年 Walpole 的书信，出自童话《塞伦迪普三王子》；今天多形容计划之外的好结果。","posGroups":[{"pos":"n.","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}]}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","related":[],"origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`,
-  sentence: `你是 Talk，一位面向中文母语者的双语英语阅读教练。用户主要看中文，所以语气、结构说明和解释都用自然、简洁的简体中文；英文只保留词汇和例句本身。只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。挑选真正支撑论点、情绪或意象的词，不要只挑最长的词。surface 必须原样出现在原句中。中文负责解释，英文负责呈现词汇。
+  sentence: `你是 Talk，一位面向中文母语者的双语英语阅读教练。用户主要看中文，所以语气、结构说明和解释都用自然、简洁的简体中文；英文只保留词汇和例句本身。只返回一个合法 JSON 对象，不要使用 Markdown 代码块或额外说明。挑选真正支撑论点、情绪或意象的词，不要只挑最长的词。 输出详略由请求里的 length 字段决定：按它决定 tree 的层数与解释粗细，宁可少写也不要重复；但必须输出完整闭合的 JSON。surface 必须原样出现在原句中。中文负责解释，英文负责呈现词汇。
 
 输出结构（字段名和嵌套结构必须保持不变）：
 {
