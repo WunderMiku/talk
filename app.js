@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "163";
+  const APP_VERSION = "164";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -89,7 +89,7 @@
 
   // Sentences now carry a summary, a parse tree and level-tagged key words,
   // which no longer fits in the old per-detail ceiling.
-  const SENTENCE_MAX_TOKENS = { fast: 1800, standard: 2800, deep: 3800 };
+  const SENTENCE_MAX_TOKENS = { fast: 4000, standard: 6000, deep: 8000 };
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   // Bumped when the shape of a cached entry changes (POS spelled out, English
@@ -2073,6 +2073,7 @@
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     try {
       let content = "";
+    let retryLength = null;
       try {
         content = await postChatStream(endpoint, cfg, messages, controller.signal, false, 1600);
       } catch (error) {
@@ -4889,8 +4890,12 @@
       // A truncated answer is the most common cause here: retry once with a
       // larger ceiling instead of showing a raw JSON error to the reader.
       if (!/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
-      const retryTokens = Math.min(6000, Math.round(maxTokens * 1.7));
-      const retry = await postChat(endpoint, cfg, messages, controller.signal, true, retryTokens);
+      const retryTokens = Math.min(8000, Math.round(maxTokens * 1.8));
+      const retryMessages = messages.concat([{
+        role: "user",
+        content: "上一次输出在中途被截断了。请更精简地重写：tree 最多 8 个节点，keyWords 不超过 8 个，不要重复解释，务必输出完整闭合的 JSON。"
+      }]);
+      const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
       if (!retry.ok) throw parseError;
       const retryJson = await retry.json();
       const retryMessage = retryJson?.choices?.[0]?.message;
@@ -4901,12 +4906,14 @@
       if (!retryContent) throw parseError;
       try {
         parsed = parseJsonObject(retryContent);
+        retryLength = retryContent.length;
+        content = retryContent;
       } catch (_) {
         diagLog("error", "model.truncated", "json truncated", { type, detail, chars: retryContent.length, tokens: retryTokens });
         throw new Error(`模型返回的 JSON 被截断（约 ${retryContent.length} 字符），可以重试或把生成深度调到「深入」。`);
       }
     }
-    diagLog("info", "model.ok", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
+    diagLog("info", "model.ok", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt, retried: retryLength !== null });
     if (type === "word") {
       const data = normalizeModelWord(parsed, query);
       data.source = "model";
