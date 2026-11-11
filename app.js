@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "162";
+  const APP_VERSION = "163";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -403,6 +403,13 @@
         enableThinking: Boolean(profile.enableThinking),
         thinkingBudget: Math.max(0, Math.min(262144, Number(profile.thinkingBudget) || 0))
       };
+    });
+    // Newly shipped presets must show up for people who already saved profiles,
+    // otherwise a fresh provider stays invisible until they wipe local data.
+    ["google"].forEach((id) => {
+      if (profiles.some((profile) => profile.id === id)) return;
+      const preset = MODEL_PRESETS.find((item) => item.id === id);
+      if (preset) profiles.push({ ...preset, apiKey: "" });
     });
     return { profiles, activeProfileId: String(parsed.activeProfileId || profiles[0].id) };
   }
