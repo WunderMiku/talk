@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "166";
+  const APP_VERSION = "167";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4761,7 +4761,7 @@
     return `${googleRoot(cfg?.baseUrl)}/models/${encodeURIComponent(model)}:${action}${sep}key=${encodeURIComponent(String(cfg?.apiKey || "").trim())}`;
   }
 
-  function googlePayload(messages, maxTokens, jsonMode) {
+  function googlePayload(messages, maxTokens, jsonMode, cfg = {}) {
     const system = messages.filter((m) => m.role === "system").map((m) => String(m.content || "")).join("\n\n");
     const user = messages.filter((m) => m.role !== "system").map((m) => String(m.content || "")).join("\n\n");
     const payload = {
@@ -4772,6 +4772,11 @@
       }
     };
     if (jsonMode) payload.generationConfig.responseMimeType = "application/json";
+    // Gemini 2.5/3 spend output tokens on thinking unless told otherwise; a
+    // long JSON answer then gets cut mid-object even with a generous ceiling.
+    const model = String(cfg.model || "").toLowerCase();
+    if (/gemini-3/.test(model)) payload.generationConfig.thinkingConfig = { thinkingLevel: "LOW" };
+    else if (/gemini-2\.5/.test(model)) payload.generationConfig.thinkingConfig = { thinkingBudget: 0 };
     if (system) payload.systemInstruction = { parts: [{ text: system }] };
     return payload;
   }
@@ -4956,12 +4961,17 @@
 
   async function googleChatStream(cfg, messages, signal, maxTokens, onDelta) {
     const url = googleModelUrl(cfg, true);
-    const response = await fetch(url, {
+    const post = () => fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-      body: JSON.stringify(googlePayload(messages, maxTokens, true)),
+      body: JSON.stringify(googlePayload(messages, maxTokens, true, cfg)),
       signal
     });
+    let response = await post();
+    if (response.status === 503 || response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      response = await post();
+    }
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
@@ -5005,12 +5015,17 @@
 
   async function googleChat(cfg, messages, signal, maxTokens, jsonMode = true) {
     const url = googleModelUrl(cfg, false);
-    const response = await fetch(url, {
+    const post = () => fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(googlePayload(messages, maxTokens, jsonMode)),
+      body: JSON.stringify(googlePayload(messages, maxTokens, jsonMode, cfg)),
       signal
     });
+    let response = await post();
+    if (response.status === 503 || response.status === 429) {
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      response = await post();
+    }
     const raw = await response.text().catch(() => "");
     let json = null;
     try { json = raw ? JSON.parse(raw) : null; } catch (_) { /* keep raw for the error */ }
