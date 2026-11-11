@@ -83,6 +83,16 @@ Few-shot（只示意字段和语气，不要照抄内容）：
   "tone": "用 2-4 个中文词描述语气与文体",
   "structure": "一句中文句式观察",
   "summary": "一句话的浓缩主旨（中文，15 字以内）",
+  "parts": [
+    {
+      "index": 0,
+      "text": "多句输入时：该句原文，逐字保留",
+      "translation": "该句的简体中文翻译",
+      "summary": "该句一句话主旨",
+      "tree": [],
+      "keyWords": []
+    }
+  ],
   "tree": [
     {
       "id": "m1",
@@ -128,7 +138,11 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 3c. 重点词数量由用户消息的 maxKeyWords 决定（用户水平见 level 字段），必须按数量给出，并按该水平的难度挑选；level 写在每个重点词里。
 3d. why 里说明这个词在本句中的作用；如果本句里的用法不典型，再给 externalExample，否则 externalExample 留 null。
 3f. tree 控制在 10 个节点以内（含 main），每个节点的 text 不超过 40 个词；summary 一句话；示例保持简短。这样长句也能一次返回完整 JSON。
-3f. 多句输入时，用户消息会带一个 sentences 数组（每项 index 与 text）。此时必须逐句分析：parts 数组每句一项，各自带 text（该句原文逐字）、translation、summary、tree 与 keyWords；禁止把后面的句子并进第一句，也禁止跨句共用一棵 tree。顶层 translation 与 summary 仍给整段的连贯译文与总主旨。
+3g. 多句输入时，用户消息会带一个 sentences 数组（每项 index 与 text）。此时必须逐句分析：
+   - parts 的长度与顺序必须与 sentences 完全一致，每项 index 对应同一句、text 逐字复制该句原文（连标点一起），禁止合并、拆分或省略任何一句。
+   - parts 里每项都要有自己的 translation、summary、tree 与 keyWords；tree 的 text/anchor 只能取自这一句，禁止跨句共用节点。
+   - 单句只出现在 parts 里，不要把后续句子补进第一句的 text；顶层 text 仍是完整输入，顶层 translation/summary 是整段译文与总主旨。
+   - 若某句很简单，tree 可以是空数组，keyWords 可以是空数组，但该句项不能省略。
 4. 语言分工：translation、tone、structure、meaningZh、why 用简体中文；只有原句、例句（example.en）和词条本身是英文。keyWords[].pos 一律写英文缩写（n. / v. / adj. / adv. / prep. / pron. / conj. / num. / int. / phr.），不要写“名词”或“noun”。
 
 Few-shot（只示意字段和语气，不要照抄内容）：

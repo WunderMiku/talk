@@ -305,7 +305,7 @@ textarea:focus-visible,
   min-height: 58px;
   margin: 0 -22px;
   padding: 10px 22px 8px;
-  background: linear-gradient(180deg, rgba(243, 240, 231, 0.98) 0%, rgba(243, 240, 231, 0.92) 64%, rgba(243, 240, 231, 0) 100%);
+  background: var(--paper);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
@@ -334,6 +334,18 @@ textarea:focus-visible,
   color: var(--coral);
   font-size: 34px;
   line-height: 0.55;
+}
+
+
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 12px;
+  background: linear-gradient(180deg, var(--paper), transparent);
+  pointer-events: none;
 }
 
 .topbar-context {
@@ -8111,3 +8123,44 @@ textarea:focus-visible,
 .template-note { font-size: 11px; color: var(--muted); }
 .example-foot.is-solo { justify-content: flex-end; }
 .sentence-part-zh { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.sentence-part-missing {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+  border-left: 2px solid var(--line-strong);
+  padding-left: 10px;
+}
+/* Multi-sentence pages need room between the per-sentence beats. */
+.sentence-part {
+  padding: 24px 0 26px;
+}
+.sentence-part + .sentence-part {
+  padding-top: 28px;
+}
+.sentence-part:first-of-type {
+  padding-top: 20px;
+}
+.sentence-part .block-head,
+.sentence-part > .block-head {
+  margin-bottom: 16px;
+}
+.sentence-part .onion-block {
+  margin: 16px 0 0;
+}
+.sentence-part-zh {
+  margin: 16px 0 0;
+  line-height: 1.75;
+}
+.sentence-part .summary-card {
+  margin: 14px 0 0;
+}
+.sentence-part .key-list {
+  margin: 16px 0 0;
+}
+.sentence-part .key-card + .key-card {
+  margin-top: 12px;
+}
+.sentence-part-missing {
+  margin: 14px 0 0;
+}

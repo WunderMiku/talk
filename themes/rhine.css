@@ -123,7 +123,7 @@
 }
 
 [data-theme="rhine"] .topbar {
-  background: linear-gradient(180deg, #e9e5dc 0%, #e9e5dc 74%, rgba(233, 229, 220, 0) 100%);
+  background: var(--paper);
 }
 
 [data-theme="rhine"] .brand {

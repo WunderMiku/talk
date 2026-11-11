@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "169";
+  const APP_VERSION = "170";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3126,16 +3126,37 @@
   }
 
   function splitSentences(text) {
-    const value = String(text || "").trim();
+    const value = String(text || "").replace(/\s+/g, " ").trim();
     if (!value) return [];
-    try {
-      if (typeof Intl !== "undefined" && Intl.Segmenter) {
-        const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
-        const pieces = [...segmenter.segment(value)].map((item) => item.segment.trim()).filter(Boolean);
-        if (pieces.length) return pieces.slice(0, 6);
-      }
-    } catch (_) { /* fall through to the regex */ }
-    return value.split(/(?<=[.!?。！？])\s+/).map((item) => item.trim()).filter(Boolean).slice(0, 6);
+    const ABBR = /^(mr|mrs|ms|dr|prof|st|jr|sr|vs|etc|e\.g|i\.e|fig|no|approx|dept|est|al)$/i;
+    const edges = /[.!?。！？…]["”’')」』]?$/;
+    const mergePiece = (prev, next) => {
+      if (!prev) return next;
+      const bare = prev.replace(/[)"”’」』]+$/, "");
+      const lastWord = (bare.split(/[\s(]/).pop() || "").replace(/\.$/, "");
+      if (ABBR.test(lastWord)) return `${prev} ${next}`;
+      if (/^[A-Z]$/.test(lastWord)) return `${prev} ${next}`;
+      if (!edges.test(bare)) return `${prev} ${next}`;
+      return null;
+    };
+    const collect = (input) => {
+      const out = [];
+      try {
+        if (typeof Intl !== "undefined" && Intl.Segmenter) {
+          const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+          return [...segmenter.segment(input)].map((item) => item.segment.trim()).filter(Boolean);
+        }
+      } catch (_) { /* fall through to the regex */ }
+      return input.split(/(?<=[.!?。！？…])\s+|(?<=[。！？])/).map((item) => item.trim()).filter(Boolean);
+    };
+    const merged = [];
+    collect(value).forEach((piece) => {
+      if (!merged.length) { merged.push(piece); return; }
+      const joined = mergePiece(merged[merged.length - 1], piece);
+      if (joined) merged[merged.length - 1] = joined;
+      else merged.push(piece);
+    });
+    return merged.map((item) => item.trim()).filter(Boolean).slice(0, 8);
   }
 
   function normalizeSentenceParts(value) {
@@ -3151,6 +3172,29 @@
         keyWords: normalizeKeyWords(part.keyWords || part.key_words || part.words)
       };
     }).filter(Boolean);
+  }
+
+  function alignSentenceParts(parts, pieces) {
+    if (!pieces.length) return parts;
+    const byText = new Map();
+    parts.forEach((part, index) => {
+      const key = normalizeWord(part.text);
+      if (key && !byText.has(key)) byText.set(key, part);
+      if (index < pieces.length && !byText.has(normalizeWord(pieces[index]))) byText.set(normalizeWord(pieces[index]), part);
+    });
+    return pieces.map((text, index) => {
+      const key = normalizeWord(text);
+      const hit = byText.get(key) || parts[index] || null;
+      const matches = hit && normalizeWord(hit.text) === key;
+      return {
+        text,
+        translation: matches ? hit.translation || "" : "",
+        summary: matches ? hit.summary || "" : "",
+        tree: matches ? hit.tree || [] : [],
+        keyWords: matches ? hit.keyWords || [] : [],
+        incomplete: Boolean(hit && !matches)
+      };
+    });
   }
 
   function ensureSentence(raw) {
@@ -3322,10 +3366,12 @@
 
   function onionLine(text, tree, keyWords) {
     const nodes = Array.isArray(tree) ? tree.filter((node) => node && (node.text || node.children?.length)) : [];
-    const main = nodes.find((node) => node.kind === "main") || nodes[0];
-    if (!main) return annotateSentence(text, keyWords);
-    const extras = nodes.filter((node) => node !== main);
-    const children = hoistDetached((main.children || []).concat(extras), 1);
+    if (!nodes.length) return annotateSentence(text, keyWords);
+    const main = nodes.find((node) => node.kind === "main");
+    // Models often return only the folded layers; treat them as children of the sentence itself.
+    const children = main
+      ? hoistDetached((main.children || []).concat(nodes.filter((node) => node !== main)), 1)
+      : hoistDetached(nodes, 1);
     if (!children.length) return annotateSentence(text, keyWords);
     return onionCompose(text, children, keyWords, 1);
   }
@@ -3348,12 +3394,12 @@
     const bookmark = `sentence:${sentence.id}`;
     const multi = renderParts.length > 1;
     return `
-      ${backTopbar({ label: "句子", title: `${sentence.keyWords.length} 个重点词`, bookmark })}
+      ${backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${sentence.keyWords.length} 个重点词`, bookmark })}
       <main class="result-page">
         <section class="sentence-hero">
           <div class="result-kicker reveal" style="--d:0">
             <span class="kicker-pill accent">句子</span>
-            <span class="kicker-pill">${sentence.keyWords.length} 个重点词</span>
+            <span class="kicker-pill">${multi ? `${renderParts.length} 句` : `${sentence.keyWords.length} 个重点词`}</span>
           </div>
           ${multi ? "" : `<div class="onion reveal" style="--d:0.6">${onionSentenceBlock(renderParts[0], 0, sentence.keyWords)}</div>`}
           <div class="sentence-source reveal" style="--d:1">
@@ -3365,9 +3411,9 @@
         </section>
 
         <section class="block reveal" style="--d:1.3">
-          ${blockHead(nextNo(), "整句意思", "中文翻译")}
+          ${blockHead(nextNo(), multi ? "整段意思" : "整句意思", "中文翻译")}
           <div class="translation-card">
-            <span class="translation-label">${icon("quote")} 整句理解</span>
+            <span class="translation-label">${icon("quote")} ${multi ? "整段理解" : "整句理解"}</span>
             <p class="translation-text">${esc(sentence.translation || "连接模型后生成翻译。")}</p>
             ${sentence.tone ? `<span class="translation-tone">${esc(sentence.tone)}</span>` : ""}
           </div>
@@ -3390,12 +3436,13 @@
           <div class="onion">${onionSentenceBlock(part, index, part.keyWords.length ? part.keyWords : sentence.keyWords)}</div>
           ${part.translation ? `<p class="sentence-part-zh">${esc(part.translation)}</p>` : ""}
           ${part.summary ? `<div class="summary-card">${esc(part.summary)}</div>` : ""}
+          ${part.incomplete ? `<p class="sentence-part-missing">模型把这几句并成了一段，这一句没有单独分析；重试或逐句查询即可。</p>` : ""}
           ${part.keyWords.length ? `<div class="key-list">${part.keyWords.map((keyWord, n) => keyCard(keyWord, index * 100 + n)).join("")}</div>` : ""}
         </section>`).join("") : ""}
 
-        ${!multi && sentence.summary ? `
+        ${sentence.summary ? `
         <section class="block reveal" style="--d:1.35">
-          ${blockHead(nextNo(), "浓缩主旨", "一句话记住")}
+          ${blockHead(nextNo(), multi ? "整段主旨" : "浓缩主旨", "一句话记住")}
           <div class="summary-card">${esc(sentence.summary)}</div>
         </section>` : ""}
 
@@ -5091,6 +5138,9 @@
       return { type: "word", data };
     }
     const data = normalizeModelSentence(parsed, query);
+    if (pieces.length > 1 && data.sentences.length) {
+      data.sentences = alignSentenceParts(data.sentences, pieces);
+    }
     data.sourceType = "model";
     data.model = cfg.model;
     data.source = "语境分析";
@@ -5452,7 +5502,19 @@
   function normalizeModelSentence(raw, fallbackSentence) {
     const base = unwrapModel(raw);
     const text = String(base.text || base.sentence || fallbackSentence || "").trim();
-    const keyWords = normalizeKeyWords(base.keyWords || base.key_words || base.words);
+    let keyWords = normalizeKeyWords(base.keyWords || base.key_words || base.words);
+    const sentences = normalizeSentenceParts(base.sentences || base.parts);
+    if (!keyWords.length && sentences.length) {
+      const seen = new Set();
+      keyWords = sentences.flatMap((part, index) => part.keyWords.map((item) => ({ ...item, sentenceIndex: index })))
+        .filter((item) => {
+          const key = `${normalizeWord(item.word)}:${item.sentenceIndex}`;
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        })
+        .slice(0, 12);
+    }
     if (!text) throw new Error("模型返回的内容里没有原句。");
     // A sentence with no key words is still a valid page (short or plain
     // sentences happen); only a missing sentence is fatal.
@@ -5464,7 +5526,7 @@
       structure: typeof base.structure === "string" ? base.structure : String(base.structure?.note || ""),
       summary: String(base.summary || base.gist || "").trim(),
       tree: normalizeStructureTree(base.tree || base.structureTree || (base.structure && base.structure.tree)),
-      sentences: normalizeSentenceParts(base.sentences || base.parts),
+      sentences,
       keyWords,
       source: "语境分析",
       sourceType: "model"

@@ -113,7 +113,7 @@
 }
 
 [data-theme="constructivist"] .topbar {
-  background: linear-gradient(180deg, #efe4d0 0%, #efe4d0 72%, rgba(239, 228, 208, 0) 100%);
+  background: var(--paper);
 }
 
 [data-theme="constructivist"] .brand {
