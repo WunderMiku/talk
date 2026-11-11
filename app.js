@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "171";
+  const APP_VERSION = "172";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -5042,6 +5042,7 @@
       maxKeyWords: level.maxKeyWords,
       levelHint: level.hint,
       length: SENTENCE_DEPTH_BRIEF[detail] || SENTENCE_DEPTH_BRIEF.standard,
+      budget: pieces.length > 1 ? "每句 tree 不超过 6 个节点，重点词不超过 3 个；简单句用空数组，不要展开关系词。" : "",
       text: String(query),
       ...(sentences ? { sentences } : {})
     });
@@ -5080,17 +5081,27 @@
     let content = "";
     const startedAt = Date.now();
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
+    const streamOnce = () => postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
+      if (typeof options.onPreview === "function") {
+        try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
+      }
+    });
     try {
       // Do not combine streaming with response_format by default: some
       // OpenAI-compatible gateways silently return one buffered JSON response
       // when both are present. The static prompt already requires JSON.
-      content = await postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
-        if (typeof options.onPreview === "function") {
-          try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
-        }
-      });
+      content = await streamOnce();
     } catch (error) {
       diagLog("error", "model.fail", error?.message || String(error), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
+      // Mobile networks drop long streams; give the same request one silent retry.
+      if (!content && error?.name !== "AbortError") {
+        await wait(900);
+        try {
+          content = await streamOnce();
+        } catch (retryError) {
+          diagLog("error", "model.fail", retryError?.message || String(retryError), { type, detail, ms: Date.now() - startedAt, chars: String(query).length, attempt: 2 });
+        }
+      }
       // Older/limited gateways may reject streaming. Retry once non-streaming
       // only when no content has been received.
       if (!content && error?.name !== "AbortError") {
@@ -5110,9 +5121,8 @@
         if (Array.isArray(content)) {
           content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
         }
-      } else {
-        throw error;
       }
+      if (!content) throw error;
     } finally {
       window.clearTimeout(timer);
     }
@@ -5120,17 +5130,22 @@
     diagLog("info", "model.content", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
     let parsed;
     let retryLength = null;
+    const emptyish = content.trim().length < 12;
     try {
+      if (emptyish) throw new Error("模型返回的内容过短，可能被网关截断了。");
       parsed = parseJsonObject(content);
     } catch (parseError) {
-      diagLog("error", "model.parse", parseError?.message || String(parseError), { type, detail, chars: content.length });
+      diagLog("error", emptyish ? "model.empty" : "model.parse", parseError?.message || String(parseError), { type, detail, chars: content.length });
       // A truncated answer is the most common cause here: retry once with a
       // larger ceiling instead of showing a raw JSON error to the reader.
-      if (!/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
+      if (!emptyish && !/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
       const retryTokens = Math.min(outputCeiling(cfg), Math.round(maxTokens * 1.5));
+      const concise = type === "sentence"
+        ? "只保留必要字段：parts[] 每句一项，tree 每句最多 6 个节点，keyWords 每句最多 3 个且不要 family/synonyms/antonyms/example（这些留空数组或 null）。"
+        : "只保留必要字段：每个词条最多 2 个义项、2 个同根词、2 个近义词、1 个反义词、1 个例句；不要展开长解释。";
       const retryMessages = messages.concat([{
         role: "user",
-        content: "上一次输出在中途被截断了。请更精简地重写：tree 最多 8 个节点，keyWords 不超过 8 个，不要重复解释，务必输出完整闭合的 JSON。"
+        content: `上一次输出在中途被截断了或几乎没有内容。请更精简地重写：${concise}不要重复解释，务必输出完整闭合的 JSON。`
       }]);
       const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
       if (!retry.ok) throw parseError;
