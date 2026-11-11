@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "170";
+  const APP_VERSION = "171";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1058,6 +1058,17 @@
     }
   }
 
+  function removeSentenceRecord(key) {
+    if (!key) return;
+    sentenceCache.delete(key);
+    if (wordDb) wordDb.delete(SENTENCE_DB_STORE, key).catch(() => {});
+  }
+
+  function clearSentenceCache() {
+    sentenceCache.clear();
+    if (wordDb) wordDb.clear(SENTENCE_DB_STORE).catch(() => {});
+  }
+
   function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
     const key = normalizeWord(word);
     const hit = wordCache.get(key);
@@ -1411,6 +1422,7 @@
         const id = decoded.slice(9);
         const result = DATA.sentences.find((item) => item.id === id);
         if (result) return { name: "sentence", id, result };
+        if (id.startsWith("model-")) return { name: "sentence", id };
       }
       if (decoded === "translate" || decoded === "translator") return { name: "translator" };
     } catch (_) {
@@ -1658,7 +1670,12 @@
 
   function getSentence(route) {
     if (route?.result) return ensureSentence(route.result);
-    return ensureSentence(DATA.sentences.find((item) => item.id === route?.id));
+    const id = String(route?.id || "");
+    if (id.startsWith("model-")) {
+      const cached = cacheGetSentence(id.slice("model-".length));
+      if (cached) return ensureSentence(cached);
+    }
+    return ensureSentence(DATA.sentences.find((item) => item.id === id));
   }
 
   /* ============================================================
@@ -3455,6 +3472,8 @@
 
         <div class="page-actions reveal" style="--d:2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏句子</button>
+          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-sentence">${icon("refresh")} 重新生成分析</button>` : ""}
+          <button class="btn btn-secondary" type="button" data-action="forget-sentence">删除缓存</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
         </div>
       </main>`;
@@ -4556,10 +4575,12 @@
         <span><strong>${stats.count}</strong> / ${stats.max} 个词条</span>
         <span>${formatBytes(stats.bytes)} · ${stats.backend}</span>
       </div>
+      <p class="field-hint">句子分析缓存 ${sentenceCache.size} 条（按原文、深度、水平区分），可单独删除或整表清空。</p>
       <div class="cache-actions">
         <button class="btn btn-secondary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
         <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
         <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
+        <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-sentence-cache">清空句子</button>
         <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
       </div>
       <div class="theme-cache-setting">
@@ -4679,6 +4700,7 @@
           <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
           <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
           <button class="link-btn" type="button" data-action="clear-word-cache">清空词条</button>
+          <button class="link-btn" type="button" data-action="clear-sentence-cache">清空句子</button>
           <button class="link-btn" type="button" data-action="clear-audio-cache">清空语音</button>
           <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
         </div>
@@ -4829,7 +4851,7 @@
     throw new DemoMiss("sentence", query, DATA.sentences.slice(0, 2).map((item) => item.text));
   }
 
-  async function runSearch(rawQuery, requestedMode = "auto") {
+  async function runSearch(rawQuery, requestedMode = "auto", options = {}) {
     const query = sanitizeQuery(rawQuery);
     const input = $("#search-input");
     if (input && input.value.trim() !== query) {
@@ -4864,7 +4886,7 @@
         const onPreview = (preview) => updateStreamPreview(preview, type);
         result = type === "word"
           ? await lookupWordDeduped(query, { onPreview })
-          : await modelLookup(query, type, state.settings, { onPreview });
+          : await modelLookup(query, type, state.settings, { ...options, onPreview });
       } else {
         await wait(820);
         result = lookupDemo(query, type);
@@ -5035,7 +5057,7 @@
     const sentenceCacheKey = type === "sentence"
       ? await sentenceKey(query, sentenceLevelOf(cfg.sentenceLevel).id, detail)
       : "";
-    if (type === "sentence") {
+    if (type === "sentence" && !options.skipCache) {
       const cached = cacheGetSentence(sentenceCacheKey);
       if (cached) {
         diagLog("info", "sentence.cache", "hit", { chars: String(query).length });
@@ -5144,7 +5166,10 @@
     data.sourceType = "model";
     data.model = cfg.model;
     data.source = "语境分析";
-    if (sentenceCacheKey) cachePutSentence(sentenceCacheKey, data, sentenceLevelOf(cfg.sentenceLevel).id, detail);
+    if (sentenceCacheKey) {
+      data.id = `model-${sentenceCacheKey}`;
+      cachePutSentence(sentenceCacheKey, data, sentenceLevelOf(cfg.sentenceLevel).id, detail);
+    }
     return { type: "sentence", data };
   }
 
@@ -5910,6 +5935,35 @@
         speakText(target.dataset.text || "", target, state.settings, { bypassCache: true });
         break;
 
+      case "regenerate-sentence": {
+        event.preventDefault();
+        const active = activeSentenceData();
+        if (!active || !hasModelConfig()) break;
+        const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
+        const detail = state.settings?.detailLevel || "standard";
+        const key = await sentenceKey(active.text, level, detail);
+        removeSentenceRecord(key);
+        await runSearch(active.text, "sentence", { skipCache: true });
+        break;
+      }
+
+      case "forget-sentence": {
+        event.preventDefault();
+        const active = activeSentenceData();
+        if (!active) break;
+        const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
+        const detail = state.settings?.detailLevel || "standard";
+        removeSentenceRecord(await sentenceKey(active.text, level, detail));
+        toast("已删除这条句子缓存");
+        break;
+      }
+
+      case "clear-sentence-cache":
+        event.preventDefault();
+        clearSentenceCache();
+        toast("句子缓存已清除");
+        break;
+
       case "regenerate-word": {
         event.preventDefault();
         const active = activeWordData();
@@ -6555,6 +6609,11 @@
       return;
     }
     runSearch(word, "word");
+  }
+
+  function activeSentenceData() {
+    if (state.route.name !== "sentence") return null;
+    return getSentence(state.route);
   }
 
   function activeWordData() {
