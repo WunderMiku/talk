@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "161";
+  const APP_VERSION = "162";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -267,6 +267,7 @@
   const PROVIDERS = {
     deepseek: { baseUrl: "https://api.deepseek.com", model: "deepseek-chat" },
     openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
+    google: { baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-3.6-flash" },
     custom: { baseUrl: "", model: "" }
   };
 
@@ -286,6 +287,14 @@
       baseUrl: "https://api.openai.com/v1",
       model: "gpt-4o-mini",
       note: "OpenAI 官方接口；浏览器直连可能受 CORS 限制。"
+    },
+    {
+      id: "google",
+      name: "Google Gemini",
+      provider: "google",
+      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
+      model: "gemini-3.6-flash",
+      note: "Google AI Studio 原生接口（generateContent）；模型名可改，例如 gemini-2.5-flash。"
     },
     {
       id: "qwen",
@@ -1429,7 +1438,7 @@
     const timer = window.setTimeout(() => controller.abort(), 45_000);
     let data;
     try {
-      const response = await postChat(endpointFor(cfg.baseUrl), cfg, [
+      const response = await postChat(endpointFor(cfg.baseUrl, cfg), cfg, [
         { role: "system", content: window.TALK_PROMPTS.examples },
         { role: "user", content: JSON.stringify(payload) }
       ], controller.signal, true, 900);
@@ -2046,7 +2055,7 @@
   }
 
   async function requestTranslation(text, cfg, sourceLanguage, selectedStyles) {
-    const endpoint = endpointFor(cfg.baseUrl);
+    const endpoint = endpointFor(cfg.baseUrl, cfg);
     const messages = [
       { role: "system", content: TRANSLATOR_SYSTEM_PROMPT },
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
@@ -2428,7 +2437,7 @@
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 50_000);
     try {
-      const endpoint = endpointFor(state.settings.baseUrl);
+      const endpoint = endpointFor(state.settings.baseUrl, state.settings);
       const messages = [
         { role: "system", content: window.TALK_PROMPTS.theme },
         // Keep the (potentially long) exclusion list last: the static prompt
@@ -4555,26 +4564,31 @@
     try {
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), 30_000);
-      const response = await fetch(endpointFor(state.draft.baseUrl), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${String(state.draft.apiKey || "").trim()}`
-        },
-        body: JSON.stringify({
-          model: state.draft.model,
-          messages: [{ role: "user", content: "Reply with exactly: OK" }],
-          temperature: 0,
-          max_tokens: 8,
-          stream: false,
-          ...thinkingParams(state.draft)
-        }),
-        signal: controller.signal
-      });
-      window.clearTimeout(timer);
-      if (!response.ok) {
-        const text = await response.text().catch(() => "");
-        throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 120)}` : ""}`);
+      if (isGoogleProvider(state.draft)) {
+        await googleChat(state.draft, [{ role: "user", content: "Reply with exactly: OK" }], controller.signal, 16, false);
+        window.clearTimeout(timer);
+      } else {
+        const response = await fetch(endpointFor(state.draft.baseUrl, state.draft), {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${String(state.draft.apiKey || "").trim()}`
+          },
+          body: JSON.stringify({
+            model: state.draft.model,
+            messages: [{ role: "user", content: "Reply with exactly: OK" }],
+            temperature: 0,
+            max_tokens: 8,
+            stream: false,
+            ...thinkingParams(state.draft)
+          }),
+          signal: controller.signal
+        });
+        window.clearTimeout(timer);
+        if (!response.ok) {
+          const text = await response.text().catch(() => "");
+          throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 120)}` : ""}`);
+        }
       }
       const elapsed = Math.round(performance.now() - started);
       status.className = "key-status";
@@ -4709,7 +4723,46 @@
      Model API
      ============================================================ */
 
-  function endpointFor(baseUrl) {
+  function isGoogleProvider(cfg) {
+    return String(cfg?.provider || "").toLowerCase() === "google";
+  }
+
+  function googleRoot(baseUrl) {
+    const base = String(baseUrl || "https://generativelanguage.googleapis.com/v1beta").trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(base)) throw new Error("API 地址需要以 http:// 或 https:// 开头。");
+    return /\/v\d+(?:beta|alpha)?(?:\/|$)/i.test(base) ? base : `${base}/v1beta`;
+  }
+
+  function googleModelUrl(cfg, stream) {
+    const model = String(cfg?.model || "gemini-3.6-flash").trim().replace(/^models\//, "") || "gemini-3.6-flash";
+    const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
+    const sep = action.includes("?") ? "&" : "?";
+    return `${googleRoot(cfg?.baseUrl)}/models/${encodeURIComponent(model)}:${action}${sep}key=${encodeURIComponent(String(cfg?.apiKey || "").trim())}`;
+  }
+
+  function googlePayload(messages, maxTokens, jsonMode) {
+    const system = messages.filter((m) => m.role === "system").map((m) => String(m.content || "")).join("\n\n");
+    const user = messages.filter((m) => m.role !== "system").map((m) => String(m.content || "")).join("\n\n");
+    const payload = {
+      contents: [{ role: "user", parts: [{ text: user }] }],
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: maxTokens
+      }
+    };
+    if (jsonMode) payload.generationConfig.responseMimeType = "application/json";
+    if (system) payload.systemInstruction = { parts: [{ text: system }] };
+    return payload;
+  }
+
+  function googleText(json) {
+    const parts = json?.candidates?.[0]?.content?.parts;
+    if (!Array.isArray(parts)) return "";
+    return parts.map((part) => String(part?.text || "")).join("");
+  }
+
+  function endpointFor(baseUrl, cfg) {
+    if (isGoogleProvider(cfg)) return googleModelUrl(cfg, false).replace(/:generateContent\?.*$/, "");
     let base = String(baseUrl || "").trim().replace(/\/+$/, "");
     if (!base) throw new Error("请先在模型设置里填写 API 地址。");
     if (!/^https?:\/\//i.test(base)) throw new Error("API 地址需要以 http:// 或 https:// 开头。");
@@ -4768,7 +4821,7 @@
       const cached = cacheGetWord(query, detail);
       if (cached) return { type: "word", data: cached };
     }
-    const endpoint = endpointFor(cfg.baseUrl);
+    const endpoint = endpointFor(cfg.baseUrl, cfg);
     const prompt = type === "sentence" ? sentencePrompt(query, detail) : wordPrompt(query, detail);
     const messages = [
       { role: "system", content: systemPrompt(type) },
@@ -4871,7 +4924,76 @@
     return "";
   }
 
+  async function googleChatStream(cfg, messages, signal, maxTokens, onDelta) {
+    const url = googleModelUrl(cfg, true);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
+      body: JSON.stringify(googlePayload(messages, maxTokens, true)),
+      signal
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
+    }
+    if (!response.body) return googleText(await response.json());
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let index = buffer.indexOf("\n\n");
+      while (index >= 0) {
+        const frame = buffer.slice(0, index);
+        buffer = buffer.slice(index + 2);
+        index = buffer.indexOf("\n\n");
+        const line = frame.split("\n").find((row) => row.startsWith("data:"));
+        if (!line) continue;
+        const data = line.slice(5).trim();
+        if (!data || data === "[DONE]") continue;
+        try {
+          const text = googleText(JSON.parse(data));
+          if (text) {
+            content += text;
+            if (typeof onDelta === "function") onDelta(content);
+          }
+        } catch (_) { /* partial frames are skipped */ }
+      }
+    }
+    return content;
+  }
+
+  async function googleChat(cfg, messages, signal, maxTokens, jsonMode = true) {
+    const url = googleModelUrl(cfg, false);
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify(googlePayload(messages, maxTokens, jsonMode)),
+      signal
+    });
+    const raw = await response.text().catch(() => "");
+    let json = null;
+    try { json = raw ? JSON.parse(raw) : null; } catch (_) { /* keep raw for the error */ }
+    if (!response.ok) {
+      const message = json?.error?.message || raw.slice(0, 260);
+      throw new Error(`HTTP ${response.status}${message ? ` · ${message}` : ""}`);
+    }
+    const content = googleText(json);
+    return {
+      ok: true,
+      status: response.status,
+      json: async () => ({ choices: [{ message: { content } }] }),
+      text: async () => raw
+    };
+  }
+
   async function postChatStream(endpoint, cfg, messages, signal, allowJsonMode, maxTokens, onDelta) {
+    if (isGoogleProvider(cfg)) {
+      return googleChatStream(cfg, messages, signal, maxTokens, onDelta);
+    }
     const body = {
       model: cfg.model,
       messages,
@@ -5030,6 +5152,9 @@
   }
 
   async function postChat(endpoint, cfg, messages, signal, allowJsonMode, maxTokens = 2600) {
+    if (isGoogleProvider(cfg)) {
+      return googleChat(cfg, messages, signal, maxTokens);
+    }
     const body = {
       model: cfg.model,
       messages,
