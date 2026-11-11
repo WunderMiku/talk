@@ -128,6 +128,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 3c. 重点词数量由用户消息的 maxKeyWords 决定（用户水平见 level 字段），必须按数量给出，并按该水平的难度挑选；level 写在每个重点词里。
 3d. why 里说明这个词在本句中的作用；如果本句里的用法不典型，再给 externalExample，否则 externalExample 留 null。
 3f. tree 控制在 10 个节点以内（含 main），每个节点的 text 不超过 40 个词；summary 一句话；示例保持简短。这样长句也能一次返回完整 JSON。
+3f. 多句输入时，用户消息会带一个 sentences 数组（每项 index 与 text）。此时必须逐句分析：parts 数组每句一项，各自带 text（该句原文逐字）、translation、summary、tree 与 keyWords；禁止把后面的句子并进第一句，也禁止跨句共用一棵 tree。顶层 translation 与 summary 仍给整段的连贯译文与总主旨。
 4. 语言分工：translation、tone、structure、meaningZh、why 用简体中文；只有原句、例句（example.en）和词条本身是英文。keyWords[].pos 一律写英文缩写（n. / v. / adj. / adv. / prep. / pron. / conj. / num. / int. / phr.），不要写“名词”或“noun”。
 
 Few-shot（只示意字段和语气，不要照抄内容）：

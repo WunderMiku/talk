@@ -8027,7 +8027,7 @@ textarea:focus-visible,
   opacity: 1;
 }
 
-.onion-slot.is-open .onion-wrap {
+.onion-slot.is-open > .onion-wrap {
   display: block;
   margin: 0.15em 0 0.5em 1.4em;
   padding-left: 0.9em;
@@ -8064,13 +8064,13 @@ textarea:focus-visible,
 .onion-mark:focus-visible { background: var(--accent-wash); color: var(--accent-ink); }
 .onion-slot.is-open > .onion-mark { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
 /* the other fold style: put the clause back in the sentence */
-.onion-block[data-fold="inline"] .onion-slot.is-open .onion-wrap {
+.onion-block[data-fold="inline"] .onion-slot.is-open > .onion-wrap {
   display: inline;
   margin: 0;
   padding: 0;
   border-left: 0;
 }
-.onion-block[data-fold="inline"] .onion-slot.is-open .onion-clause {
+.onion-block[data-fold="inline"] .onion-slot.is-open > .onion-wrap > .onion-clause {
   display: inline;
   font-size: 0.95em;
 }
@@ -8089,6 +8089,25 @@ textarea:focus-visible,
   float: right;
   margin: 0.35em 0.2em 0 0.6em;
 }
-.onion-block[data-fold="block"] .onion-slot.is-open .onion-wrap { display: block; }
-.onion-block[data-fold="inline"] .onion-slot.is-open .onion-wrap { margin-left: 0.18em; }
-.onion-block[data-fold="block"] .onion-slot.is-open .onion-wrap { margin-left: 0; }
+.onion-block[data-fold="block"] .onion-slot.is-open > .onion-wrap { display: block; }
+.onion-block[data-fold="inline"] .onion-slot.is-open > .onion-wrap { margin-left: 0.18em; }
+.onion-block[data-fold="block"] .onion-slot.is-open > .onion-wrap { margin-left: 0; }
+
+/* Template picker and per-sentence sections (v168) */
+.template-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.template-row {
+  display: flex; flex-direction: column; gap: 4px; text-align: left;
+  padding: 14px 16px; border: 1px solid var(--line-strong); border-radius: var(--r-md);
+  background: var(--paper-2); color: var(--ink);
+}
+.template-row:hover { border-color: var(--ink); }
+.template-head { display: flex; align-items: center; gap: 8px; }
+.template-head strong { font-size: 15px; font-weight: 700; }
+.template-badge {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  padding: 2px 6px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--muted);
+}
+.template-url { font-size: 10px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.template-note { font-size: 11px; color: var(--muted); }
+.example-foot.is-solo { justify-content: flex-end; }
+.sentence-part-zh { margin: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.7; }

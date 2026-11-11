@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "167";
+  const APP_VERSION = "168";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -108,6 +108,10 @@
   const WORD_CACHE_KEY = "talk.wordcache.v1";
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
+  const SENTENCE_DB_STORE = "sentences";
+  const SENTENCE_CACHE_SCHEMA = 1;
+  const SENTENCE_LIMIT = 120;
+  const sentenceCache = new Map();
   const DEFAULT_CACHE_MAX = 300;
   const PREFETCH_LIMIT = 4;
   const DEFAULT_CACHE_TTL_DAYS = 90;
@@ -284,6 +288,7 @@
       provider: "deepseek",
       baseUrl: "https://api.deepseek.com",
       model: "deepseek-chat",
+      protocol: "openai",
       note: "OpenAI 兼容；浏览器直连 CORS 可用。"
     },
     {
@@ -292,6 +297,7 @@
       provider: "openai",
       baseUrl: "https://api.openai.com/v1",
       model: "gpt-4o-mini",
+      protocol: "openai",
       note: "OpenAI 官方接口；浏览器直连可能受 CORS 限制。"
     },
     {
@@ -300,6 +306,7 @@
       provider: "google",
       baseUrl: "https://generativelanguage.googleapis.com/v1beta",
       model: "gemini-3.6-flash",
+      protocol: "google",
       note: "Google AI Studio 原生接口（generateContent）；模型名可改，例如 gemini-2.5-flash。"
     },
     {
@@ -354,10 +361,24 @@
       note: "任意 OpenAI 兼容服务。"
     }
   ];
+  const CUSTOM_TEMPLATE = {
+    id: "custom",
+    name: "自定义（OpenAI 兼容）",
+    provider: "custom",
+    protocol: "openai",
+    baseUrl: "",
+    model: "",
+    note: "任何兼容 /chat/completions 的服务：填地址、模型名和密钥即可。"
+  };
+
+  const PROVIDER_TEMPLATES = [...MODEL_PRESETS, CUSTOM_TEMPLATE];
+
 
   function defaultModelProfiles() {
     return MODEL_PRESETS.map((preset) => ({
       ...preset,
+      protocol: preset.protocol || "openai",
+      templateId: preset.id,
       apiKey: "",
       thinkingCapable: Boolean(preset.thinkingCapable),
       enableThinking: Boolean(preset.enableThinking),
@@ -405,17 +426,12 @@
         model: oldQwen ? preset.model : String(profile.model || ""),
         apiKey: String(profile.apiKey || ""),
         note: String(profile.note || (oldQwen ? preset.note : "")),
+        protocol: String(profile.protocol || (String(profile.baseUrl || "").includes("generativelanguage") ? "google" : "openai")),
+        templateId: String(profile.templateId || (profile.baseUrl ? "" : "custom")),
         thinkingCapable: Boolean(profile.thinkingCapable) || isQwen,
         enableThinking: Boolean(profile.enableThinking),
         thinkingBudget: Math.max(0, Math.min(262144, Number(profile.thinkingBudget) || 0))
       };
-    });
-    // Newly shipped presets must show up for people who already saved profiles,
-    // otherwise a fresh provider stays invisible until they wipe local data.
-    ["google"].forEach((id) => {
-      if (profiles.some((profile) => profile.id === id)) return;
-      const preset = MODEL_PRESETS.find((item) => item.id === id);
-      if (preset) profiles.push({ ...preset, apiKey: "" });
     });
     return { profiles, activeProfileId: String(parsed.activeProfileId || profiles[0].id) };
   }
@@ -450,6 +466,7 @@
     const profile = activeProfile(draft);
     if (!profile) return;
     profile.provider = draft.provider || profile.provider || "custom";
+    profile.protocol = profile.protocol || (String(profile.provider).toLowerCase() === "google" ? "google" : "openai");
     profile.baseUrl = String(draft.baseUrl || "");
     profile.model = String(draft.model || "");
     profile.apiKey = String(draft.apiKey || "");
@@ -929,10 +946,13 @@
       return;
     }
     try {
-      wordDb = await window.idb.openDB(WORD_DB_NAME, 1, {
+      wordDb = await window.idb.openDB(WORD_DB_NAME, 2, {
         upgrade(db) {
           if (!db.objectStoreNames.contains(WORD_DB_STORE)) {
             db.createObjectStore(WORD_DB_STORE, { keyPath: "key" });
+          }
+          if (!db.objectStoreNames.contains(SENTENCE_DB_STORE)) {
+            db.createObjectStore(SENTENCE_DB_STORE, { keyPath: "key" });
           }
         }
       });
@@ -940,6 +960,12 @@
       for (const entry of entries) {
         if (entry?.key && entry?.data) wordCache.set(entry.key, entry);
       }
+      try {
+        const storedSentences = await wordDb.getAll(SENTENCE_DB_STORE);
+        for (const record of storedSentences) {
+          if (record?.key && record?.data) sentenceCache.set(record.key, record);
+        }
+      } catch (_) { /* older databases may not have the store yet */ }
       const legacy = legacyWordCache();
       let migrated = 0;
       for (const [key, hit] of Object.entries(legacy)) {
@@ -998,6 +1024,37 @@
     }
     for (const [key] of entries.slice(cacheMax())) {
       if (wordCache.has(key)) await removeWordRecord(key);
+    }
+  }
+
+  async function sentenceKey(text, level, detail) {
+    const raw = `${String(text).trim()}|${level}|${detail}`;
+    try {
+      const buffer = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(raw));
+      return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+    } catch (_) {
+      return `k-${raw.length}-${raw.slice(0, 40).replace(/\s+/g, "_")}`;
+    }
+  }
+
+  function cacheGetSentence(key) {
+    const record = sentenceCache.get(key);
+    if (!record || record.schema !== SENTENCE_CACHE_SCHEMA) return null;
+    return record.data || null;
+  }
+
+  function cachePutSentence(key, data, level, detail) {
+    const record = { key, schema: SENTENCE_CACHE_SCHEMA, savedAt: Date.now(), level, detail, data };
+    sentenceCache.set(key, record);
+    if (wordDb) {
+      wordDb.put(SENTENCE_DB_STORE, record).catch(() => {});
+    }
+    if (sentenceCache.size > SENTENCE_LIMIT) {
+      const ordered = [...sentenceCache.values()].sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
+      ordered.slice(0, sentenceCache.size - SENTENCE_LIMIT).forEach((entry) => {
+        sentenceCache.delete(entry.key);
+        if (wordDb) wordDb.delete(SENTENCE_DB_STORE, entry.key).catch(() => {});
+      });
     }
   }
 
@@ -1375,6 +1432,16 @@
     renderRoute(route, direction, { instant });
   }
 
+  function setOnionOpen(slot, open) {
+    if (!slot) return;
+    slot.classList.toggle("is-open", open);
+    const mark = slot.querySelector(":scope > .onion-mark");
+    if (mark) {
+      mark.textContent = open ? "−" : "+";
+      mark.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+  }
+
   function refreshThemedPage() {
     if (!screen || !state.route || state.route.name === "loading") return;
     const html = pageHtml(state.route);
@@ -1473,7 +1540,7 @@
       cached.examplesByTheme = merged;
       cachePutWord(normalizeWord(word.word), cached, state.settings.detailLevel || "standard");
     }
-    if (state.route?.name === "word") refreshThemedPage();
+    updateExamplesBlock(word);
   }
 
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
@@ -2807,12 +2874,53 @@
     return page ? $('.meaning-pager', page) : null;
   }
 
+  function exampleBlockHtml(word, no) {
+    const exampleTheme = window.TALK_THEME?.current?.() || { id: "paper", label: "Paper" };
+    const themedExamples = exampleForTheme(word, exampleTheme.id);
+    if (!themedExamples.length) return "";
+    const missingThemes = themesMissingExamples(word);
+    return `
+        <section class="block word-example-block reveal" data-block-no="${attr(no)}" style="--d:2.4">
+          ${blockHead(no, "例句", `${themedExamples.length} 条`)}
+          <div class="example-toolbar">
+            <span class="mono">按当前主题的语气写出</span>
+            <button class="link-btn" type="button" data-action="regen-examples" data-word="${attr(word.word)}">换一批</button>
+          </div>
+          ${themedExamples.map((example) => `
+            <div class="example-card">
+              <span class="example-quote">“</span>
+              <p class="example-en">${highlightPlain(example.en, word.word)}</p>
+              ${example.zh ? `<p class="example-zh">${esc(example.zh)}</p>` : ""}
+              <div class="example-foot${example.source ? "" : " is-solo"}">
+                ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : ""}
+                <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
+              </div>
+            </div>`).join("")}
+          ${missingThemes.length ? `<p class="example-hint">还有 ${missingThemes.length} 套主题没有例句，切过去时会自动补上。</p>` : ""}
+        </section>`;
+  }
+
+  function updateExamplesBlock(word) {
+    if (!screen || state.route?.name !== "word") return false;
+    const section = $(".word-example-block", screen);
+    const no = section?.dataset?.blockNo;
+    if (!section || !no) return false;
+    const scroll = screen.scrollTop;
+    const html = exampleBlockHtml(word, no);
+    if (!html) {
+      section.remove();
+    } else {
+      section.outerHTML = html;
+    }
+    screen.scrollTop = scroll;
+    applyCacheDisplay();
+    refreshCacheBorders(screen);
+    return true;
+  }
+
   function wordPage(word, layer = null) {
     let blockNo = 0;
     const nextNo = () => String(++blockNo).padStart(2, "0");
-    const exampleTheme = window.TALK_THEME?.current?.() || { id: "paper", label: "Paper" };
-    const themedExamples = exampleForTheme(word, exampleTheme.id);
-    const missingThemes = themesMissingExamples(word);
     const bookmark = `word:${normalizeWord(word.word)}`;
     const heroNote = word.note ? rich(word.note) : "";
     const header = layer
@@ -2912,25 +3020,7 @@
           </div>
         </section>` : ""}
 
-        ${themedExamples.length ? `
-        <section class="block word-example-block reveal" style="--d:2.4">
-          ${blockHead(nextNo(), "例句", `${esc(exampleTheme.label)} · ${themedExamples.length} 条`)}
-          <div class="example-toolbar">
-            <span class="mono">按当前主题的语气写出</span>
-            <button class="link-btn" type="button" data-action="regen-examples" data-word="${attr(word.word)}">换一批</button>
-          </div>
-          ${themedExamples.map((example) => `
-            <div class="example-card">
-              <span class="example-quote">“</span>
-              <p class="example-en">${highlightPlain(example.en, word.word)}</p>
-              ${example.zh ? `<p class="example-zh">${esc(example.zh)}</p>` : ""}
-              <div class="example-foot">
-                ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : `<span class="example-source">${esc(exampleTheme.label)}</span>`}
-                <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
-              </div>
-            </div>`).join("")}
-          ${missingThemes.length ? `<p class="example-hint">还有 ${missingThemes.length} 套主题没有例句，切过去时会自动补上。</p>` : ""}
-        </section>` : ""}
+        ${exampleBlockHtml(word, nextNo())}
 
         ${word.collocations.length ? `
         <section class="block word-collocation-block reveal" style="--d:2.6">
@@ -3035,6 +3125,19 @@
     return [];
   }
 
+  function splitSentences(text) {
+    const value = String(text || "").trim();
+    if (!value) return [];
+    try {
+      if (typeof Intl !== "undefined" && Intl.Segmenter) {
+        const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
+        const pieces = [...segmenter.segment(value)].map((item) => item.segment.trim()).filter(Boolean);
+        if (pieces.length) return pieces.slice(0, 6);
+      }
+    } catch (_) { /* fall through to the regex */ }
+    return value.split(/(?<=[.!?。！？])\s+/).map((item) => item.trim()).filter(Boolean).slice(0, 6);
+  }
+
   function normalizeSentenceParts(value) {
     if (!Array.isArray(value)) return [];
     return value.map((part) => {
@@ -3044,7 +3147,8 @@
         text,
         translation: String(part.translation || "").trim(),
         summary: String(part.summary || "").trim(),
-        tree: normalizeStructureTree(part.tree || part.structure)
+        tree: normalizeStructureTree(part.tree || part.structure),
+        keyWords: normalizeKeyWords(part.keyWords || part.key_words || part.words)
       };
     }).filter(Boolean);
   }
@@ -3242,6 +3346,7 @@
     const renderParts = parts.map((part, index) => ({ ...part, tree: (part.tree && part.tree.length) ? part.tree : (index === 0 ? tree : []) }));
     state.structureNodes = registerTreeNodes(tree.concat(...parts.map((part) => part.tree || [])), {});
     const bookmark = `sentence:${sentence.id}`;
+    const multi = renderParts.length > 1;
     return `
       ${backTopbar({ label: "句子", title: `${sentence.keyWords.length} 个重点词`, bookmark })}
       <main class="result-page">
@@ -3250,7 +3355,7 @@
             <span class="kicker-pill accent">句子</span>
             <span class="kicker-pill">${sentence.keyWords.length} 个重点词</span>
           </div>
-          <div class="onion reveal" style="--d:0.6">${renderParts.map((part, index) => onionSentenceBlock(part, index, sentence.keyWords)).join("")}</div>
+          ${multi ? "" : `<div class="onion reveal" style="--d:0.6">${onionSentenceBlock(renderParts[0], 0, sentence.keyWords)}</div>`}
           <div class="sentence-source reveal" style="--d:1">
             <span>${esc(sentence.source || "Talk corpus")}</span>
             <span class="wave"></span>
@@ -3279,18 +3384,27 @@
           </div>` : ""}
         </section>
 
-        ${sentence.summary ? `
+        ${multi ? renderParts.map((part, index) => `
+        <section class="block sentence-part reveal" style="--d:1.3">
+          ${blockHead(nextNo(), `句子 ${index + 1}`, part.translation ? "中文翻译" : "结构")}
+          <div class="onion">${onionSentenceBlock(part, index, part.keyWords.length ? part.keyWords : sentence.keyWords)}</div>
+          ${part.translation ? `<p class="sentence-part-zh">${esc(part.translation)}</p>` : ""}
+          ${part.summary ? `<div class="summary-card">${esc(part.summary)}</div>` : ""}
+          ${part.keyWords.length ? `<div class="key-list">${part.keyWords.map((keyWord, n) => keyCard(keyWord, index * 100 + n)).join("")}</div>` : ""}
+        </section>`).join("") : ""}
+
+        ${!multi && sentence.summary ? `
         <section class="block reveal" style="--d:1.35">
           ${blockHead(nextNo(), "浓缩主旨", "一句话记住")}
           <div class="summary-card">${esc(sentence.summary)}</div>
         </section>` : ""}
 
-        <section class="block reveal" style="--d:1.5">
+        ${multi ? "" : `<section class="block reveal" style="--d:1.5">
           ${blockHead(nextNo(), "值得注意的词", "点击展开")}
           <div class="key-list">
             ${sentence.keyWords.map((keyWord, index) => keyCard(keyWord, index)).join("")}
           </div>
-        </section>
+        </section>`}
 
         <div class="page-actions reveal" style="--d:2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏句子</button>
@@ -3918,6 +4032,25 @@
     openKeyLayer(index);
   }
 
+  function openTemplatePicker() {
+    openSheetShell({ kicker: "MODEL TEMPLATES", title: "从模板新建配置" });
+    const body = $("#sheet-scroll", overlayRoot);
+    if (!body) return;
+    body.innerHTML = `
+      <p class="sheet-lead">先选一个协议模板，再填地址、模型名与密钥；保存后它就是你自己的配置，之后只在这份列表里切换。</p>
+      <div class="template-list">
+        ${PROVIDER_TEMPLATES.map((template) => `
+          <button class="template-row" type="button" data-action="new-from-template" data-template="${attr(template.id)}">
+            <span class="template-head">
+              <strong>${esc(template.name)}</strong>
+              <span class="template-badge">${template.protocol === "google" ? "Gemini" : "OpenAI 兼容"}</span>
+            </span>
+            <span class="template-url mono">${esc(template.baseUrl || "自行填写地址")}</span>
+            <span class="template-note">${esc(template.note || "")}</span>
+          </button>`).join("")}
+      </div>`;
+  }
+
   function openSheetShell({ kicker, title }) {
     state.sheetOpenedAt = performance.now();
     if (state.sheetCloseTimer) {
@@ -4228,7 +4361,7 @@
 
   function modelSettingsHtml(draft) {
     return `
-      <p class="settings-intro">接入你自己的模型。Talk 使用 OpenAI 兼容的 Chat Completions 格式；所有修改会自动保存。</p>
+      <p class="settings-intro">从模板新建一份自己的配置，再填地址、模型与密钥；Talk 支持 OpenAI 兼容接口与 Google Gemini 两种协议。</p>
       <div class="model-profile-head">
         <span class="settings-subhead">模型配置</span>
         <span class="mono">${draft.profiles.length} 个</span>
@@ -4745,7 +4878,9 @@
   }
 
   function isGoogleProvider(cfg) {
-    return String(cfg?.provider || "").toLowerCase() === "google";
+    if (cfg?.protocol) return String(cfg.protocol).toLowerCase() === "google";
+    if (String(cfg?.provider || "").toLowerCase() === "google") return true;
+    return /generativelanguage\.googleapis\.com/i.test(String(cfg?.baseUrl || ""));
   }
 
   function googleRoot(baseUrl) {
@@ -4829,8 +4964,9 @@
     });
   }
 
-  function sentencePrompt(query, detail = "standard") {
+  function sentencePrompt(query, detail = "standard", pieces = []) {
     const level = sentenceLevelOf(state.settings?.sentenceLevel);
+    const sentences = pieces.length ? pieces.map((text, index) => ({ index, text })) : undefined;
     return JSON.stringify({
       task: "sentence",
       detail,
@@ -4838,7 +4974,8 @@
       maxKeyWords: level.maxKeyWords,
       levelHint: level.hint,
       length: SENTENCE_DEPTH_BRIEF[detail] || SENTENCE_DEPTH_BRIEF.standard,
-      text: String(query)
+      text: String(query),
+      ...(sentences ? { sentences } : {})
     });
   }
 
@@ -4848,8 +4985,19 @@
       const cached = cacheGetWord(query, detail);
       if (cached) return { type: "word", data: cached };
     }
+    const pieces = type === "sentence" ? splitSentences(query) : [];
+    const sentenceCacheKey = type === "sentence"
+      ? await sentenceKey(query, sentenceLevelOf(cfg.sentenceLevel).id, detail)
+      : "";
+    if (type === "sentence") {
+      const cached = cacheGetSentence(sentenceCacheKey);
+      if (cached) {
+        diagLog("info", "sentence.cache", "hit", { chars: String(query).length });
+        return { type: "sentence", data: cached };
+      }
+    }
     const endpoint = endpointFor(cfg.baseUrl, cfg);
-    const prompt = type === "sentence" ? sentencePrompt(query, detail) : wordPrompt(query, detail);
+    const prompt = type === "sentence" ? sentencePrompt(query, detail, pieces) : wordPrompt(query, detail);
     const messages = [
       { role: "system", content: systemPrompt(type) },
       { role: "user", content: prompt }
@@ -4947,6 +5095,7 @@
     data.sourceType = "model";
     data.model = cfg.model;
     data.source = "语境分析";
+    if (sentenceCacheKey) cachePutSentence(sentenceCacheKey, data, sentenceLevelOf(cfg.sentenceLevel).id, detail);
     return { type: "sentence", data };
   }
 
@@ -5757,10 +5906,8 @@
           break;
         }
         const themeId = window.TALK_THEME?.current?.().id || "paper";
-        const merged = { ...(active.examplesByTheme || {}) };
-        delete merged[themeId];
-        active.examplesByTheme = merged;
-        await fillThemeExamples(active, [themeId]).catch(() => {});
+        const needed = [themeId, ...themesMissingExamples(active).filter((id) => id !== themeId)];
+        await fillThemeExamples(active, needed).catch(() => {});
         toast("已按当前主题换了一批例句");
         break;
       }
@@ -5790,26 +5937,15 @@
         event.stopPropagation();
         const slot = target.closest(".onion-slot");
         if (!slot) break;
-        const open = !slot.classList.contains("is-open");
-        slot.classList.toggle("is-open", open);
-        target.setAttribute("aria-expanded", open ? "true" : "false");
-        target.textContent = open ? "−" : "+";
-
+        setOnionOpen(slot, !slot.classList.contains("is-open"));
         break;
       }
 
       case "onion-toggle-all": {
         event.preventDefault();
         const mode = target.dataset.mode === "collapse" ? "collapse" : "expand";
-        $$(".onion-slot").forEach((slot) => {
-          const open = mode === "expand";
-          slot.classList.toggle("is-open", open);
-          const mark = $(".onion-mark", slot);
-          if (mark) {
-            mark.setAttribute("aria-expanded", open ? "true" : "false");
-            mark.textContent = open ? "−" : "+";
-          }
-        });
+        const open = mode === "expand";
+        $$(".onion-slot", screen || document).forEach((slot) => setOnionOpen(slot, open));
         break;
       }
 
@@ -5857,6 +5993,10 @@
         window.TALK_THEME.apply(target.dataset.theme);
         applyContentCopy();
         refreshThemedPage();
+        if (state.route?.name === "word") {
+          const current = getWord(state.route);
+          if (current) scheduleThemeExamples(current);
+        }
         renderSettingsContent();
         break;
 
@@ -5930,20 +6070,30 @@
         event.preventDefault();
         if (!state.draft) break;
         syncDraftProfile(state.draft);
-        const number = state.draft.profiles.filter((item) => item.id.startsWith("custom-")).length + 1;
-        const id = `custom-${Date.now()}`;
+        openTemplatePicker();
+        break;
+      }
+
+      case "new-from-template": {
+        event.preventDefault();
+        if (!state.draft) break;
+        const template = PROVIDER_TEMPLATES.find((item) => item.id === target.dataset.template) || CUSTOM_TEMPLATE;
+        closeSheet();
         const profile = {
-          id,
-          name: `新模型 ${number}`,
-          provider: "custom",
-          baseUrl: "",
-          model: "",
+          id: `${template.id}-${Date.now()}`,
+          name: template.name,
+          provider: template.provider || "custom",
+          protocol: template.protocol || "openai",
+          templateId: template.id,
+          baseUrl: template.baseUrl || "",
+          model: template.model || "",
           apiKey: "",
-          note: "自定义 OpenAI 兼容服务。"
+          note: template.note || ""
         };
         state.draft.profiles = [...state.draft.profiles, profile];
         state.draft = applyProfileToSettings(state.draft, profile);
-        scheduleSettingsCommit();
+        commitSettingsDraft();
+        openSettingsSheet();
         renderSettingsContent();
         break;
       }
