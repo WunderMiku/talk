@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "173";
+  const APP_VERSION = "175";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -89,7 +89,7 @@
 
   // Sentences now carry a summary, a parse tree and level-tagged key words,
   // which no longer fits in the old per-detail ceiling.
-  const SENTENCE_MAX_TOKENS = { fast: 8000, standard: 16000, deep: 32000 };
+  const SENTENCE_MAX_TOKENS = { fast: 6000, standard: 12000, deep: 20000 };
   // The depth option shapes the prompt; these ceilings only stop a runaway reply.
   const SENTENCE_DEPTH_BRIEF = {
     fast: "需要多少写多少即可，但偏向精简：tree 一般 3–5 个节点，重点词 2–4 个，每层解释一句话。",
@@ -1888,9 +1888,9 @@
               <span class="mono">原文</span>
               <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
             </div>
-            <textarea id="translator-input" rows="3" maxlength="${TRANSLATOR_MAX_CHARS}" placeholder="${attr(copy.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
+            <textarea id="translator-input" rows="3" placeholder="${attr(copy.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
             <div class="translator-input-foot">
-              <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span><span class="translator-char-count">0 / ${TRANSLATOR_MAX_CHARS}</span></span>
+              <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span><span class="translator-char-count">0 字</span></span>
               <button class="search-submit" type="submit" aria-label="生成选中的风格">${icon("arrowUpRight")}</button>
             </div>
           </div>
@@ -1925,11 +1925,11 @@
       <div class="translation-workspace-body">
         <form class="workspace-translator-form" id="workspace-translator-form" novalidate>
           <div class="workspace-input-shell">
-            <textarea id="workspace-translator-input" rows="2" maxlength="${TRANSLATOR_MAX_CHARS}" spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
+            <textarea id="workspace-translator-input" rows="2"  spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
             <div class="workspace-input-foot">
               <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
               <span class="translator-language">自动识别</span>
-              <span class="translator-char-count">0 / ${TRANSLATOR_MAX_CHARS}</span>
+              <span class="translator-char-count">0 字</span>
               <button class="search-submit" type="submit" aria-label="重新翻译">${icon("arrowUpRight")}</button>
             </div>
           </div>
@@ -1993,7 +1993,7 @@
     const workspaceValue = $("#workspace-translator-input")?.value ?? value;
     const shown = $("#workspace-translator-input") ? workspaceValue : value;
     $$(".translator-char-count").forEach((label) => {
-      label.textContent = `${shown.length} / ${TRANSLATOR_MAX_CHARS}`;
+      label.textContent = `${shown.length} 字`;
     });
   }
 
@@ -2158,10 +2158,7 @@
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
-    const deadline = type === "sentence"
-      ? (detail === "deep" ? 150_000 : detail === "fast" ? 70_000 : 100_000)
-      : (detail === "deep" ? 110_000 : 75_000);
-    const timer = window.setTimeout(() => controller.abort(), deadline);
+    const timer = window.setTimeout(() => controller.abort(), 60_000);
     const startedAt = Date.now();
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     try {
@@ -2189,10 +2186,6 @@
     const text = String(raw || "").trim();
     if (!text) {
       toast("先输入一句中文或英文");
-      return;
-    }
-    if (text.length > TRANSLATOR_MAX_CHARS) {
-      toast(`请控制在 ${TRANSLATOR_MAX_CHARS} 个字符以内`);
       return;
     }
     const selectedStyles = TRANSLATOR_STYLES
@@ -2638,7 +2631,7 @@
             </div>
           </div>
           <div class="search-row">
-            <textarea class="search-input" id="search-input" rows="1" maxlength="800" placeholder="${attr(copy.searchPlaceholder)}" aria-label="单词或句子" spellcheck="false"></textarea>
+            <textarea class="search-input" id="search-input" rows="1" placeholder="${attr(copy.searchPlaceholder)}" aria-label="单词或句子" spellcheck="false"></textarea>
             <button class="search-submit" type="submit" aria-label="查询">${icon("arrowUpRight")}</button>
           </div>
           <div class="search-bottom">
@@ -4872,10 +4865,6 @@
       toast("先输入一个单词或一句话");
       return;
     }
-    if (query.length > SEARCH_MAX_CHARS) {
-      toast(`请控制在 ${SEARCH_MAX_CHARS} 个字符以内`);
-      return;
-    }
 
     const type = requestedMode === "auto" ? detectType(query) : requestedMode;
     state.lastAttempt = { query, type };
@@ -4943,9 +4932,9 @@
   function outputCeiling(cfg) {
     const provider = String(cfg?.provider || "").toLowerCase();
     if (provider === "google") return 32000;
-    if (provider === "openai") return 32000;
+    if (provider === "openai") return 16000;
     if (provider === "deepseek") return 8192;
-    return 32000;
+    return 20000;
   }
 
   function isGoogleProvider(cfg) {
@@ -5073,8 +5062,16 @@
       { role: "system", content: systemPrompt(type) },
       { role: "user", content: prompt }
     ];
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 60_000);
+    let controller = new AbortController();
+    let timedOut = false;
+    let timer = 0;
+    const armDeadline = () => {
+      window.clearTimeout(timer);
+      controller = new AbortController();
+      timedOut = false;
+      timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 60_000);
+    };
+    armDeadline();
     const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
     const wanted = type === "sentence"
       ? Math.max(detailTokens, SENTENCE_MAX_TOKENS[detail] || SENTENCE_MAX_TOKENS.standard)
@@ -5095,9 +5092,12 @@
       content = await streamOnce();
     } catch (error) {
       diagLog("error", "model.fail", error?.message || String(error), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
-      // Mobile networks drop long streams; give the same request one silent retry.
-      if (!content && error?.name !== "AbortError") {
-        await wait(900);
+      // Mobile networks drop long streams and gateways sometimes cut our 60s
+      // deadline. Both are worth one silent retry with a fresh signal.
+      const retriable = timedOut || error?.name !== "AbortError" || /不是 JSON|空响应|Failed to fetch|network error/i.test(String(error?.message || ""));
+      if (!content && retriable) {
+        await wait(timedOut ? 300 : 900);
+        armDeadline();
         try {
           content = await streamOnce();
         } catch (retryError) {
@@ -5106,7 +5106,8 @@
       }
       // Older/limited gateways may reject streaming. Retry once non-streaming
       // only when no content has been received.
-      if (!content && error?.name !== "AbortError") {
+      if (!content && retriable) {
+        armDeadline();
         let response;
         try {
           response = await postChat(endpoint, cfg, messages, controller.signal, true, maxTokens);
@@ -5117,7 +5118,7 @@
           const text = await response.text().catch(() => "");
           throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
         }
-        const json = await response.json();
+        const json = await readJsonResponse(response);
         const message = json?.choices?.[0]?.message;
         content = message?.content;
         if (Array.isArray(content)) {
@@ -5127,6 +5128,15 @@
       if (!content) throw error;
     } finally {
       window.clearTimeout(timer);
+    }
+    if (!content) {
+      diagLog("error", "model.empty", "网关返回了空内容", { type, detail, chars: 0 });
+      armDeadline();
+      try {
+        content = await streamOnce();
+      } catch (emptyRetryError) {
+        diagLog("error", "model.fail", emptyRetryError?.message || String(emptyRetryError), { type, detail, attempt: 2 });
+      }
     }
     if (!content) throw new Error("模型返回了空消息。");
     diagLog("info", "model.content", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
@@ -5148,7 +5158,7 @@
       }]);
       const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
       if (!retry.ok) throw parseError;
-      const retryJson = await retry.json();
+      const retryJson = await readJsonResponse(retry);
       const retryMessage = retryJson?.choices?.[0]?.message;
       let retryContent = retryMessage?.content;
       if (Array.isArray(retryContent)) {
@@ -5323,7 +5333,7 @@
         window.__talkStreamWarned = true;
         console.info("Provider returned a buffered JSON response despite stream=true.");
       }
-      const json = await response.json();
+      const json = await readJsonResponse(response, "流式接口");
       const message = json?.choices?.[0]?.message;
       let content = message?.content;
       if (Array.isArray(content)) {
@@ -5474,6 +5484,16 @@
       response = await send(false);
     }
     return response;
+  }
+
+  async function readJsonResponse(response, label = "接口") {
+    const raw = await response.text().catch(() => "");
+    if (!raw) throw new Error(`${label}返回了空响应（HTTP ${response.status}），可能是网关超时，请重试。`);
+    try {
+      return JSON.parse(raw);
+    } catch (_) {
+      throw new Error(`${label}返回的不是 JSON（HTTP ${response.status}）：${raw.slice(0, 160)}`);
+    }
   }
 
   function parseJsonObject(content) {
