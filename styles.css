@@ -3623,67 +3623,11 @@ textarea:focus-visible,
    Spelling correction line
    ============================================================ */
 
-.spelling-banner {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 26px;
-  margin: 2px 0 8px;
-  padding: 4px 2px 7px;
-  overflow: hidden;
-  border-bottom: 1px solid rgba(23, 24, 19, 0.11);
-  color: var(--muted);
-  font-family: var(--sans);
-  font-size: 10px;
-  line-height: 1.4;
-}
 
-.spelling-label {
-  flex: 0 0 auto;
-  color: var(--muted-2);
-  font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
-}
 
-.spelling-wrong {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #a14c32;
-  font-size: 10.5px;
-  font-weight: 600;
-  text-decoration: line-through;
-  text-decoration-thickness: 1px;
-  text-decoration-color: rgba(161, 76, 50, 0.55);
-}
 
-.spelling-arrow {
-  flex: 0 0 auto;
-  color: var(--muted-2);
-  font-size: 10px;
-}
 
-.spelling-right {
-  flex: 0 0 auto;
-  color: var(--ink);
-  font-size: 10.5px;
-  font-weight: 700;
-  border-bottom: 1px solid var(--lime-deep);
-}
 
-.spelling-note {
-  flex: 1 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  margin-left: 2px;
-  color: var(--muted-2);
-  font-size: 8.5px;
-}
 
 /* ============================================================
    Prefetch switch
@@ -7483,10 +7427,6 @@ textarea:focus-visible,
     margin-top: var(--word-family-gap) !important;
   }
 
-  .screen[data-page="word"] .spelling-banner,
-  .word-layer .spelling-banner {
-    grid-column: 1 / -1;
-  }
 
   /* The two-column block cluster under the family row. */
   .screen[data-page="word"] .word-columns,

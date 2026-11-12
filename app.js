@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "175";
+  const APP_VERSION = "176";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2781,22 +2781,12 @@
       collocations: normalizeStrings(raw.collocations),
       related: normalizeStrings(raw.related),
       origin: normalizeOrigin(raw.origin || raw.etymology),
-      spelling: normalizeSpelling(raw.spelling, raw.word),
       source: raw.source || "demo",
       cached: Boolean(raw.cached),
       model: raw.model || ""
     };
   }
 
-  function spellingBanner(spelling) {
-    return `
-      <aside class="spelling-banner reveal" style="--d:0" aria-label="拼写校正" title="${attr(spelling.note || "")}">
-        <span class="spelling-label">拼写</span>
-        <span class="spelling-wrong">${esc(spelling.input)}</span>
-        <span class="spelling-arrow" aria-hidden="true">→</span>
-        <span class="spelling-right">${esc(spelling.corrected)}</span>
-      </aside>`;
-  }
 
   /* Relation cards speak Chinese only. A model (or an older cached entry) may
      hand back an English definition; that is dropped rather than mixed in. */
@@ -2949,7 +2939,6 @@
     return `
       ${header}
       <main class="result-page">
-        ${word.spelling ? spellingBanner(word.spelling) : ""}
         <section class="result-hero">
           <div class="result-kicker reveal" style="--d:0">
             <span class="kicker-pill accent">单词</span>
@@ -5546,14 +5535,7 @@
       memory: String(base.memory || base.memoryHook || ""),
       related: normalizeStrings(base.related),
       origin: normalizeOrigin(base.origin || base.etymology),
-      spelling: normalizeSpelling(base.spelling || base.correction, base.word || fallbackWord)
     };
-    const queryKey = normalizeWord(fallbackWord || "");
-    const resultKey = normalizeWord(result.word || "");
-    if (queryKey && resultKey && queryKey !== resultKey && !result.spelling) {
-      throw new Error("模型给出的拼写替换差异过大，已拒绝这次结果，请重试。");
-    }
-    if (result.spelling?.corrected) result.word = normalizeWord(result.spelling.corrected);
     if (!result.short) result.short = "";
     return result;
   }
@@ -5592,56 +5574,8 @@
     };
   }
 
-  function spellingDistance(a, b) {
-    const left = String(a || "").toLowerCase();
-    const right = String(b || "").toLowerCase();
-    if (left === right) return 0;
-    const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
-    for (let i = 1; i <= left.length; i++) {
-      let diagonal = previous[0];
-      previous[0] = i;
-      for (let j = 1; j <= right.length; j++) {
-        const above = previous[j];
-        previous[j] = Math.min(
-          previous[j] + 1,
-          previous[j - 1] + 1,
-          diagonal + (left[i - 1] === right[j - 1] ? 0 : 1)
-        );
-        diagonal = above;
-      }
-    }
-    return previous[right.length];
-  }
 
-  const PROTECTED_SPELLING = new Set([
-    "google", "standard", "apple", "amazon", "microsoft", "openai", "qwen",
-    "deepseek", "github", "android", "iphone", "chatgpt", "twitter", "youtube"
-  ]);
 
-  function normalizeSpelling(value, fallbackWord = "") {
-    if (!value || typeof value !== "object") return null;
-    const input = String(value.input || value.query || "").trim();
-    const corrected = String(value.corrected || value.correction || value.word || fallbackWord || "").trim();
-    if (!input || !corrected) return null;
-    // Multi-word input is a phrase/idiom, never a spelling mistake.
-    if (/\s/.test(input.trim())) return null;
-    const changed = value.changed !== undefined
-      ? Boolean(value.changed)
-      : normalizeWord(input) !== normalizeWord(corrected);
-    const inputKey = normalizeWord(input);
-    if (!changed || inputKey === normalizeWord(corrected)) return null;
-    const confidence = Number(value.confidence || 0);
-    const maxDistance = input.length <= 4 ? 1 : 2;
-    if (PROTECTED_SPELLING.has(inputKey)) return null;
-    if (confidence && confidence < 0.75) return null;
-    if (spellingDistance(input, corrected) > maxDistance) return null;
-    return {
-      input,
-      corrected,
-      confidence,
-      note: String(value.note || value.reason || "").trim()
-    };
-  }
 
   function localizeTimelineWhen(value) {
     const text = String(value || "").trim();
