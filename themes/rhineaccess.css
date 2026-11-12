@@ -1,0 +1,592 @@
+/* ============================================================
+   Rhine Lab · Access — a special theme modelled on the
+   "ANALYSIS OS" footage: paper white, hairline windows, one acid
+   green, tiny mono labels, and a laboratory desktop that boots.
+   Experimental: scan line, window chrome, hover lift, blinking
+   status dots. All motion is switchable off by prefers-reduced-motion.
+   ============================================================ */
+
+[data-theme="rhineaccess"] {
+  --paper: #f2f0ea;
+  --paper-deep: #e7e4db;
+  --card: #fbfaf6;
+  --ink: #131313;
+  --ink-soft: #242422;
+  --muted: #6d6c66;
+  --muted-2: #96958d;
+  --line: rgba(19, 19, 19, 0.16);
+  --line-strong: #131313;
+
+  --lime: #c8f000;
+  --lime-deep: #a9cf00;
+  --lime-wash: rgba(200, 240, 0, 0.4);
+  --coral: #d2452f;
+  --coral-wash: #f7e0da;
+  --lavender: #131313;
+  --lavender-wash: #e3e1d8;
+  --sky: #7f8a78;
+  --sky-wash: #e3e7dc;
+
+  --surface-raised: #fbfaf6;
+  --surface-soft: rgba(251, 250, 246, 0.9);
+  --accent: #c8f000;
+  --accent-strong: #a9cf00;
+  --accent-wash: rgba(200, 240, 0, 0.34);
+  --accent-ink: #131313;
+  --focus-ring: rgba(19, 19, 19, 0.45);
+
+  --shadow-card: 4px 4px 0 rgba(19, 19, 19, 0.9);
+  --shadow-float: 6px 6px 0 rgba(19, 19, 19, 0.9);
+
+  --font: "Inter", "Helvetica Neue", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  --display: var(--font);
+  --sans: var(--font);
+  --mono: ui-monospace, "SFMono-Regular", "Courier New", monospace;
+
+  --radius-xs: 0;
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-card: 0;
+  --radius-sheet: 0;
+  --radius-pill: 0;
+
+  --ra-green: #c8f000;
+  --ra-ink: #131313;
+  --ra-paper: #f2f0ea;
+}
+
+/* ---------- ground: blueprint grid, scan line --------------------- */
+
+[data-theme="rhineaccess"] .screen {
+  background-color: var(--paper);
+  background-image:
+    repeating-linear-gradient(0deg, rgba(19, 19, 19, 0.045) 0 1px, transparent 1px 24px),
+    repeating-linear-gradient(90deg, rgba(19, 19, 19, 0.045) 0 1px, transparent 1px 24px);
+  background-position: 0 0, 0 0;
+}
+
+[data-theme="rhineaccess"] .screen::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: -10%;
+  height: 22vh;
+  pointer-events: none;
+  z-index: 60;
+  background: linear-gradient(180deg, transparent, rgba(200, 240, 0, 0.09), transparent);
+  mix-blend-mode: multiply;
+  animation: ra-scan 11s linear infinite;
+}
+
+@keyframes ra-scan {
+  from { transform: translateY(-30vh); }
+  to { transform: translateY(120vh); }
+}
+
+/* ---------- top bar: a window chrome strip ----------------------- */
+
+[data-theme="rhineaccess"] .topbar {
+  background: var(--paper);
+  border-bottom: 1px solid var(--ink);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+[data-theme="rhineaccess"] .topbar::after { background: none; }
+
+[data-theme="rhineaccess"] .brand {
+  font-family: var(--mono);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+[data-theme="rhineaccess"] .brand .dot { color: var(--ra-green); }
+
+[data-theme="rhineaccess"] .module-switch {
+  border: 1px solid var(--ink);
+  background: var(--card);
+}
+
+[data-theme="rhineaccess"] .module-btn {
+  border-right: 1px solid var(--ink);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  color: var(--ink);
+}
+
+[data-theme="rhineaccess"] .module-btn:last-child { border-right: 0; }
+
+[data-theme="rhineaccess"] .module-btn.active,
+[data-theme="rhineaccess"] .module-btn.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+[data-theme="rhineaccess"] .module-version {
+  font-family: var(--mono);
+  letter-spacing: 0.1em;
+  color: var(--muted);
+}
+
+[data-theme="rhineaccess"] .round-btn {
+  border: 1px solid var(--ink);
+  background: var(--card);
+  border-radius: 0;
+}
+
+[data-theme="rhineaccess"] .round-btn:hover {
+  background: var(--ra-green);
+  border-color: var(--ink);
+}
+
+/* ---------- headings: condensed plates, mono eyebrows ------------- */
+
+[data-theme="rhineaccess"] .home-title,
+[data-theme="rhineaccess"] .word-title,
+[data-theme="rhineaccess"] .translator-title,
+[data-theme="rhineaccess"] .poster-masthead h1 {
+  font-weight: 820;
+  letter-spacing: -0.045em;
+}
+
+[data-theme="rhineaccess"] .home-title em {
+  background: linear-gradient(transparent 62%, var(--ra-green) 62%);
+}
+
+[data-theme="rhineaccess"] .home-eyebrow,
+[data-theme="rhineaccess"] .section-kicker,
+[data-theme="rhineaccess"] .daily-section-kicker {
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+[data-theme="rhineaccess"] .home-eyebrow::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  background: var(--ra-green);
+  animation: ra-blink 2.4s steps(1) infinite;
+}
+
+@keyframes ra-blink {
+  0%, 62% { opacity: 1; }
+  63%, 100% { opacity: 0.25; }
+}
+
+/* ---------- cards become OS windows ------------------------------ */
+
+[data-theme="rhineaccess"] .search-card,
+[data-theme="rhineaccess"] .meaning-card,
+[data-theme="rhineaccess"] .example-card,
+[data-theme="rhineaccess"] .family-card,
+[data-theme="rhineaccess"] .summary-card,
+[data-theme="rhineaccess"] .translation-card,
+[data-theme="rhineaccess"] .key-card,
+[data-theme="rhineaccess"] .sentence-part,
+[data-theme="rhineaccess"] .theme-manifesto {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: none;
+  transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
+}
+
+[data-theme="rhineaccess"] .search-card:hover,
+[data-theme="rhineaccess"] .meaning-card:hover,
+[data-theme="rhineaccess"] .example-card:hover,
+[data-theme="rhineaccess"] .family-card:hover,
+[data-theme="rhineaccess"] .translation-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: var(--shadow-card);
+}
+
+[data-theme="rhineaccess"] .search-card {
+  position: relative;
+  padding-top: 26px;
+}
+
+[data-theme="rhineaccess"] .search-card::before,
+[data-theme="rhineaccess"] .meaning-card::before,
+[data-theme="rhineaccess"] .example-card::before {
+  content: "ANALYSIS OS / RECORD";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 20px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--paper-deep);
+  border-bottom: 1px solid var(--ink);
+}
+
+[data-theme="rhineaccess"] .meaning-card::before { content: "ANALYSIS OS / SENSES"; }
+[data-theme="rhineaccess"] .example-card::before { content: "ANALYSIS OS / CORPUS"; }
+
+[data-theme="rhineaccess"] .meaning-card { padding-top: 30px; }
+
+[data-theme="rhineaccess"] .meaning-card::after {
+  content: "●";
+  position: absolute;
+  top: 5px;
+  right: 10px;
+  font-size: 7px;
+  color: var(--ra-green);
+  animation: ra-blink 2.4s steps(1) infinite;
+}
+
+/* block index = black plate */
+[data-theme="rhineaccess"] .block-index {
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  letter-spacing: 0.08em;
+  padding: 4px 6px;
+}
+
+[data-theme="rhineaccess"] .block-head h2 {
+  font-weight: 820;
+  letter-spacing: -0.02em;
+}
+
+[data-theme="rhineaccess"] .block-head .rule {
+  height: 1px;
+  background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 6px);
+  opacity: 0.5;
+}
+
+/* ---------- buttons, chips, inputs ------------------------------- */
+
+[data-theme="rhineaccess"] .btn {
+  border-radius: 0;
+  border: 1px solid var(--ink);
+  font-family: var(--sans);
+  letter-spacing: 0;
+  transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), background 120ms;
+}
+
+[data-theme="rhineaccess"] .btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+[data-theme="rhineaccess"] .btn-primary:hover {
+  background: var(--ra-green);
+  color: var(--ink);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+[data-theme="rhineaccess"] .btn-secondary { background: var(--card); }
+
+[data-theme="rhineaccess"] .btn-secondary:hover {
+  background: var(--ra-green);
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--ink);
+}
+
+[data-theme="rhineaccess"] .chip,
+[data-theme="rhineaccess"] .kicker-pill,
+[data-theme="rhineaccess"] .level-chip,
+[data-theme="rhineaccess"] .translator-style-chip {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--card);
+  font-family: var(--mono);
+  letter-spacing: 0.04em;
+}
+
+[data-theme="rhineaccess"] .chip.accent,
+[data-theme="rhineaccess"] .kicker-pill.accent,
+[data-theme="rhineaccess"] .level-chip.is-active,
+[data-theme="rhineaccess"] .translator-style-chip.selected {
+  background: var(--ra-green);
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+[data-theme="rhineaccess"] .search-input,
+[data-theme="rhineaccess"] .translator-input,
+[data-theme="rhineaccess"] .field-input {
+  border-radius: 0;
+  background: var(--card);
+  border: 1px solid var(--ink);
+}
+
+[data-theme="rhineaccess"] .search-input:focus,
+[data-theme="rhineaccess"] .translator-input:focus {
+  outline: 2px solid var(--ra-green);
+  outline-offset: 1px;
+}
+
+[data-theme="rhineaccess"] .search-submit {
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--ra-green);
+}
+
+[data-theme="rhineaccess"] .search-submit:hover { background: var(--ra-green); color: var(--ink); }
+
+/* ---------- daily card: a sample slide --------------------------- */
+
+[data-theme="rhineaccess"] .daily {
+  background: var(--ink);
+  border-radius: 0;
+  border: 1px solid var(--ink);
+}
+
+[data-theme="rhineaccess"] .daily .daily-word { color: var(--ra-green); }
+
+[data-theme="rhineaccess"] .daily .daily-badge {
+  border: 1px solid rgba(242, 240, 234, 0.5);
+  border-radius: 0;
+  color: var(--paper);
+}
+
+/* ---------- sheets: a floating window ---------------------------- */
+
+[data-theme="rhineaccess"] .sheet {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: 8px 8px 0 rgba(19, 19, 19, 0.9);
+}
+
+[data-theme="rhineaccess"] .sheet-backdrop { background: rgba(19, 19, 19, 0.55); }
+
+[data-theme="rhineaccess"] .sheet-head {
+  border-bottom: 1px solid var(--ink);
+  background: var(--paper-deep);
+  font-family: var(--mono);
+  letter-spacing: 0.12em;
+}
+
+[data-theme="rhineaccess"] .settings-tab.is-active,
+[data-theme="rhineaccess"] .sheet-tab.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* ---------- motion: boot sequence -------------------------------- */
+
+[data-theme="rhineaccess"] .reveal {
+  animation-name: ra-boot;
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ra-boot {
+  from { opacity: 0; transform: translateY(10px); filter: blur(2px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+
+[data-theme="rhineaccess"] .screen[data-page="loading"] .skeleton {
+  background: linear-gradient(90deg, var(--paper-deep) 0%, rgba(200, 240, 0, 0.28) 50%, var(--paper-deep) 100%);
+  background-size: 220% 100%;
+  animation: ra-shimmer 1.5s linear infinite;
+}
+
+@keyframes ra-shimmer {
+  from { background-position: 120% 0; }
+  to { background-position: -120% 0; }
+}
+
+[data-theme="rhineaccess"] .theme-manifesto::after {
+  content: "▌";
+  margin-left: 6px;
+  color: var(--ra-green);
+  animation: ra-blink 1s steps(1) infinite;
+}
+
+[data-theme="rhineaccess"] .theme-manifesto {
+  background: var(--paper-deep);
+  border-left: 0;
+  border: 1px solid var(--ink);
+}
+
+[data-theme="rhineaccess"] .theme-manifesto strong { letter-spacing: 0.12em; }
+
+/* poster + archive, lightly dressed */
+[data-theme="rhineaccess"] .theme-poster {
+  background: var(--card);
+  border: 1px solid var(--ink);
+}
+
+[data-theme="rhineaccess"] .poster-masthead {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+[data-theme="rhineaccess"] .poster-masthead em { color: var(--ra-green); }
+
+/* ---------- reduced motion ---------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="rhineaccess"] .screen::after { animation: none; opacity: 0.35; }
+  [data-theme="rhineaccess"] .reveal { animation: none; }
+  [data-theme="rhineaccess"] .home-eyebrow::before,
+  [data-theme="rhineaccess"] .meaning-card::after,
+  [data-theme="rhineaccess"] .theme-manifesto::after { animation: none; }
+  [data-theme="rhineaccess"] .search-card:hover,
+  [data-theme="rhineaccess"] .meaning-card:hover,
+  [data-theme="rhineaccess"] .example-card:hover,
+  [data-theme="rhineaccess"] .family-card:hover,
+  [data-theme="rhineaccess"] .translation-card:hover { transform: none; }
+}
+
+/* ---------- corrections from the first render ------------------- */
+
+[data-theme="rhineaccess"] .module-switch {
+  border-radius: 0;
+  background: var(--card);
+  padding: 2px;
+  gap: 0;
+}
+
+[data-theme="rhineaccess"] .module-btn {
+  border-radius: 0;
+  min-width: 62px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--ink);
+  background: transparent;
+}
+
+[data-theme="rhineaccess"] .module-btn.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+[data-theme="rhineaccess"] .cache-state-pill,
+[data-theme="rhineaccess"] .source-pill,
+[data-theme="rhineaccess"] .status-pill {
+  border-radius: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--card);
+}
+
+/* the senses card already had a lime edge; turn it into a title bar */
+[data-theme="rhineaccess"] .meaning-card::before {
+  top: 0;
+  bottom: auto;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 20px;
+  border-radius: 0;
+  background: var(--paper-deep);
+  border-bottom: 1px solid var(--ink);
+  content: "ANALYSIS OS / SENSES";
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+[data-theme="rhineaccess"] .hero-note {
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+  background: var(--card);
+}
+
+[data-theme="rhineaccess"] .theme-manifesto {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 10px 12px;
+}
+
+[data-theme="rhineaccess"] .theme-manifesto strong {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+
+[data-theme="rhineaccess"] .theme-manifesto span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ---------- translator desk -------------------------------------- */
+
+[data-theme="rhineaccess"] .translator-input-card,
+[data-theme="rhineaccess"] .translator-empty,
+[data-theme="rhineaccess"] .translator-workspace,
+[data-theme="rhineaccess"] .workspace-input,
+[data-theme="rhineaccess"] .translation-card {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--card);
+  box-shadow: 5px 5px 0 rgba(19, 19, 19, 0.9);
+}
+
+[data-theme="rhineaccess"] .translator-empty {
+  box-shadow: none;
+  border-style: dashed;
+}
+
+[data-theme="rhineaccess"] .translator-style-chip,
+[data-theme="rhineaccess"] .translator-mode-btn,
+[data-theme="rhineaccess"] .translator-example-btn {
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--card);
+  color: var(--ink);
+}
+
+[data-theme="rhineaccess"] .translator-style-chip.selected {
+  background: var(--card);
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--ra-green);
+  border-color: var(--ink);
+}
+
+[data-theme="rhineaccess"] .translator-style-chip.selected .translator-style-emoji {
+  filter: grayscale(1);
+}
+
+[data-theme="rhineaccess"] .translator-mode-btn.active,
+[data-theme="rhineaccess"] .translator-mode-btn.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+[data-theme="rhineaccess"] .translator-submit,
+[data-theme="rhineaccess"] .workspace-submit {
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--ra-green);
+}
+
+[data-theme="rhineaccess"] .translator-input,
+[data-theme="rhineaccess"] .workspace-input {
+  border-radius: 0;
+  background: transparent;
+  border: 0;
+}
+
+/* Windows in this OS have no rounded corners */
+[data-theme="rhineaccess"] *:not(svg):not(path):not(circle):not(rect):not(line):not(polyline):not(polygon):not(.switch-knob):not(.sheet-handle) {
+  border-radius: 0;
+}

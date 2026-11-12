@@ -412,3 +412,74 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
     ]
   }
 };
+
+window.TALK_CONTENT.themeCopy.rhineaccess = {
+  modules: {
+    dictionary: "档案",
+    translator: "转译"
+  },
+  home: {
+    eyebrow: "RHINE LAB · ANALYSIS OS",
+    titleLead: "把词，",
+    titleAccent: "归档。",
+    lede: "每个词都是一份现场记录：来源、结构、用法与被引用过的位置。查一个词，就是调出它的档案。",
+    manifesto: {
+      ru: "STRATEGIC INFORMATION",
+      zh: "每一份记录，都可追溯"
+    },
+    searchKicker: "检索",
+    searchPlaceholder: "输入一个词，或一整段记录…",
+    recentLabel: "最近调阅",
+    modes: {
+      auto: "自动",
+      word: "词",
+      sentence: "段"
+    },
+    dailySectionKicker: "每日一条",
+    dailySectionTitle: "今日样本",
+    moodSectionKicker: "按主题归类",
+    moodSectionTitle: "档案架",
+    footerLeft: "语言是可以被记录的现场",
+    footerRight: "逐条归档，逐层追溯"
+  },
+  translator: {
+    kicker: "转译终端 · 中 / EN",
+    titleLead: "一句，",
+    titleAccent: "五种记录。",
+    lede: "同一句话，五种说法。语气不是包装，是记录它站在哪个位置。",
+    inputPlaceholder: "把要转译的句子放进来…",
+    empty: "写下你的句子。它会转译成五种记录。",
+    workspaceKicker: "转译终端",
+    workspaceTitle: "转译"
+  },
+  themeSalon: {
+    kicker: "档案 · 主题记录",
+    brand: "RHINE LAB",
+    masthead: "THEME ARCHIVE",
+    editionLabel: "主题档案",
+    leadLabel: "LEAD",
+    cta: "换一份",
+    singleCta: "再记一版",
+    pickerCta: "调档",
+    pickerKicker: "主题档案库",
+    pickerTitle: "从档案库里调一版",
+    printing: "正在归档",
+    cacheUnit: "份在档",
+    libraryLabel: "库存",
+    libraryUnit: "份",
+    noCache: "本地档案",
+    loading: "正在归档…",
+    local: "常设档案",
+    sceneLabel: "现场",
+    footerRight: "点一条记录，继续展开"
+  },
+  settings: {
+    kicker: "ANALYSIS OS / CONFIG",
+    title: "控制台",
+    tabs: [
+      ["model", "接口"],
+      ["tts", "音频"],
+      ["data", "存档"]
+    ]
+  }
+};

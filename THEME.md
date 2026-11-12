@@ -63,6 +63,7 @@ bottom corner as a multiply-blended watermark.
 | `rhine` | Rhine Lab | lab index, cool and clinical | hairlines, ticks, numbering |
 | `endfield` | Endfield | industrial field terminal | square, cut corners, one signal yellow |
 | `bitterworld` | 未许之地 | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
+| `rhineaccess` | Rhine Lab · Access | analysis OS windows, paper + one acid green | square windows, mono labels, scan line |
 
 Endfield is the most opinionated one, so it is the best example of what a theme
 may own: it flattens every radius with a single `[data-theme="endfield"] *`

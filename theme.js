@@ -56,6 +56,16 @@
       description: "工业终端：纸白底、切角与唯一一种信号黄",
       exampleStyle: "工程说明与现场记录式英语，简短、参数化、少形容词"
     },
+    rhineaccess: {
+      id: "rhineaccess",
+      label: "Rhine Lab · Access",
+      themeColor: "#f2f0ea",
+      accent: "#c8f000",
+      css: "themes/rhineaccess.css",
+      copyKey: "rhineaccess",
+      description: "实验记录终端：纸白、细线窗口与唯一一种酸性绿",
+      exampleStyle: "实验室运行记录式英语，带编号、观察条件与简短结论"
+    },
     bitterworld: {
       id: "bitterworld",
       label: "Bitterworld",
