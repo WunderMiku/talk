@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "172";
+  const APP_VERSION = "173";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -89,7 +89,7 @@
 
   // Sentences now carry a summary, a parse tree and level-tagged key words,
   // which no longer fits in the old per-detail ceiling.
-  const SENTENCE_MAX_TOKENS = { fast: 6000, standard: 12000, deep: 20000 };
+  const SENTENCE_MAX_TOKENS = { fast: 8000, standard: 16000, deep: 32000 };
   // The depth option shapes the prompt; these ceilings only stop a runaway reply.
   const SENTENCE_DEPTH_BRIEF = {
     fast: "需要多少写多少即可，但偏向精简：tree 一般 3–5 个节点，重点词 2–4 个，每层解释一句话。",
@@ -2158,7 +2158,10 @@
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 60_000);
+    const deadline = type === "sentence"
+      ? (detail === "deep" ? 150_000 : detail === "fast" ? 70_000 : 100_000)
+      : (detail === "deep" ? 110_000 : 75_000);
+    const timer = window.setTimeout(() => controller.abort(), deadline);
     const startedAt = Date.now();
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     try {
@@ -4940,9 +4943,9 @@
   function outputCeiling(cfg) {
     const provider = String(cfg?.provider || "").toLowerCase();
     if (provider === "google") return 32000;
-    if (provider === "openai") return 16000;
+    if (provider === "openai") return 32000;
     if (provider === "deepseek") return 8192;
-    return 20000;
+    return 32000;
   }
 
   function isGoogleProvider(cfg) {
@@ -5042,7 +5045,6 @@
       maxKeyWords: level.maxKeyWords,
       levelHint: level.hint,
       length: SENTENCE_DEPTH_BRIEF[detail] || SENTENCE_DEPTH_BRIEF.standard,
-      budget: pieces.length > 1 ? "每句 tree 不超过 6 个节点，重点词不超过 3 个；简单句用空数组，不要展开关系词。" : "",
       text: String(query),
       ...(sentences ? { sentences } : {})
     });
@@ -5140,12 +5142,9 @@
       // larger ceiling instead of showing a raw JSON error to the reader.
       if (!emptyish && !/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
       const retryTokens = Math.min(outputCeiling(cfg), Math.round(maxTokens * 1.5));
-      const concise = type === "sentence"
-        ? "只保留必要字段：parts[] 每句一项，tree 每句最多 6 个节点，keyWords 每句最多 3 个且不要 family/synonyms/antonyms/example（这些留空数组或 null）。"
-        : "只保留必要字段：每个词条最多 2 个义项、2 个同根词、2 个近义词、1 个反义词、1 个例句；不要展开长解释。";
       const retryMessages = messages.concat([{
         role: "user",
-        content: `上一次输出在中途被截断了或几乎没有内容。请更精简地重写：${concise}不要重复解释，务必输出完整闭合的 JSON。`
+        content: "上一次输出在中途被截断了（或几乎没有内容）。请保持同样的详细程度重写，但务必输出完整闭合的 JSON：如果确实太长，只省略 family/synonyms/antonyms 里的嵌套细节，不要删掉义项、句子分析或重点词。"
       }]);
       const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
       if (!retry.ok) throw parseError;
