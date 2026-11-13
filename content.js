@@ -255,7 +255,6 @@ window.TALK_CONTENT.themeCopy.rhine = {
     loading: "正在采样…",
     local: "常设样本",
     sceneLabel: "记录",
-    footerRight: "点击词语，继续分析"
   },
   settings: {
     kicker: "RHINE LAB / TERMINAL",
@@ -327,7 +326,6 @@ window.TALK_CONTENT.themeCopy.endfield = {
     loading: "正在归档…",
     local: "常设档案",
     sceneLabel: "现场",
-    footerRight: "点一条记录，继续展开"
   },
   settings: {
     kicker: "TERMINAL / CONFIG",
@@ -398,7 +396,6 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
     loading: "正在印刷…",
     local: "常设票册",
     sceneLabel: "现场",
-    footerRight: "点一张票根，继续读下去"
   },
   settings: {
     kicker: "BITTERWORLD / DESK",
@@ -469,7 +466,6 @@ window.TALK_CONTENT.themeCopy.rhineaccess = {
     loading: "正在归档…",
     local: "常设档案",
     sceneLabel: "现场",
-    footerRight: "点一条记录，继续展开"
   },
   settings: {
     kicker: "ANALYSIS OS / CONFIG",

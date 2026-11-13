@@ -23,8 +23,8 @@
       // Paper is the base token set in theme.css, so it ships no own file.
       css: null,
       copyKey: null,
-      description: "现代海报：米白纸面，荧光绿与珊瑚红",
-      exampleStyle: "干净利落的现代书面英语，一句一行，像海报上的短句"
+      description: "现代海报：米白纸面",
+      exampleStyle: "干净利落的现代书面英语"
     },
     constructivist: {
       id: "constructivist",
@@ -34,7 +34,7 @@
       css: "themes/ussr.css",
       copyKey: "constructivist",
       description: "俄式构成主义：粗斜切块与标语",
-      exampleStyle: "口号式、短促有力的英语，动词开头，像标语或广播"
+      exampleStyle: "口号式、短促有力的英语"
     },
     rhine: {
       id: "rhine",
@@ -44,7 +44,7 @@
       css: "themes/rhine.css",
       copyKey: "rhine",
       description: "安静的实验室：细线、刻度与观察记录",
-      exampleStyle: "冷静、精确的观察记录式英语，带测量或条件描述"
+      exampleStyle: "冷静、精确的观察记录式英语"
     },
     endfield: {
       id: "endfield",
@@ -54,7 +54,7 @@
       css: "themes/endfield.css",
       copyKey: "endfield",
       description: "工业终端：纸白底、切角与唯一一种信号黄",
-      exampleStyle: "工程说明与现场记录式英语，简短、参数化、少形容词"
+      exampleStyle: "工程说明与现场记录式英语"
     },
     rhineaccess: {
       id: "rhineaccess",
@@ -64,7 +64,7 @@
       css: "themes/rhineaccess.css",
       copyKey: "rhineaccess",
       description: "实验记录终端：纸白、细线窗口与唯一一种酸性绿",
-      exampleStyle: "实验室运行记录式英语，带编号、观察条件与简短结论"
+      exampleStyle: "实验室运行记录式英语"
     },
     bitterworld: {
       id: "bitterworld",
@@ -74,7 +74,7 @@
       css: "themes/bitterworld.css",
       copyKey: "bitterworld",
       description: "票根拼贴：米纸、墨线、检票章与一条虚线路线",
-      exampleStyle: "旅途与票根口吻的英语，带地名、路线或告示感"
+      exampleStyle: "旅途与票根口吻的英语"
     }
   };
 
