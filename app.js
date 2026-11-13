@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "184";
+  const APP_VERSION = "185";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2091,11 +2091,11 @@
         ${phrases.length ? phrases.map((item) => `<div class="translation-phrase">
           <strong>${esc(item.phrase)}</strong>
           <span>${esc(item.zh || "")}${item.note ? ` · ${esc(item.note)}` : ""}</span>
-        </div>`).join("") : `<p class="translation-detail-empty">这个版本没有返回搭配。重新生成一次试试。</p>`}
+        </div>`).join("") : `<p class="translation-detail-empty">这次没返回，重新生成试试。</p>`}
       </div>
       <div class="translation-detail-section">
         <h3>知识点</h3>
-        ${points.length ? `<ul class="translation-points">${points.map((point) => `<li>${esc(point)}</li>`).join("")}</ul>` : `<p class="translation-detail-empty">这个版本没有返回知识点。重新生成一次试试。</p>`}
+        ${points.length ? `<ul class="translation-points">${points.map((point) => `<li>${esc(point)}</li>`).join("")}</ul>` : `<p class="translation-detail-empty">这次没返回，重新生成试试。</p>`}
       </div>
       <button class="btn btn-secondary translation-detail-copy" type="button" data-action="copy-translation" data-text="${attr(variant.text)}">${icon("copy")} 复制这个版本</button>
     </div>`;
@@ -4251,7 +4251,7 @@
               ${example.zh ? `<span>${esc(example.zh)}</span>` : ""}
             </div>
           </div>` : ""}
-        ${isStub ? `<div class="sheet-note">${icon("info")}<span>这是演示词库里的迷你词条。连接模型后，可以补全义项、细微差别和更多例句。</span></div>` : ""}
+        ${isStub ? `<div class="sheet-note">${icon("info")}<span>演示词条。连接模型后可补全。</span></div>` : ""}
         ${entry?.note && !context ? `<div class="sheet-note">${icon("sparkle")}<span>${rich(entry.note)}</span></div>` : ""}
         <div class="sheet-actions">
           <button class="btn btn-primary" type="button" data-action="full-entry" data-word="${attr(word)}">${icon("arrowUpRight")} ${canOpen ? "查看完整词条" : "去查这个词"}</button>
@@ -4416,16 +4416,15 @@
         </div>`;
       })() : `
         <div class="tts-row">
-          <span class="tts-line">设备原生语音 · 点击即读，无需下载模型</span>
+          <span class="tts-line">点击即读，无需下载</span>
           <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
         </div>
-        <span class="tts-status" id="tts-test-status">将使用设备系统语音</span>
+        <span class="tts-status" id="tts-test-status"></span>
         <p class="tts-error" id="tts-error" hidden></p>`}`;
   }
 
   function modelSettingsHtml(draft) {
     return `
-      <p class="settings-intro">选模板新建配置，再填地址与密钥。</p>
       <div class="model-profile-head">
         <span class="settings-subhead">模型配置</span>
         <span class="mono">${draft.profiles.length} 个</span>
@@ -4438,8 +4437,7 @@
           </button>`).join("")}
         <button class="model-profile-add" type="button" data-action="add-profile" aria-label="新增模型配置">+</button>
       </div>
-      <p class="field-hint">每个配置独立保存地址、模型和密钥，切换不会覆盖。</p>
-      <div class="field">
+            <div class="field">
         <label for="profile-name">配置名称</label>
         <input id="profile-name" type="text" data-profile-name value="${attr(activeProfile(draft)?.name || "")}" placeholder="例如：DeepSeek 主力" spellcheck="false" autocomplete="off" />
       </div>
@@ -4457,7 +4455,6 @@
           ${Object.entries(DETAIL_LEVELS).map(([id, item]) => `
             <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
         </div>
-        <p class="field-hint">快速减少义项和例句，token 更少；标准为默认；深入更完整但更慢。切换深度不会让已缓存词条重新请求；需要新长度时用词页的「重新生成词条」。</p>
       </div>
       ${profileSupportsThinking(activeProfile(draft)) ? `
       <div class="thinking-panel">
@@ -4469,7 +4466,7 @@
           <label for="thinking-budget">思考预算（tokens）</label>
           <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
         </div>
-        <p class="field-hint">关闭思考通常快 60%–75%；预算 0 = 模型默认，建议 256–1024。</p>
+        <p class="field-hint">0 = 模型默认；一般 256–1024。</p>
       </div>` : ""}
       ${activeProfile(draft)?.note ? `<p class="field-hint model-profile-note">${esc(activeProfile(draft).note)}</p>` : ""}
       <div class="field">
@@ -4494,7 +4491,6 @@
   function dataSettingsHtml(draft) {
     const stats = wordCacheStats();
     return `
-      <p class="settings-intro">本机数据与阅读偏好。修改会自动保存。</p>
       <div class="theme-setting">
         <span class="settings-subhead">外观主题</span>
         <div class="theme-list" role="list" aria-label="外观主题">
@@ -4522,7 +4518,7 @@
       </div>
       <div class="setting-group">
         <span class="settings-subhead">学习阶段</span>
-        <p class="settings-note">只影响句子分析：决定重点词数量与难度。</p>
+        <p class="settings-note">只影响句子模式</p>
         <div class="level-row">
           ${SENTENCE_LEVELS.map((level) => `
             <button class="level-chip${draft.sentenceLevel === level.id ? " active" : ""}" type="button"
@@ -4532,7 +4528,6 @@
       </div>
       <div class="setting-group">
         <span class="settings-subhead">从句展开方式</span>
-        <p class="settings-note">缩进块：展开后另起一行、左缩进；句内插入：按原位置插回句中。</p>
         <div class="level-row">
           <button class="level-chip${(draft.foldMode || "block") === "block" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="block" aria-pressed="${(draft.foldMode || "block") === "block"}">缩进块</button>
           <button class="level-chip${draft.foldMode === "inline" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="inline" aria-pressed="${draft.foldMode === "inline"}">句内插入</button>
@@ -4540,7 +4535,7 @@
       </div>
       <div class="setting-group">
         <span class="settings-subhead">例句风格</span>
-        <p class="settings-note">每套主题用自己的语气写例句；改完只影响之后生成的例句。</p>
+        <p class="settings-note">只影响之后生成的例句</p>
         <div class="example-style-list">
           ${(window.TALK_THEME?.list?.() || []).map((theme) => `
             <label class="example-style-row">
@@ -4563,7 +4558,7 @@
       <div class="cache-display-setting">
         <span class="pref-copy">
           <strong>缓存提示方式</strong>
-          <span>边框：相关词的虚线为未缓存、实线为已缓存。三角标：只在词页右下角显示整页缓存状态。</span>
+          <span>虚线未缓存，实线已缓存</span>
         </span>
         <div class="cache-display-switch" role="group" aria-label="缓存提示方式">
           <button class="cache-display-btn ${draft.cacheDisplay !== "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="borders" aria-pressed="${draft.cacheDisplay !== "corner"}">边框</button>
@@ -4597,7 +4592,7 @@
         </div>
       </div>
       <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
-      <p class="api-note">词条缓存优先从 IndexedDB 读取，未命中才请求模型；发音只缓存 Qwen 语音生成的音频。</p>`;
+`;
   }
 
   function renderSettingsContent() {
@@ -4654,7 +4649,7 @@
     const recent = words.entries.slice(0, 24);
     holder.innerHTML = `
       <div class="sheet-content" id="cache-dashboard">
-        <p class="settings-intro">所有数据只存在当前浏览器。词条在 IndexedDB，语音也在 IndexedDB；导出 JSON 只包含词条，不包含音频。</p>
+        <p class="settings-intro">只存本机；导出不含音频。</p>
         <div class="cache-summary-grid">
           <div class="cache-summary-card">
             <span class="cache-summary-label">词条</span>
@@ -4683,7 +4678,7 @@
             <input type="number" min="1" max="3650" step="1" value="${words.ttlDays}" data-cache-setting="cacheTtlDays" inputmode="numeric" />
           </label>
         </div>
-        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>；Qwen 语音缓存另计。</p>
+        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>。</p>
         <div class="cache-list-head">
           <span class="settings-subhead">已缓存词条</span>
           <span class="mono">${words.count} 条</span>

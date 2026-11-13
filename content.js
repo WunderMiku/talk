@@ -8,7 +8,7 @@ window.TALK_CONTENT = {
     eyebrow: "英语 · 在语境中理解",
     titleLead: "把词，",
     titleAccent: "看透。",
-    lede: "不只告诉你词义，更让你看见一个词<strong>怎么活</strong>。查一个单词，或读懂一整句话。",
+    lede: "不只告诉你词义，更让你看见一个词<strong>怎么活</strong>。",
     searchKicker: "查一查",
     searchPlaceholder: "输入一个单词，或一整句话…",
     recentLabel: "最近",
@@ -70,7 +70,7 @@ window.TALK_CONTENT.themeCopy = {
       eyebrow: "ЯЗЫК · 语言前线",
       titleLead: "把词，",
       titleAccent: "握紧。",
-      lede: "语言不是装饰。它是武器，是旗帜，是把人聚在一起的声音。查一个词，<strong>夺回它的含义</strong>。",
+      lede: "语言不是装饰。它是武器，是旗帜，是把人聚在一起的声音。",
       manifesto: {
         ru: "СЛОВО — ЭТО ОРУЖИЕ",
         zh: "词语就是武器"
@@ -96,7 +96,7 @@ window.TALK_CONTENT.themeCopy = {
       titleAccent: "五种火力。",
       lede: "同一句话，五种语气。不是修饰，是选择站在哪个位置说话。",
       inputPlaceholder: "把你要说的话，放进来…",
-      empty: "写下你的话。它会锻成五种说法。",
+      empty: "它会锻成五种说法。",
       workspaceKicker: "语言前线",
       workspaceTitle: "译场"
     },
@@ -119,7 +119,6 @@ window.TALK_CONTENT.themeCopy = {
       loading: "正在排版…",
       local: "常设展",
       sceneLabel: "现场",
-      footerRight: "点击词语，继续读"
     },
     settings: {
       kicker: "指挥台",
@@ -153,7 +152,6 @@ window.TALK_CONTENT.themeSalon = {
   loading: "正在布展…",
   local: "本地主题",
   sceneLabel: "场景",
-  footerRight: "点击词，继续展开"
 };
 
 window.TALK_CONTENT.themeDecks = [
@@ -234,7 +232,7 @@ window.TALK_CONTENT.themeCopy.rhine = {
     titleAccent: "多种输出。",
     lede: "保留原意，只改变语气、场合与力度。让同一句话在不同语境里成立。",
     inputPlaceholder: "把要转译的句子放进来…",
-    empty: "写下样本。系统会给出几种可用的英文输出。",
+    empty: "系统会给出几种可用的英文输出。",
     workspaceKicker: "RHINE LAB / OUTPUT",
     workspaceTitle: "转译结果"
   },
@@ -280,7 +278,7 @@ window.TALK_CONTENT.themeCopy.endfield = {
     eyebrow: "FIELD TERMINAL · 语言终端",
     titleLead: "把词，",
     titleAccent: "拆开。",
-    lede: "每个词都是一份现场记录。查一个词，读它的结构、它的来路、它在别处的用法。",
+    lede: "每个词都是一份现场记录。",
     manifesto: {
       ru: "FIELD RECORD",
       zh: "现场记录"
@@ -306,7 +304,7 @@ window.TALK_CONTENT.themeCopy.endfield = {
     titleAccent: "五种语气。",
     lede: "同一句话，五种说法。语气不是修饰，是选择站在哪个位置说话。",
     inputPlaceholder: "把要转译的句子放进来…",
-    empty: "写下你的句子。它会转译成五种说法。",
+    empty: "它会转译成五种说法。",
     workspaceKicker: "转译台",
     workspaceTitle: "转译"
   },
@@ -351,7 +349,7 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
     eyebrow: "BITTERWORLD · 未许之地",
     titleLead: "把词，",
     titleAccent: "摊开。",
-    lede: "每个词都是一张票根：从哪来、经过谁、能换到什么。查一个词，就是读完这张票。",
+    lede: "每个词都是一张票根：从哪来、经过谁、能换到什么。",
     manifesto: {
       ru: "BITTERWORLD BITTER 44",
       zh: "每一张票，都有去处"
@@ -377,7 +375,7 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
     titleAccent: "五种口吻。",
     lede: "同一句话，五种说法。语气不是装饰，是你选择站在哪个检票口说话。",
     inputPlaceholder: "把要换一种说法的句子放进来…",
-    empty: "写下你的句子。它会换到五种口吻。",
+    empty: "它会换到五种口吻。",
     workspaceKicker: "译站",
     workspaceTitle: "译站"
   },
@@ -422,7 +420,7 @@ window.TALK_CONTENT.themeCopy.rhineaccess = {
     eyebrow: "RHINE LAB · ANALYSIS OS",
     titleLead: "把词，",
     titleAccent: "归档。",
-    lede: "每个词都是一份现场记录：来源、结构、用法与被引用过的位置。查一个词，就是调出它的档案。",
+    lede: "每个词都是一份现场记录：来源、结构、用法与被引用过的位置。",
     manifesto: {
       ru: "STRATEGIC INFORMATION",
       zh: "每一份记录，都可追溯"
@@ -448,7 +446,7 @@ window.TALK_CONTENT.themeCopy.rhineaccess = {
     titleAccent: "五种记录。",
     lede: "同一句话，五种说法。语气不是包装，是记录它站在哪个位置。",
     inputPlaceholder: "把要转译的句子放进来…",
-    empty: "写下你的句子。它会转译成五种记录。",
+    empty: "它会转译成五种记录。",
     workspaceKicker: "转译终端",
     workspaceTitle: "转译"
   },
