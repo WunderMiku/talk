@@ -7691,7 +7691,7 @@ textarea:focus-visible,
 .example-toolbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   margin: 0 0 12px;
   color: var(--muted);

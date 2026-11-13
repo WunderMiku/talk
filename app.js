@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "183";
+  const APP_VERSION = "184";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2892,12 +2892,10 @@
     const exampleTheme = window.TALK_THEME?.current?.() || { id: "paper", label: "Paper" };
     const themedExamples = exampleForTheme(word, exampleTheme.id);
     if (!themedExamples.length) return "";
-    const missingThemes = themesMissingExamples(word);
     return `
         <section class="block word-example-block reveal" data-block-no="${attr(no)}" style="--d:2.4">
           ${blockHead(no, "例句", `${themedExamples.length} 条`)}
           <div class="example-toolbar">
-            <span class="mono">按当前主题的语气写出</span>
             <button class="link-btn" type="button" data-action="regen-examples" data-word="${attr(word.word)}">换一批</button>
           </div>
           ${themedExamples.map((example) => `
@@ -2910,7 +2908,6 @@
                 <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
               </div>
             </div>`).join("")}
-          ${missingThemes.length ? `<p class="example-hint">还有 ${missingThemes.length} 套主题没有例句，切过去时会自动补上。</p>` : ""}
         </section>`;
   }
 
