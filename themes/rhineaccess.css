@@ -696,3 +696,9 @@
   white-space: nowrap;
   text-align: right;
 }
+
+/* dashed base rule lives on .relation-card .rel-chip — outrank it */
+[data-theme="rhineaccess"] .relation-card .rel-chip {
+  border: 1px solid var(--line-strong);
+  border-style: solid;
+}
