@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "182";
+  const APP_VERSION = "183";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1503,7 +1503,8 @@
 
   function scheduleThemeExamples(word) {
     if (!word || !hasModelConfig()) return;
-    const missing = themesMissingExamples(word);
+    const activeTheme = window.TALK_THEME?.current?.();
+    const missing = themesMissingExamples(word).filter((id) => !activeTheme || id === activeTheme.id);
     if (!missing.length) return;
     const key = normalizeWord(word.word);
     if (!key || examplesInFlight.has(key)) return;
@@ -3176,9 +3177,11 @@
     if (!Array.isArray(value)) return [];
     return value.map((part) => {
       const text = String(part?.text || part?.sentence || "").trim();
-      if (!text) return null;
+      const index = Number.isInteger(part?.index) ? part.index : null;
+      if (!text && index === null) return null;
       return {
         text,
+        index,
         translation: String(part.translation || "").trim(),
         summary: String(part.summary || "").trim(),
         tree: normalizeStructureTree(part.tree || part.structure),
@@ -3197,8 +3200,11 @@
     });
     return pieces.map((text, index) => {
       const key = normalizeWord(text);
-      const hit = byText.get(key) || parts[index] || null;
-      const matches = hit && normalizeWord(hit.text) === key;
+      const hit = byText.get(key)
+        || parts.find((part) => part.index === index || part.index === index + 1)
+        || parts[index]
+        || null;
+      const matches = hit && (!hit.text || normalizeWord(hit.text) === key);
       return {
         text,
         translation: matches ? hit.translation || "" : "",
@@ -5019,7 +5025,10 @@
     return JSON.stringify({
       task: "word",
       detail,
-      themes: themeBriefs(),
+      themes: themeBriefs().filter((theme) => {
+        const active = window.TALK_THEME?.current?.();
+        return !active || theme.id === active.id;
+      }),
       query: String(query)
     });
   }
@@ -5558,6 +5567,18 @@
     const text = String(base.text || base.sentence || fallbackSentence || "").trim();
     let keyWords = normalizeKeyWords(base.keyWords || base.key_words || base.words);
     const sentences = normalizeSentenceParts(base.sentences || base.parts);
+    if (sentences.length) {
+      const bySentence = new Map();
+      keyWords.forEach((item) => {
+        const index = Number(item.sentenceIndex) || 0;
+        if (!index) return;
+        if (!bySentence.has(index)) bySentence.set(index, []);
+        bySentence.get(index).push(item);
+      });
+      sentences.forEach((part, index) => {
+        if (!part.keyWords?.length) part.keyWords = bySentence.get(index + 1) || bySentence.get(part.index || -1) || [];
+      });
+    }
     if (!keyWords.length && sentences.length) {
       const seen = new Set();
       keyWords = sentences.flatMap((part, index) => part.keyWords.map((item) => ({ ...item, sentenceIndex: index })))
