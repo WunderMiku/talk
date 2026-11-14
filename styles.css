@@ -8387,3 +8387,14 @@ html.motion-ready .reveal-item.is-in {
   margin-left: 2px;
 }
 
+
+.example-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.example-actions .example-speak {
+  margin: 0;
+}

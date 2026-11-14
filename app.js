@@ -3036,8 +3036,10 @@
               ${example.zh ? `<p class="example-zh">${esc(example.zh)}</p>` : ""}
               <div class="example-foot${example.source ? "" : " is-solo"}">
                 ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : ""}
-                <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
-                <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${example.en}${example.zh ? `\n${example.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
+                <div class="example-actions">
+                  <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
+                  <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${example.en}${example.zh ? `\n${example.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
+                </div>
               </div>
             </div>`).join("")}
         </section>`;
