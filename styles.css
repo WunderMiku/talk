@@ -8257,3 +8257,96 @@ html.motion-ready .reveal-item.is-in {
   flex-wrap: wrap;
   gap: 10px;
 }
+
+/* ---------- press & hover: one motion vocabulary ------------------ */
+
+:root {
+  --dur-press: 120ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-btn,
+  .btn,
+  .chip,
+  .recent-chip,
+  .module-btn,
+  .translator-mode-btn,
+  .translator-style-chip,
+  .translator-example-btn,
+  .example-action,
+  .level-chip,
+  .theme-row-head,
+  .word-link,
+  .family-card,
+  .relation-card,
+  .rel-chip,
+  .search-submit,
+  .daily-arrow,
+  .brand,
+  .link-btn,
+  .speak-btn,
+  .example-speak,
+  .sheet-close,
+  .copy-btn,
+  .word-head .icon-btn {
+    transition-property: background-color, border-color, color, box-shadow, translate, opacity;
+    transition-duration: var(--dur-hover);
+    transition-timing-function: var(--ease-out-expo);
+  }
+
+  .icon-btn:hover,
+  .btn:hover,
+  .chip:hover,
+  .recent-chip:hover,
+  .module-btn:hover,
+  .translator-mode-btn:hover,
+  .translator-style-chip:hover,
+  .translator-example-btn:hover,
+  .example-action:hover,
+  .level-chip:hover,
+  .word-link:hover,
+  .family-card:hover,
+  .relation-card:hover,
+  .rel-chip:hover,
+  .daily-arrow:hover,
+  .brand:hover,
+  .link-btn:hover,
+  .speak-btn:hover,
+  .example-speak:hover,
+  .sheet-close:hover,
+  .copy-btn:hover {
+    translate: 0 -1px;
+  }
+}
+
+.icon-btn:active,
+.btn:active,
+.chip:active,
+.recent-chip:active,
+.module-btn:active,
+.translator-mode-btn:active,
+.translator-style-chip:active,
+.translator-example-btn:active,
+.example-action:active,
+.level-chip:active,
+.theme-row-head:active,
+.word-link:active,
+.family-card:active,
+.relation-card:active,
+.rel-chip:active,
+.search-submit:active,
+.daily-arrow:active,
+.brand:active {
+  translate: 0 1px;
+  transition-duration: var(--dur-press);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn:active,
+  .btn:active,
+  .chip:active,
+  .module-btn:active,
+  .search-submit:active {
+    translate: none;
+  }
+}
