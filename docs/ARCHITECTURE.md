@@ -130,6 +130,13 @@ prompts.js           与主题无关，主题不影响提示词
 
 主题**不参与组件布局**。版式差异（比如横屏间距）走 `styles.css` 里的 `--word-*` 变量，而不是在主题文件里写 `!important` 覆写——这是 2026 年 11 月那次重构的核心约束。
 
+## 滚动与入场
+
+- 页面自己滚 `.screen`，不滚 `body`；平滑滚动用 `vendor/lenis.min.js`（1.1.20，随仓库提交，SW 预缓存），在 `setupSmoothScroll()` 里 `wrapper` 与 `content` 都指向 `.screen`，`lerp 0.09`、`smoothWheel true`、`syncTouch false`（触屏保持原生）。
+- 路由切换用 `scrollScreenTo(0, true)` 复位，并在换页后 `lenis.resize()` 重算高度；`reduce-motion` 下完全不创建 Lenis。
+- 嵌套滚动区（设置弹层、翻译结果区）标 `data-lenis-prevent`，滚轮/触摸在其中不会被页面接管。
+- 入场用 `IntersectionObserver`：`.reveal` 按 section 触发，初始上浮 6px、时长 0.28s、无透明度变化；`rootMargin` 底部提前 120px；滚到离底 40px 内时兜底全部 `is-in`。`html.motion-ready` 由 head 里的内联脚本在首帧前加上，3 秒未初始化则摘除，保证 JS 失败时内容仍可见。
+
 ## 发音
 
 两个引擎，设置 → 发音里切换：

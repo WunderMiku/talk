@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "194";
+  const APP_VERSION = "195";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1557,6 +1557,44 @@
   }
 
   let revealObserver = null;
+  let lenis = null;
+
+  function setupSmoothScroll() {
+    if (reduceMotion || !window.Lenis || lenis) return;
+    try {
+      lenis = new Lenis({
+        wrapper: screen,
+        content: screen,
+        lerp: 0.09,
+        smoothWheel: true,
+        syncTouch: false,
+        wheelMultiplier: 1
+      });
+    } catch (_) {
+      lenis = null;
+      return;
+    }
+    const raf = (time) => {
+      lenis?.raf(time);
+      window.requestAnimationFrame(raf);
+    };
+    window.requestAnimationFrame(raf);
+  }
+
+  function scrollScreenTo(top, immediate = false) {
+    if (lenis) {
+      lenis.scrollTo(top, { immediate, force: true });
+      return;
+    }
+    screen.scrollTop = top;
+  }
+
+  function resizeSmoothScroll() {
+    if (!lenis) return;
+    window.requestAnimationFrame(() => lenis?.resize());
+  }
+
+
 
   function revealAllRemaining() {
     const pending = $$(".reveal:not(.is-in), .reveal-item:not(.is-in)");
@@ -1641,7 +1679,8 @@
         prefetchToken += 1;
         hideCacheCorner();
       }
-      screen.scrollTop = 0;
+      scrollScreenTo(0, true);
+      resizeSmoothScroll();
       screen.classList.remove("is-leaving", "is-back-leaving", "is-entering");
       void screen.offsetWidth;
       screen.classList.add("is-entering");
@@ -1984,7 +2023,7 @@
         </div>
         <button class="icon-btn" type="button" data-action="close-workspace" aria-label="关闭翻译结果">${icon("close")}</button>
       </header>
-      <div class="translation-workspace-body">
+      <div class="translation-workspace-body" data-lenis-prevent>
         <form class="workspace-translator-form" id="workspace-translator-form" novalidate>
           <div class="workspace-input-shell">
             <textarea id="workspace-translator-input" rows="2"  spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
@@ -3015,7 +3054,7 @@
     } else {
       section.outerHTML = html;
     }
-    screen.scrollTop = scroll;
+    scrollScreenTo(scroll, true);
     applyCacheDisplay();
     refreshCacheBorders(screen);
     return true;
@@ -4224,7 +4263,7 @@
           </div>
           <button class="sheet-close" type="button" data-action="close-sheet" aria-label="关闭">${icon("close")}</button>
         </div>
-        <div class="sheet-scroll" id="sheet-scroll"></div>
+        <div class="sheet-scroll" id="sheet-scroll" data-lenis-prevent></div>
       </section>`;
 
     state.sheetOpen = true;
@@ -7304,6 +7343,7 @@
     history.replaceState({ route: initial, depth: 0 }, "", routeHash(initial));
     setupReveal();
     renderRoute(initial, "forward", { instant: true });
+    setupSmoothScroll();
     registerServiceWorker();
 
     // Expose a tiny debugging surface for the design review.

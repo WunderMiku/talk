@@ -20,4 +20,8 @@ fetch() {
 echo "Downloading idb browser bundle..."
 fetch "https://cdn.jsdelivr.net/npm/idb@8.0.0/build/umd.js" "${VENDOR_DIR}/idb.js"
 
+# Lenis smooths the .screen scroller; vendored so the PWA works offline.
+echo "Downloading Lenis..."
+fetch "https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js" "${VENDOR_DIR}/lenis.min.js"
+
 echo "Static site assets ready in ${DEST}."
