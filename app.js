@@ -3037,6 +3037,7 @@
               <div class="example-foot${example.source ? "" : " is-solo"}">
                 ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : ""}
                 <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
+                <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${example.en}${example.zh ? `\n${example.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
               </div>
             </div>`).join("")}
         </section>`;
@@ -3093,6 +3094,7 @@
             ${wordPosSwitchHtml(wordPosGroups(word))}
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(`${word.translation || word.short}${word.short && word.translation ? `\n${word.short}` : ""}`)}" aria-label="复制释义" title="复制释义">${icon("copy")}</button>
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(word.translation || word.short)}</p>
@@ -6226,6 +6228,14 @@
         event.preventDefault();
         copyCurrentPage();
         break;
+
+      case "copy-text": {
+        event.preventDefault();
+        const text = target.dataset.copy || "";
+        if (!text) break;
+        void copyText(text).then((copied) => toast(copied ? "已复制" : "这个浏览器不允许复制"));
+        break;
+      }
 
       case "translator-style": {
         event.preventDefault();

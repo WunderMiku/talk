@@ -8350,3 +8350,40 @@ html.motion-ready .reveal-item.is-in {
     translate: none;
   }
 }
+
+/* long-press menus belong to the OS; the app offers explicit copy buttons */
+.app,
+.screen {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.app input,
+.app textarea,
+.app [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.copy-inline {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.copy-inline svg {
+  width: 13px;
+  height: 13px;
+}
+
+.example-copy {
+  margin-left: 2px;
+}
+
