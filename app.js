@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "190";
+  const APP_VERSION = "191";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3544,6 +3544,7 @@
 
 
 
+        ${reclassifyRow("word")}
         <div class="page-actions reveal" style="--d:3.2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
@@ -3556,6 +3557,27 @@
   /* ============================================================
      Chunk page (sense group)
      ============================================================ */
+
+  function currentLookupText() {
+    const route = state.route;
+    if (route.name === "word") return activeWordData()?.word || route.word || "";
+    if (route.name === "chunk") return route.result?.chunk || route.query || "";
+    if (route.name === "sentence") return route.result?.text || route.query || "";
+    if (route.name === "reverse") return route.result?.text || "";
+    return route.query || "";
+  }
+
+  function reclassifyRow(current, text = "") {
+    const items = [["word", "词"], ["chunk", "意群"], ["sentence", "句"]];
+    return `<div class="reclassify reveal" style="--d:2.9">
+      <span class="reclassify-label">当它是</span>
+      <span class="reclassify-group" role="group" aria-label="改判颗粒度">
+        ${items.map(([id, label]) => `<button class="reclassify-btn${id === current ? " is-current" : ""}" type="button"
+          data-action="reclassify" data-paradigm="${id}"
+          ${id === current ? 'disabled aria-disabled="true"' : ""}>${label}</button>`).join("")}
+      </span>
+    </div>`;
+  }
 
   function chunkPage(chunk) {
     let blockNo = 0;
@@ -3678,6 +3700,7 @@
           </div>
         </section>` : ""}
 
+        ${reclassifyRow("chunk", chunk.chunk)}
         <div class="page-actions reveal" style="--d:3">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} ${esc(copy.bookmark || "收藏")}</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} ${esc(copy.copy || "复制")}</button>
@@ -4038,7 +4061,12 @@
       ? sentence.sentences
       : [{ text: sentence.text, translation: sentence.translation, summary: sentence.summary || "", tree: sentence.tree || [] }];
     const tree = sentence.tree?.length ? sentence.tree : (parts[0]?.tree || []);
-    const renderParts = parts.map((part, index) => ({ ...part, tree: (part.tree && part.tree.length) ? part.tree : (index === 0 ? tree : []) }));
+    const topKeyWords = Array.isArray(sentence.keyWords) ? sentence.keyWords : [];
+    const renderParts = parts.map((part, index) => ({
+      ...part,
+      keyWords: Array.isArray(part.keyWords) ? part.keyWords : [],
+      tree: (part.tree && part.tree.length) ? part.tree : (index === 0 ? tree : [])
+    }));
     state.structureNodes = registerTreeNodes(tree.concat(...parts.map((part) => part.tree || [])), {});
     const bookmark = `sentence:${sentence.id}`;
     const multi = renderParts.length > 1;
@@ -4098,10 +4126,11 @@
         ${multi ? "" : `<section class="block reveal" style="--d:1.5">
           ${blockHead(nextNo(), "值得注意的词", "点击展开")}
           <div class="key-list">
-            ${sentence.keyWords.map((keyWord, index) => keyCard(keyWord, index)).join("")}
+            ${topKeyWords.map((keyWord, index) => keyCard(keyWord, index)).join("")}
           </div>
         </section>`}
 
+        ${reclassifyRow("sentence")}
         <div class="page-actions reveal" style="--d:2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏句子</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-sentence">${icon("refresh")} 重新生成分析</button>` : ""}
@@ -4262,6 +4291,7 @@
           <button class="btn btn-primary" type="button" data-action="settings">${icon("wand")} 连接模型</button>
           <button class="btn btn-secondary" type="button" data-action="lookup" data-query="${attr(fallback[0])}" data-type="${typeForChip}">先看示例</button>
         </div>
+        ${reclassifyRow("")}
         <div class="recent-row reveal" style="--d:1.2; padding-left:0; padding-right:0; margin-top:22px; flex-wrap:wrap;">
           ${fallback.slice(0, 3).map((item) => `
             <button class="chip" type="button" data-action="lookup" data-query="${attr(item)}" data-type="${typeForChip}">
@@ -6577,6 +6607,15 @@
           button.setAttribute("aria-pressed", String(active));
         });
         updateSearchMeta();
+        break;
+      }
+
+      case "reclassify": {
+        event.preventDefault();
+        const paradigm = target.dataset.paradigm || "";
+        const text = currentLookupText();
+        if (!text || !paradigm) break;
+        runSearch(text, paradigm);
         break;
       }
 

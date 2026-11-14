@@ -8771,3 +8771,47 @@ html.motion-ready .reveal.reveal-soft.is-in {
 .reverse-gloss {
   color: var(--ink);
 }
+
+.reclassify {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 18px;
+}
+
+.reclassify-label {
+  color: var(--muted);
+  font-family: var(--mono, ui-monospace);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.reclassify-group {
+  display: inline-flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.reclassify-btn {
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.reclassify-btn:hover {
+  color: var(--ink);
+}
+
+.reclassify-btn.is-current {
+  background: var(--ink);
+  color: var(--paper);
+  cursor: default;
+}
