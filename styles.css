@@ -8898,16 +8898,92 @@ html.motion-ready .reveal.reveal-soft.is-in {
   position: relative;
 }
 
+.sentence-line .seg-space {
+  display: inline;
+  white-space: pre;
+}
+
+.seg-no,
+.seg-arrow {
+  display: none;
+}
+
+.seg-no {
+  width: 0;
+  overflow: visible;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 8px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary, var(--muted));
+  transform: translateY(15px);
+}
+
+.seg-arrow {
+  width: 0;
+  overflow: visible;
+  white-space: nowrap;
+  font-size: 0.5em;
+  font-style: normal;
+  line-height: 1;
+  color: var(--muted);
+  transform: translate(0.1em, -0.85em);
+}
+
+.part-stage .seg-no {
+  transform: translateY(9px);
+}
+
+/* 意群切分：只用托盘与编号，不再插斜杠 */
+.sentence-page[data-view="segments"] .sentence-line .seg {
+  margin-right: 0.45em;
+  border-bottom: 1px solid color-mix(in srgb, var(--ink) 34%, transparent);
+  padding-bottom: 2px;
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg:last-of-type {
+  margin-right: 0;
+}
+
+.sentence-page[data-view="segments"] .seg-no,
+.sentence-page[data-view="segments"] .seg[data-chunk] .seg-arrow {
+  display: inline-block;
+  vertical-align: baseline;
+}
+
+.sentence-page[data-view="segments"] .sentence-line .kw,
+.sentence-page[data-view="focus"] .sentence-line .kw {
+  border-color: transparent;
+  background: none;
+}
+
+/* 信息焦点：只留明暗，不叠任何底色与下划线 */
 .sentence-page[data-view="focus"] .sentence-line .seg[data-role="modifier"] {
   opacity: 0.28;
 }
 
 .sentence-page[data-view="focus"] .sentence-line .seg[data-role="focus"] {
-  box-shadow: inset 0 -3px 0 var(--accent);
+  box-shadow: none;
 }
 
-.sentence-line .seg[data-chunk] {
-  cursor: pointer;
+.seg-legend {
+  margin: 10px 0 0;
+  font-family: var(--mono);
+  font-size: 9px;
+  line-height: 1.5;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
+.seg-legend span {
+  display: none;
+}
+
+.sentence-page[data-view="original"] .seg-legend [data-for="original"],
+.sentence-page[data-view="segments"] .seg-legend [data-for="segments"],
+.sentence-page[data-view="focus"] .seg-legend [data-for="focus"] {
+  display: inline;
 }
 
 .seg-switch {
@@ -9100,42 +9176,4 @@ html.motion-ready .reveal.reveal-soft.is-in {
   border-radius: 0;
   padding: 0 1px;
   background: none;
-}
-
-/* sense-group view: separated by slashes that hug the word, never the trailing space */
-.sentence-line .seg-space {
-  position: relative;
-  display: inline;
-  white-space: pre;
-  margin-inline: 0.14em;
-}
-
-.sentence-page[data-view="segments"] .sentence-line .seg::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -4px;
-  border-bottom: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent);
-}
-
-.sentence-page[data-view="segments"] .sentence-line .seg-space::before {
-  content: "/";
-  position: absolute;
-  left: 50%;
-  top: 0;
-  transform: translateX(-50%);
-  font-weight: 700;
-  color: color-mix(in srgb, var(--ink) 68%, transparent);
-}
-
-.sentence-page[data-view="segments"] .sentence-line .seg-space:last-child::before {
-  content: none;
-}
-
-/* keep keyword emphasis from fighting the segment rules */
-.sentence-page[data-view="segments"] .sentence-line .kw {
-  border-bottom-color: transparent;
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  border-radius: 2px;
 }

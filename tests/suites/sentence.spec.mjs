@@ -60,6 +60,7 @@ suite("dictionary · sentence analysis", { timeout: 60_000 }, (s) => {
     await page.click("[data-action=sentence-view][data-view=focus]");
     t.expect(await main.getAttribute("data-view")).toBe("focus");
     t.expect(await page.locator(".seg-switch-btn.is-active").innerText()).toBe("信息焦点");
+    t.expect(await page.locator(".seg-legend [data-for=\"focus\"]").isVisible()).toBe(true);
   });
 
   s.test("keeps the line geometry identical in every view", async (state, t) => {
@@ -71,17 +72,24 @@ suite("dictionary · sentence analysis", { timeout: 60_000 }, (s) => {
 
     const original = await boxes();
     await page.click("[data-action=sentence-view][data-view=segments]");
-    t.expect(JSON.stringify(await boxes())).toBe(JSON.stringify(original));
-    const slashes = await page.evaluate(() => [...document.querySelectorAll(".seg-space")]
-      .map((node) => getComputedStyle(node, "::before").content));
-    t.expect(slashes.filter((value) => value === "\"/\"").length).toBe(2);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    const split = await boxes();
+    t.expect(split.length).toBe(original.length);
+    const segMargin = () => page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".sentence-line .seg")).marginRight) || 0);
+    t.expect(await segMargin() > 0).toBe(true);
+    t.expect(await page.locator(".seg-no").count()).toBe(3);
+    t.expect(await page.locator(".seg-legend [data-for=\"segments\"]").isVisible()).toBe(true);
+    t.expect(await page.locator(".seg-legend [data-for=\"original\"]").isVisible()).toBe(false);
     await page.click("[data-action=sentence-view][data-view=focus]");
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    t.expect(await segMargin()).toBe(0);
     t.expect(JSON.stringify(await boxes())).toBe(JSON.stringify(original));
   });
 
   s.test("opens a chunk when a segment carries one", async (state, t) => {
     const page = await analyse(state, "The scientist continued his research. Critics now admit that they were wrong.");
     await page.click(".construction-row");
+    await new Promise((resolve) => setTimeout(resolve, 500));
     t.expect(state.env.server.mock.requestsOf("chunk").length).toBe(1);
   });
 

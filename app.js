@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "197";
+  const APP_VERSION = "198";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4106,12 +4106,15 @@
     const text = String(part.text || "");
     const segments = Array.isArray(part.segments) ? part.segments : [];
     if (!segments.length) return `<p class="sentence-line">${annotateSentence(text, keyWords)}</p>`;
-    const spans = segments.map((segment) => {
+    const spans = segments.map((segment, index) => {
       const chunk = segment.chunk ? ` data-chunk="${attr(segment.chunk)}"` : "";
       const raw = String(segment.text || "");
       const tail = raw.match(/\s+$/)?.[0] || "";
       const core = tail ? raw.slice(0, -tail.length) : raw;
-      return `<span class="seg" data-role="${esc(segment.role)}"${chunk}>${annotateSentence(core, keyWords)}</span>`
+      const marker = String(index + 1).padStart(2, "0");
+      const arrow = segment.chunk ? `<i class="seg-arrow" aria-hidden="true">↗</i>` : "";
+      return `<span class="seg" data-role="${esc(segment.role)}" data-seg="${marker}"${chunk}>`
+        + `<i class="seg-no" aria-hidden="true">${marker}</i>${annotateSentence(core, keyWords)}${arrow}</span>`
         + `<span class="seg-space" aria-hidden="true">${esc(tail)}</span>`;
     }).join("");
     return `<p class="sentence-line is-segmented">${spans}</p>`;
@@ -4122,7 +4125,12 @@
       <button class="seg-switch-btn is-active" type="button" data-action="sentence-view" data-view="original">原句</button>
       <button class="seg-switch-btn" type="button" data-action="sentence-view" data-view="segments">意群切分</button>
       <button class="seg-switch-btn" type="button" data-action="sentence-view" data-view="focus">信息焦点</button>
-    </div>`;
+    </div>
+    <p class="seg-legend" aria-live="polite">
+      <span data-for="original">— 重点词（点击查词）</span>
+      <span data-for="segments">01–04 阅读意群边界（编号对应下方信息推进） · ↗ 可点进意群页</span>
+      <span data-for="focus">深色：信息起点与末端焦点　浅色：修饰背景（已降噪）</span>
+    </p>`;
   }
 
   function sentenceFlow(part) {
