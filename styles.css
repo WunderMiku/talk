@@ -9107,6 +9107,7 @@ html.motion-ready .reveal.reveal-soft.is-in {
   position: relative;
   display: inline;
   white-space: pre;
+  margin-inline: 0.14em;
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg::before {
@@ -9121,11 +9122,11 @@ html.motion-ready .reveal.reveal-soft.is-in {
 .sentence-page[data-view="segments"] .sentence-line .seg-space::before {
   content: "/";
   position: absolute;
-  left: 0;
+  left: 50%;
   top: 0;
-  transform: translateX(-0.02em);
-  font-weight: 500;
-  color: color-mix(in srgb, var(--ink) 55%, transparent);
+  transform: translateX(-50%);
+  font-weight: 700;
+  color: color-mix(in srgb, var(--ink) 68%, transparent);
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg-space:last-child::before {
