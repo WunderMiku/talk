@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "193";
+  const APP_VERSION = "194";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1558,12 +1558,22 @@
 
   let revealObserver = null;
 
+  function revealAllRemaining() {
+    const pending = $$(".reveal:not(.is-in), .reveal-item:not(.is-in)");
+    pending.forEach((element) => element.classList.add("is-in"));
+  }
+
   function observeReveals(scope) {
     if (!revealObserver) return;
     const root = scope || screen;
     if (!root) return;
+    // Sections animate as one block: nested .reveal nodes settle with their
+    // parent instead of drifting in a beat later.
+    root.querySelectorAll(".reveal").forEach((element) => {
+      if (element.parentElement?.closest(".reveal")) element.classList.add("is-in");
+    });
     root.querySelectorAll(".reveal:not(.is-in)").forEach((element) => {
-      revealObserver.observe(element);
+      if (!element.parentElement?.closest(".reveal")) revealObserver.observe(element);
     });
     root.querySelectorAll(".reveal-item:not(.is-in)").forEach((element) => {
       revealObserver.observe(element);
@@ -1583,6 +1593,9 @@
     }
     html.classList.add("motion-ready");
     window.__talkReveal = true;
+    screen.addEventListener("scroll", () => {
+      if (screen.scrollHeight - screen.scrollTop - screen.clientHeight < 40) revealAllRemaining();
+    }, { passive: true });
     revealObserver = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
@@ -1592,7 +1605,7 @@
     }, {
       root: null,
       threshold: 0.01,
-      rootMargin: "0px 0px 40px 0px"
+      rootMargin: "0px 0px 120px 0px"
     });
     observeReveals(screen);
   }

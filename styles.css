@@ -3039,26 +3039,19 @@ textarea:focus-visible,
    motion) nothing is hidden, so the page can never be left blank. */
 html.motion-ready .reveal,
 html.motion-ready .reveal-item {
-  opacity: 0.25;
-  translate: 0 8px;
-  transition:
-    opacity var(--dur-reveal, 0.28s) var(--ease-out-expo, ease-out),
-    translate var(--dur-reveal, 0.28s) var(--ease-out-expo, ease-out);
-  transition-delay: calc(var(--i, var(--d, 0)) * 40ms);
-  will-change: opacity, translate;
+  opacity: 1;
+  translate: 0 6px;
+  transition: translate var(--dur-reveal, 0.28s) var(--ease-out-expo, ease-out);
+  will-change: translate;
+}
+
+html.motion-ready .reveal-item {
+  transition-delay: calc(var(--i, 0) * 40ms);
 }
 
 html.motion-ready .reveal.is-in,
 html.motion-ready .reveal-item.is-in {
-  opacity: 1;
   translate: 0 0;
-}
-
-@media (hover: none), (max-width: 719px) {
-  html.motion-ready .reveal,
-  html.motion-ready .reveal-item {
-    translate: 0 6px;
-  }
 }
 
 .reveal-blur {
