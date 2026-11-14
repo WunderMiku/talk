@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "195";
+  const APP_VERSION = "196";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1567,7 +1567,8 @@
         content: screen,
         lerp: 0.09,
         smoothWheel: true,
-        syncTouch: false,
+        syncTouch: true,
+        syncTouchLerp: 0.075,
         wheelMultiplier: 1
       });
     } catch (_) {
