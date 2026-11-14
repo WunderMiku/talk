@@ -1,0 +1,9 @@
+{
+  "variants": [
+    { "style": "plain", "text": "Let's go.", "nuance": "最直接的邀请" },
+    { "style": "idiomatic", "text": "Let's head out.", "nuance": "像母语者随口一说" },
+    { "style": "formal", "text": "Shall we proceed?", "nuance": "书面、会议场合" },
+    { "style": "internet", "text": "let's roll", "nuance": "社交媒体上的轻松说法" },
+    { "style": "elegant", "text": "Shall we be on our way?", "nuance": "文学化的礼貌" }
+  ]
+}

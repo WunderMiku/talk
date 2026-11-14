@@ -1,0 +1,24 @@
+{
+  "overview": "想在聊天里轻描淡写地补一句，可以用这些。",
+  "candidates": [
+    {
+      "expression": "by the way",
+      "paradigm": "chunk",
+      "whenToUse": "最通用，适合朋友和同事",
+      "gloss": "顺便说一下"
+    },
+    {
+      "expression": "incidentally",
+      "paradigm": "word",
+      "phonetic": "/ˌɪn.sɪˈden.tli/",
+      "whenToUse": "稍正式，写作或会议",
+      "gloss": "顺带一提"
+    },
+    {
+      "expression": "Oh, before I forget, the meeting moved to three.",
+      "paradigm": "sentence",
+      "whenToUse": "口语，带一点想起什么的语气",
+      "gloss": "对了，趁我还没忘，会议改到三点了。"
+    }
+  ]
+}

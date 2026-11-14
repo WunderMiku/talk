@@ -1,0 +1,32 @@
+{
+  "chunk": "by the way",
+  "form": "idiom",
+  "phonetic": "/baɪ ðə weɪ/",
+  "translation": "顺便说一下",
+  "short": "used to add a remark",
+  "register": "spoken",
+  "note": "口语里放在句首，话题轻轻一转。",
+  "senses": [
+    {
+      "zh": "顺便说一下",
+      "en": "used to add a remark",
+      "when": "聊天、邮件"
+    }
+  ],
+  "keyWords": [
+    {
+      "word": "way",
+      "pos": "n.",
+      "gloss": "方式"
+    }
+  ],
+  "slots": [],
+  "variants": [],
+  "origin": null,
+  "examples": [
+    {
+      "en": "By the way, the meeting moved to three.",
+      "zh": "顺便说一下，会议改到三点了。"
+    }
+  ]
+}

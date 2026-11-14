@@ -146,8 +146,22 @@ app.js                  应用主体：路由、请求、渲染、缓存、设�
 sw.js                   app-shell service worker
 vendor/idb.js           构建时下载的 IndexedDB 助手
 scripts/screenshots.mjs Playwright 截图脚本
+tests/                  离线端到端测试（假模型 + Playwright）
 docs/ARCHITECTURE.md    实现说明与设计取舍
+docs/TESTING.md         测试怎么跑、怎么加
 ```
+
+## 开发与测试
+
+站点没有构建步骤；`package.json` 只为测试与截图脚本存在。
+
+```bash
+npm install
+npx playwright install chromium
+npm test
+```
+
+测试不需要 API key：页面会被指向同源的假模型（`/__mock`），用例与桩数据都在 `tests/`。单独跑某个套件用 `npm test -- chunk`，看用例列表用 `npm test -- --list`。
 
 ## 设计上的几个选择
 

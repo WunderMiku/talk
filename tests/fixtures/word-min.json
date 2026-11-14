@@ -1,0 +1,47 @@
+{
+  "word": "serendipity",
+  "phonetic": "/ˌser.ənˈdɪp.ə.ti/",
+  "pos": "n.",
+  "translation": "意外发现美好事物的运气",
+  "short": "the happy accident of finding something good",
+  "senses": [
+    {
+      "zh": "意外发现美好事物的运气",
+      "en": "the happy accident of finding something good",
+      "label": "核心义"
+    }
+  ],
+  "family": [
+    {
+      "word": "serendipitous",
+      "pos": "adj.",
+      "gloss": "偶然的"
+    }
+  ],
+  "synonyms": [
+    {
+      "word": "chance",
+      "pos": "n.",
+      "gloss": "机会"
+    }
+  ],
+  "antonyms": [
+    {
+      "word": "design",
+      "pos": "n.",
+      "gloss": "设计"
+    }
+  ],
+  "examples": [
+    {
+      "en": "Serendipity brought the two of them together.",
+      "zh": "机缘巧合让两人走到一起。"
+    }
+  ],
+  "collocations": [
+    "pure serendipity"
+  ],
+  "origin": {
+    "note": "1754 年，Walpole 用一个童话地名造出了这个词。"
+  }
+}

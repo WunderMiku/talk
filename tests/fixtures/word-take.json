@@ -1,0 +1,20 @@
+{
+  "word": "take",
+  "phonetic": "/teɪk/",
+  "pos": "v.",
+  "translation": "拿；带走",
+  "short": "to carry or move something",
+  "senses": [
+    {
+      "zh": "拿；带走",
+      "en": "to carry or move something",
+      "label": "核心义"
+    }
+  ],
+  "examples": [
+    {
+      "en": "Take this with you.",
+      "zh": "把这个带上。"
+    }
+  ]
+}

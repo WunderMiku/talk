@@ -182,6 +182,11 @@ export class MockServer {
     this.requestCount = {};
   }
 
+  /** The doc-comment control surface (`server.mock.on(...)`) is the server itself. */
+  get mock() {
+    return this;
+  }
+
   get origin() {
     return `http://127.0.0.1:${this.port}`;
   }

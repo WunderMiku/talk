@@ -200,9 +200,13 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 截图脚本 `scripts/screenshots.mjs` 用 Playwright 生成 README 图片，需要先 `npm i -D playwright && npx playwright install chromium`。脚本以 `SHOT_OUT` 指定输出目录。
 
+## 自动化测试
+
+`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、离线降级与主题覆盖，共 13 例。细节见 [TESTING.md](TESTING.md)。
+
 ## 手工验收清单
 
-改完 UI 或提示词后至少过一遍：
+自动化覆盖不到的部分（视觉与手感），改完 UI 或提示词后至少过一遍：
 
 - [ ] 首页三种主题各切一次，标题文案与语气对得上
 - [ ] 查一个缓存词（离线可用）和一个新词（走 API），标记正确
@@ -216,7 +220,7 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 ## 已知限制
 
-- 没有自动化测试套件。上面那份清单是目前唯一的回归手段，改动依赖手测。
+- 自动化测试只覆盖行为与 DOM，不覆盖视觉；观感仍要靠上面的手工清单。
 - 纯前端意味着 API key 一定暴露在浏览器里，只能用限额 key；要藏 key 就得加一层服务端代理。
 - 流式解析是容错的括号扫描，不是完整的增量 JSON parser；极端情况下（模型在字符串里输出未转义的括号）预览可能短暂错乱，最终结果仍以完整 JSON 为准。
 - 宽屏下同根词卡片仍是固定宽度，右侧会留白。

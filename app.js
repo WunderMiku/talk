@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "191";
+  const APP_VERSION = "192";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -105,6 +105,9 @@
   // schema 2 payloads stay readable and are upgraded in place on next write.
   const WORD_CACHE_SCHEMA = 3;
   const WORD_CACHE_MIN_SCHEMA = 2;
+  const REVERSE_KEY = "talk.reverse.v1";
+  const REVERSE_LIMIT = 20;
+  const REVERSE_TTL = 7 * 24 * 60 * 60 * 1000;
   const WORD_CACHE_KEY = "talk.wordcache.v1";
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
@@ -1988,7 +1991,8 @@
 
   function getReverse(route) {
     if (route?.result) return route.result;
-    return reverseStore[idSafe(route?.id)] || null;
+    const entry = reverseStore[idSafe(route?.id)];
+    return entry?.result || null;
   }
 
   function idSafe(value) {
@@ -5696,9 +5700,6 @@
   const REVERSE_SYSTEM_PROMPT = window.TALK_PROMPTS.reverse;
   const CHUNK_CACHE_PREFIX = "chunk:";
   const CHUNK_CACHE_LIMIT = 60;
-  const REVERSE_KEY = "talk.reverse.v1";
-  const REVERSE_LIMIT = 20;
-  const REVERSE_TTL = 7 * 24 * 60 * 60 * 1000;
   const REVERSE_MAX_SENTENCE_WORDS = 20;
 
   state.translatorStyles = TRANSLATOR_STYLES.map((style) => style.id);

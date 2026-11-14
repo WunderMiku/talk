@@ -1,0 +1,66 @@
+{
+  "chunk": "take off",
+  "form": "phrasal-verb",
+  "phonetic": "/teɪk ɒf/",
+  "translation": "起飞；脱下；匆匆离开",
+  "short": "to leave the ground, or to remove something",
+  "register": "neutral",
+  "note": "多义短语，靠宾语判断：飞机起飞、脱掉衣服、匆匆离开。",
+  "senses": [
+    {
+      "zh": "（飞机）起飞",
+      "en": "to leave the ground and begin to fly",
+      "when": "交通与旅行"
+    },
+    {
+      "zh": "脱下（衣服）",
+      "en": "to remove something, especially clothes",
+      "when": "日常动作"
+    }
+  ],
+  "keyWords": [
+    {
+      "word": "take",
+      "pos": "v.",
+      "gloss": "拿"
+    },
+    {
+      "word": "off",
+      "pos": "adv.",
+      "gloss": "离开"
+    }
+  ],
+  "slots": [
+    {
+      "slot": "take off + 时间/地点",
+      "role": "起飞",
+      "example": {
+        "en": "The plane took off at six.",
+        "zh": "飞机六点起飞。"
+      }
+    }
+  ],
+  "variants": [
+    {
+      "form": "took off",
+      "example": {
+        "en": "It took off on time.",
+        "zh": "它准时起飞了。"
+      }
+    }
+  ],
+  "origin": {
+    "story": "来自航海时代的起航用语。",
+    "source": "航海"
+  },
+  "examples": [
+    {
+      "en": "The plane took off on time.",
+      "zh": "飞机准时起飞。"
+    },
+    {
+      "en": "Take off your coat.",
+      "zh": "把外套脱了。"
+    }
+  ]
+}

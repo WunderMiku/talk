@@ -1,0 +1,60 @@
+{
+  "text": "The scientist continued his research. Critics now admit that they were wrong.",
+  "translation": "科学家继续研究。批评者如今承认自己错了。",
+  "tone": "平实",
+  "structure": "两句并列",
+  "summary": "坚持最终说服了批评者。",
+  "tree": [],
+  "keyWords": [
+    {
+      "word": "research",
+      "pos": "n.",
+      "meaningZh": "研究",
+      "sentenceIndex": 1
+    },
+    {
+      "word": "admit",
+      "pos": "v.",
+      "meaningZh": "承认",
+      "sentenceIndex": 2
+    }
+  ],
+  "sentences": [
+    {
+      "index": 1,
+      "text": "The scientist continued his research.",
+      "translation": "科学家继续研究。",
+      "summary": "他坚持研究。",
+      "tree": [],
+      "keyWords": [
+        {
+          "word": "research",
+          "pos": "n.",
+          "meaningZh": "研究"
+        }
+      ]
+    },
+    {
+      "index": 2,
+      "text": "Critics now admit that they were wrong.",
+      "translation": "批评者如今承认自己错了。",
+      "summary": "批评者认错。",
+      "tree": [
+        {
+          "id": "c1",
+          "kind": "clause",
+          "text": "that they were wrong",
+          "anchor": "admit",
+          "label": "宾语从句"
+        }
+      ],
+      "keyWords": [
+        {
+          "word": "admit",
+          "pos": "v.",
+          "meaningZh": "承认"
+        }
+      ]
+    }
+  ]
+}

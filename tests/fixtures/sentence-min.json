@@ -1,0 +1,23 @@
+{
+  "text": "The scientist who faced doubt continued his research.",
+  "translation": "面对质疑的科学家继续他的研究。",
+  "tone": "克制",
+  "structure": "主谓宾 + 定语从句",
+  "summary": "他顶着质疑继续研究。",
+  "tree": [
+    {
+      "id": "c1",
+      "kind": "clause",
+      "text": "who faced doubt",
+      "anchor": "scientist",
+      "label": "定语从句"
+    }
+  ],
+  "keyWords": [
+    {
+      "word": "doubt",
+      "pos": "n.",
+      "meaningZh": "质疑"
+    }
+  ]
+}
