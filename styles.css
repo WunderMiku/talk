@@ -8413,3 +8413,27 @@ html.motion-ready .reveal.is-in .reveal {
 .example-actions .example-speak {
   margin: 0;
 }
+
+/* Soft mode: real content replacing a skeleton fades, never scales. */
+html.motion-ready .reveal.reveal-soft {
+  opacity: 0.3;
+  translate: 0 6px;
+  scale: 1;
+  transition:
+    opacity 0.26s var(--ease-out-expo, ease-out),
+    translate 0.26s var(--ease-out-expo, ease-out);
+  will-change: opacity, translate;
+}
+
+html.motion-ready .reveal.reveal-soft.is-in {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* When a result replaces a skeleton the title is already the same word:
+   skip the letterpress entrance so nothing overlaps itself. */
+.screen.reveal-soft-mode .word-title .letter {
+  animation: none;
+  opacity: 1;
+  transform: none;
+}

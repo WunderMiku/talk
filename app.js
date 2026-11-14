@@ -1441,6 +1441,7 @@
     } catch (_) {
       /* History can fail in private frames. The screen still works. */
     }
+    if (direction === "back" && route.name === "home") setRevealMode("instant-top");
     renderRoute(route, direction, { instant });
   }
 
@@ -1602,6 +1603,11 @@
   }
 
   const STAGGER_MS = 55;
+  let revealMode = "normal";
+
+  function setRevealMode(mode) {
+    revealMode = mode;
+  }
 
   function observeReveals(scope) {
     if (!revealObserver) return;
@@ -1616,6 +1622,27 @@
     root.querySelectorAll(".reveal:not(.is-in)").forEach((element) => {
       if (element.parentElement?.closest(".reveal")) return;
       const rect = element.getBoundingClientRect();
+      const mode = revealMode;
+      // A route that lands on top of an existing screen does not need to push
+      // in: the top band is simply there.
+      if (mode === "instant-top" && rect.top < 220) {
+        element.style.transition = "none";
+        element.classList.add("is-in");
+        window.requestAnimationFrame(() => { element.style.transition = ""; });
+        return;
+      }
+      // Content that replaces a skeleton fades in without scale, so the grey
+      // blocks never appear to morph into text.
+      if (mode === "soft" && rect.top < viewport * 0.92) {
+        element.classList.add("reveal-soft");
+        const delay = order * 40;
+        order += 1;
+        window.setTimeout(() => {
+          element.style.transitionDelay = "0ms";
+          element.classList.add("is-in");
+        }, delay);
+        return;
+      }
       // Anything already on the first screen cascades top-to-bottom, one beat
       // after another; everything below waits for the observer.
       if (rect.top < viewport * 0.92) {
@@ -1632,6 +1659,7 @@
     root.querySelectorAll(".reveal-item:not(.is-in)").forEach((element) => {
       revealObserver.observe(element);
     });
+    revealMode = "normal";
   }
 
   function setupReveal() {
@@ -1680,6 +1708,7 @@
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
       screen.innerHTML = pageHtml(route);
+      screen.classList.toggle("reveal-soft-mode", revealMode === "soft");
       applyInputMode($("#search-input"), "en");
       enhanceWordColumns(screen);
       applyCacheDisplay();
@@ -3728,13 +3757,13 @@
             <span${withPreview ? ' id="loading-status-text"' : ""}>${status}</span>
           </div>
           ${withPreview ? '<div class="live-preview" id="live-preview" hidden></div>' : ""}
-          <div class="skeleton-stack reveal" style="--d:1">
+          <div class="skeleton-stack">
             <div class="skeleton hero"></div>
             <div class="skeleton line"></div>
             <div class="skeleton line short"></div>
           </div>
         </div>
-        <div class="skeleton-blocks reveal" style="--d:1">
+        <div class="skeleton-blocks">
           <div class="skeleton card tall"></div>
           <div class="skeleton card"></div>
           <div class="skeleton line"></div>
@@ -5038,6 +5067,7 @@
       const route = result.type === "word"
         ? { name: "word", word: result.data.word, result: result.data }
         : { name: "sentence", id: result.data.id, result: result.data };
+      setRevealMode("soft");
       navigate(route, { replace: true, direction: "forward" });
     } catch (error) {
       if (token !== state.searchSeq) return;
