@@ -113,6 +113,13 @@ memory                                记法
 
 数值都在 `app.js` 的 `DETAIL_LEVELS` 里，提示词里另有一份同样的数量要求（`prompts.js`）。改深度要两边一起改，否则模型会收到互相矛盾的指令。
 
+
+### 按压与复制
+
+- 所有可点元素共用一套动作：悬停 `translate: 0 -1px`、按下 `0 1px`，时长 160ms / 120ms，缓动 `--ease-out-expo`；触摸设备只有按下态；`prefers-reduced-motion` 下不位移。
+- 禁用长按菜单：`.app`/`.screen` 设 `user-select: none` 与 `-webkit-touch-callout: none`，输入框与文本域例外。
+- 复制入口只有三处：词头操作行的「复制释义」（中文释义 + 英文简义）、每条例句动作组的「复制」（英文 + 中文）、句子页与翻译结果卡原有的复制。统一走 `data-action="copy-text"` + `data-copy`，复制成功弹「已复制」。
+
 ## 主题系统
 
 主题是「基础 token + 覆盖文件」的结构：
