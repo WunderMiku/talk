@@ -24,4 +24,8 @@ fetch "https://cdn.jsdelivr.net/npm/idb@8.0.0/build/umd.js" "${VENDOR_DIR}/idb.j
 echo "Downloading Lenis..."
 fetch "https://cdn.jsdelivr.net/npm/lenis@1.1.20/dist/lenis.min.js" "${VENDOR_DIR}/lenis.min.js"
 
+# html-to-image rasterises the composed share card.
+echo "Downloading html-to-image..."
+fetch "https://cdn.jsdelivr.net/npm/html-to-image@1.11.13/dist/html-to-image.js" "${VENDOR_DIR}/html-to-image.js"
+
 echo "Static site assets ready in ${DEST}."

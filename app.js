@@ -1516,7 +1516,7 @@
     bookmark: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4V4Z"/></svg>`,
     chevronDown: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`,
     close: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
-    copy: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/></svg>`,
+    share: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.4 10.7 7.2-4.2"/><path d="m8.4 13.3 7.2 4.2"/></svg>`,    copy: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/></svg>`,
     info: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 10.5V16"/><circle cx="12" cy="7.8" r=".8" fill="currentColor" stroke="none"/></svg>`,
     refresh: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-4L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14 4l2-2"/><path d="M20 20v-5h-5"/></svg>`,
     trash: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m6 7 1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg>`,
@@ -2045,7 +2045,367 @@
       </header>`;
   }
 
-  function backTopbar({ label, title, bookmark = null }) {
+
+  /* ============================================================
+     Share card
+     ============================================================ */
+
+  function sharePageData() {
+    const route = state.route;
+    const theme = window.TALK_THEME?.current?.() || { label: "Talk" };
+    if (route.name === "word") {
+      const word = activeWordData();
+      if (!word?.word) return null;
+      const example = exampleForTheme(word) || word.examples?.[0] || null;
+      return {
+        kind: "单词",
+        title: word.word,
+        phonetic: word.phonetic || "",
+        pos: posLabel(word.posGroups?.[0]?.pos || word.pos),
+        translation: word.translation || "",
+        note: word.short || "",
+        example: example?.en || "",
+        exampleZh: example?.zh || "",
+        senses: (word.posGroups || []).flatMap((group) => group.senses || []).map((sense) => sense.zh).filter(Boolean).slice(0, 3),
+        collocations: (word.collocations || []).map((item) => item.phrase || item.text || item).filter(Boolean).slice(0, 4),
+        family: (word.family || []).map((item) => item.word).filter(Boolean).slice(0, 4),
+        theme: theme.label || "Talk"
+      };
+    }
+    if (route.name === "chunk") {
+      const chunk = route.result;
+      if (!chunk?.chunk) return null;
+      const example = chunk.examples?.[0] || null;
+      return {
+        kind: "意群",
+        title: chunk.chunk,
+        phonetic: chunk.phonetic || "",
+        pos: registerLabel(chunk.register) || "",
+        translation: chunk.translation || "",
+        note: chunk.short || "",
+        example: example?.en || "",
+        exampleZh: example?.zh || "",
+        senses: (chunk.senses || []).map((sense) => sense.zh).filter(Boolean).slice(0, 3),
+        collocations: (chunk.variants || []).map((item) => item.text || item).filter(Boolean).slice(0, 4),
+        family: [],
+        theme: theme.label || "Talk"
+      };
+    }
+    if (route.name === "sentence") {
+      const sentence = route.result;
+      if (!sentence?.text) return null;
+      return {
+        kind: "句子",
+        title: sentence.text,
+        phonetic: "",
+        pos: sentence.tone || "",
+        translation: sentence.translation || "",
+        note: sentence.syntax || "",
+        example: "",
+        exampleZh: "",
+        senses: (sentence.keyWords || []).map((word) => `${word.word} · ${word.meaningZh || word.meaning || ""}`).slice(0, 3),
+        collocations: [],
+        family: [],
+        theme: theme.label || "Talk"
+      };
+    }
+    return null;
+  }
+
+  function wrapCanvasText(ctx, text, maxWidth) {
+    const lines = [];
+    let line = "";
+    for (const char of String(text || "")) {
+      const next = line + char;
+      if (line && ctx.measureText(next).width > maxWidth) {
+        lines.push(line);
+        line = char;
+      } else {
+        line = next;
+      }
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  function shareCardCanvas(data) {
+    const styles = getComputedStyle(document.documentElement);
+    const read = (name, fallback) => (styles.getPropertyValue(name) || fallback).trim();
+    const paper = read("--paper", "#f6f1e7");
+    const ink = read("--ink", "#171813");
+    const accent = read("--lime", "#d9ff6b");
+    const accentInk = read("--accent-ink", "#557000");
+    const muted = read("--muted", "#6b6a5f");
+    const family = read("--font", '"Inter", "Noto Sans SC", sans-serif');
+    const mono = read("--mono", 'ui-monospace, "SFMono-Regular", monospace');
+
+    const W = 1080;
+    const H = 1350;
+    const pad = 84;
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, W, H);
+
+    // header
+    ctx.fillStyle = accent;
+    ctx.fillRect(pad, 74, 44, 44);
+    ctx.fillStyle = ink;
+    ctx.font = `500 26px ${mono}`;
+    ctx.textBaseline = "alphabetic";
+    ctx.fillText(`TALK · ${data.theme}`.toUpperCase(), pad + 64, 108);
+    ctx.textAlign = "right";
+    ctx.fillStyle = muted;
+    ctx.fillText(data.kind, W - pad, 108);
+    ctx.textAlign = "left";
+
+    // rule
+    ctx.fillStyle = accentInk;
+    ctx.fillRect(pad, 152, W - pad * 2, 3);
+
+    // title
+    let y = 320;
+    const titleSize = data.kind === "句子" ? 66 : 104;
+    ctx.fillStyle = ink;
+    ctx.font = `800 ${titleSize}px ${family}`;
+    const titleLines = wrapCanvasText(ctx, data.title, W - pad * 2).slice(0, 4);
+    for (const line of titleLines) {
+      ctx.fillText(line, pad, y);
+      y += titleSize * 1.18;
+    }
+
+    // meta
+    y += 10;
+    ctx.font = `500 30px ${mono}`;
+    ctx.fillStyle = muted;
+    const meta = [data.phonetic, data.pos].filter(Boolean).join("  ·  ");
+    if (meta) ctx.fillText(meta, pad, y);
+
+    // translation
+    y += 96;
+    ctx.fillStyle = ink;
+    ctx.font = `600 42px ${family}`;
+    const trLines = wrapCanvasText(ctx, data.translation, W - pad * 2).slice(0, 3);
+    for (const line of trLines) {
+      ctx.fillText(line, pad, y);
+      y += 62;
+    }
+
+    // note
+    if (data.note) {
+      y += 8;
+      ctx.fillStyle = muted;
+      ctx.font = `400 32px ${family}`;
+      const noteLines = wrapCanvasText(ctx, data.note, W - pad * 2).slice(0, 3);
+      for (const line of noteLines) {
+        ctx.fillText(line, pad, y);
+        y += 46;
+      }
+    }
+
+    // example
+    if (data.example) {
+      y += 34;
+      ctx.fillStyle = accent;
+      ctx.fillRect(pad, y - 30, 6, 120);
+      ctx.fillStyle = ink;
+      ctx.font = `500 34px ${family}`;
+      const exLines = wrapCanvasText(ctx, data.example, W - pad * 2 - 36).slice(0, 3);
+      for (const line of exLines) {
+        ctx.fillText(line, pad + 30, y);
+        y += 48;
+      }
+      if (data.exampleZh) {
+        ctx.fillStyle = muted;
+        ctx.font = `400 28px ${family}`;
+        const zh = wrapCanvasText(ctx, data.exampleZh, W - pad * 2 - 36).slice(0, 2);
+        for (const line of zh) {
+          ctx.fillText(line, pad + 30, y + 4);
+          y += 42;
+        }
+      }
+    } else if (data.senses?.length) {
+      y += 6;
+      ctx.font = `500 26px ${mono}`;
+      data.senses.forEach((sense, index) => {
+        ctx.fillStyle = accentInk;
+        ctx.fillText(String(index + 1).padStart(2, "0"), pad, y);
+        ctx.fillStyle = ink;
+        ctx.font = `500 34px ${family}`;
+        const lines = wrapCanvasText(ctx, sense, W - pad * 2 - 76).slice(0, 2);
+        lines.forEach((line, lineIndex) => {
+          ctx.fillText(line, pad + 66, y + lineIndex * 44);
+        });
+        y += 44 * lines.length + 26;
+        ctx.font = `500 26px ${mono}`;
+      });
+    }
+
+    // collocations & family
+    if (data.collocations?.length) {
+      y += 22;
+      ctx.fillStyle = accentInk;
+      ctx.font = `500 24px ${mono}`;
+      ctx.fillText("搭配", pad, y);
+      ctx.fillStyle = ink;
+      ctx.font = `500 30px ${family}`;
+      const text = data.collocations.join("  ·  ");
+      const lines = wrapCanvasText(ctx, text, W - pad * 2 - 100).slice(0, 2);
+      lines.forEach((line, index) => ctx.fillText(line, pad + 84, y + index * 40));
+      y += 40 * lines.length + 14;
+    }
+    if (data.family?.length) {
+      ctx.fillStyle = accentInk;
+      ctx.font = `500 24px ${mono}`;
+      ctx.fillText("同根", pad, y);
+      ctx.fillStyle = ink;
+      ctx.font = `500 30px ${family}`;
+      ctx.fillText(data.family.join("  ·  "), pad + 84, y);
+      y += 40;
+    }
+
+    // footer
+    ctx.fillStyle = accentInk;
+    ctx.fillRect(pad, H - 168, W - pad * 2, 2);
+    ctx.fillStyle = ink;
+    ctx.font = `700 40px ${family}`;
+    ctx.fillText("把词，看透。", pad, H - 96);
+    ctx.textAlign = "right";
+    ctx.fillStyle = muted;
+    ctx.font = `500 24px ${mono}`;
+    ctx.fillText("wundermiku.github.io/talk", W - pad, H - 96);
+    ctx.textAlign = "left";
+    return canvas;
+  }
+
+  let shareCard = null;
+
+  function shareComposeParts() {
+    const route = state.route;
+    const pick = (selector) => document.querySelector(selector);
+    if (route.name === "word") {
+      return [pick(".result-hero"), pick(".meaning-card"), pick(".example-card")].filter(Boolean);
+    }
+    if (route.name === "chunk") {
+      return [pick(".chunk-hero"), pick(".sense-card"), pick(".chunk-example")].filter(Boolean);
+    }
+    if (route.name === "sentence") {
+      const card = pick(".translation-card");
+      const block = card?.closest(".block") || card;
+      const parts = [pick(".sentence-stage"), block].filter(Boolean);
+      if (!parts.length) parts.push(pick(".sentence-line"));
+      return parts;
+    }
+    return [];
+  }
+
+  async function buildShareImage(data) {
+    const route = state.route;
+    const parts = shareComposeParts();
+    if (!parts.length) return null;
+    const paper = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#f6f1e7";
+    const theme = window.TALK_THEME?.current?.() || {};
+    const stage = document.createElement("div");
+    const scope = route.name === "chunk" ? "chunk-page" : route.name === "sentence" ? "sentence-page" : "result-page";
+    stage.className = `share-compose ${scope}`;
+    stage.setAttribute("data-theme", theme.id || "");
+    if (route.name === "sentence") stage.setAttribute("data-view", "original");
+    stage.innerHTML = `
+      <div class="share-compose-brand">
+        <span class="share-compose-logo">talk.</span>
+        <span class="mono">${esc(theme.label || "Talk")} · ${esc(data.kind)}</span>
+      </div>
+      <div class="share-compose-body"></div>
+      <div class="share-compose-foot">
+        <span>把词，看透。</span>
+        <span class="mono">wundermiku.github.io/talk</span>
+      </div>`;
+    const body = stage.querySelector(".share-compose-body");
+    for (const node of parts) {
+      const clone = node.cloneNode(true);
+      clone.querySelectorAll(".example-actions, .speak-btn, .copy-inline, .word-copy, .quote-mark, .example-toolbar, .chunk-toolbar, .sentence-tools, .page-actions, .reclassify").forEach((el) => el.remove());
+      clone.querySelectorAll(".reveal, .is-in").forEach((el) => el.classList.remove("reveal", "is-in"));
+      clone.classList.remove("reveal", "is-in");
+      clone.style.opacity = "1";
+      clone.style.transform = "none";
+      clone.style.color = "var(--ink)";
+      clone.querySelectorAll("*").forEach((el) => {
+        el.style.animation = "none";
+        el.style.opacity = "1";
+        el.style.transform = "none";
+        el.style.translate = "none";
+        el.style.scale = "none";
+      });
+      clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
+      body.appendChild(clone);
+    }
+    document.body.appendChild(stage);
+    try {
+      const width = 390;
+      const canvas = await window.htmlToImage.toCanvas(stage, {
+        width,
+        height: stage.scrollHeight,
+        pixelRatio: Math.min(3, 1080 / width),
+        backgroundColor: paper,
+        style: { transform: "none", margin: "0" }
+      });
+      return canvas;
+    } catch (_) {
+      return null;
+    } finally {
+      stage.remove();
+    }
+  }
+
+  async function openShareSheet() {
+    const data = sharePageData();
+    if (!data) {
+      toast("这一页还没有可分享的内容");
+      return;
+    }
+    openSheetShell({ kicker: "分享这一页", title: data.title });
+    const body = document.getElementById("sheet-scroll");
+    if (!body) return;
+    body.innerHTML = `
+      <div class="share-sheet">
+        <div class="share-loading"><span class="mono">正在排版分享图…</span></div>
+        <div class="share-actions" hidden>
+          <a class="btn btn-primary" data-share-save download="talk-${encodeURIComponent(data.title).slice(0, 24)}.png">保存图片</a>
+          <button class="btn btn-secondary" type="button" data-action="share-native">系统分享</button>
+        </div>
+        <p class="share-hint">${esc(data.theme)} 主题 · ${esc(data.kind)}</p>
+      </div>`;
+
+    const canvas = window.htmlToImage ? await buildShareImage(data) : shareCardCanvas(data);
+    if (!canvas) {
+      const sheet = body.querySelector(".share-sheet");
+      if (sheet) sheet.innerHTML = `<p class="share-hint">这一页暂时生成不了分享图</p>`;
+      return;
+    }
+    const url = canvas.toDataURL("image/png");
+    state.shareUrl = url;
+    const sheet = body.querySelector(".share-sheet");
+    if (!sheet) return;
+    sheet.querySelector(".share-loading")?.remove();
+    const actions = sheet.querySelector(".share-actions");
+    const hint = sheet.querySelector(".share-hint");
+    const img = document.createElement("img");
+    img.className = "share-card-img";
+    img.alt = "分享图预览";
+    img.src = url;
+    img.width = canvas.width;
+    img.height = canvas.height;
+    sheet.insertBefore(img, actions || hint);
+    if (actions) {
+      actions.hidden = false;
+      const save = actions.querySelector("[data-share-save]");
+      if (save) save.href = url;
+    }
+  }
+
+  function backTopbar({ label, title, bookmark = null, share = false }) {
     const saved = bookmark ? state.saved.includes(bookmark) : false;
     return `
       <header class="topbar">
@@ -2056,6 +2416,7 @@
         </div>
         <div class="top-actions">
           ${bookmark ? `<button class="icon-btn ${saved ? "is-saved" : ""}" type="button" data-action="save" aria-label="${saved ? "取消收藏" : "收藏"}" aria-pressed="${saved}" title="${saved ? "已收藏" : "收藏"}">${icon("bookmark")}</button>` : ""}
+          ${share ? `<button class="icon-btn" type="button" data-action="share-page" aria-label="分享这一页" title="分享这一页">${icon("share")}</button>` : ""}
           <button class="icon-btn" type="button" data-action="settings" aria-label="连接模型" title="连接模型">${icon("settings")}</button>
         </div>
       </header>`;
@@ -3406,7 +3767,7 @@
           relation: layer.relation,
           depth: layer.depth
         })
-      : backTopbar({ label: `单词 · ${word.level}`, title: word.word, bookmark });
+      : backTopbar({ label: `单词 · ${word.level}`, title: word.word, bookmark, share: true });
     return `
       ${header}
       <main class="result-page">
@@ -3610,7 +3971,7 @@
       </article>`;
 
     return `
-      ${backTopbar({ label: `${copy.label || "意群"} · ${formLabel}`, title: shorten(chunk.chunk, 26), bookmark })}
+      ${backTopbar({ label: `${copy.label || "意群"} · ${formLabel}`, title: shorten(chunk.chunk, 26), bookmark, share: true })}
       <main class="result-page chunk-page">
         <section class="result-hero chunk-hero">
           <div class="result-kicker reveal" style="--d:0">
@@ -4265,7 +4626,7 @@
     const bookmark = `sentence:${sentence.id}`;
     const single = !multi;
     return `
-      ${backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`, bookmark })}
+      ${backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`, bookmark, share: true })}
       <main class="result-page sentence-page" data-view="original">
         <section class="sentence-hero">
           <div class="result-kicker reveal" style="--d:0">
@@ -7116,6 +7477,31 @@
         event.preventDefault();
         copyCurrentPage();
         break;
+
+      case "share-page": {
+        event.preventDefault();
+        openShareSheet();
+        break;
+      }
+
+      case "share-native": {
+        event.preventDefault();
+        if (!state.shareUrl) break;
+        (async () => {
+          try {
+            const blob = await (await fetch(state.shareUrl)).blob();
+            const file = new File([blob], "talk-card.png", { type: "image/png" });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: "talk." });
+              return;
+            }
+            toast("这台设备不支持系统分享，请用「保存图片」");
+          } catch (_) {
+            toast("分享没有完成，可以保存图片再发");
+          }
+        })();
+        break;
+      }
 
       case "copy-text": {
         event.preventDefault();

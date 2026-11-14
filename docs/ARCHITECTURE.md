@@ -171,6 +171,10 @@ Qwen 的结果写进 `talk.audio.v1`，同一个词第二次点播放不联网�
 
 v122 之前打包过一个本地 Kokoro 模型，每个访客要多下约 115 MB、加载 13–17 秒，量化后的 ONNX 在 Android WebGPU 上不稳定，已经整体移除。
 
+## 分享图
+
+顶栏的分享按钮只出现在词条、意群与句子页。客户端把当前页面的真实元素（标题区、释义卡、例句/译文卡）克隆进一个离屏舞台，套上当前主题的样式，再用 `vendor/html-to-image.js` 渲染成 1080 宽的 PNG：可保存，也可通过 `navigator.share` 交给系统。它不请求模型，也不上传内容。
+
 ## 部署
 
 `.github/workflows/pages.yml` 把静态文件拷进 `dist/` 再发布到 GitHub Pages，没有任何构建步骤：

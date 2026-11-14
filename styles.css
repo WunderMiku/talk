@@ -9260,3 +9260,127 @@ html.motion-ready .reveal.reveal-soft.is-in {
 .sentence-page[data-view="segments"] .sentence-line .seg:hover {
   border-bottom-color: color-mix(in srgb, var(--ink) 72%, transparent);
 }
+
+/* share card */
+.share-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 18px 26px;
+}
+
+.share-card-img {
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 18px 40px rgba(20, 20, 16, 0.12);
+}
+
+.share-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.share-actions .btn {
+  flex: 1 1 0;
+  justify-content: center;
+}
+
+.share-hint {
+  margin: 0;
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.share-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 220px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 14px;
+  color: var(--muted);
+}
+
+/* composed share image */
+.share-compose {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 1;
+  width: 390px;
+  padding: 18px 22px 22px;
+  background: var(--paper);
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--font);
+}
+
+.share-compose-brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+}
+
+.share-compose-logo {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -0.03em;
+}
+
+.share-compose-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.share-compose-body .result-hero,
+.share-compose-body .chunk-hero {
+  padding: 0;
+  margin: 0;
+}
+
+.share-compose-body .meaning-card,
+.share-compose-body .example-card,
+.share-compose-body .sense-card,
+.share-compose-body .chunk-example,
+.share-compose-body .translation-card {
+  margin: 0;
+  box-shadow: none;
+}
+
+.share-compose-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid var(--accent-ink, var(--line-strong));
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.share-compose-foot .mono {
+  font-size: 9px;
+  color: var(--muted);
+}
+
+.share-compose .example-card::before,
+.share-compose .example-card::after,
+.share-compose .translation-card::before,
+.share-compose .translation-card::after,
+.share-compose .meaning-card::after {
+  display: none !important;
+  content: none !important;
+}
