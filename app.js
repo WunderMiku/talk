@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "188";
+  const APP_VERSION = "189";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2115,7 +2115,7 @@
       variants: TRANSLATOR_STYLES.map((style, index) => ({
         style: style.id,
         text: bodies[index] || bodies[0],
-        nuance: nuances[index] || "",
+        nuance: "",
         phrases: [],
         points: []
       })),
