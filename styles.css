@@ -27,6 +27,9 @@
   --mono: "SF Mono", ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-reveal: 0.5s;
+  --dur-hover: 0.35s;
   --shadow-card: 0 24px 60px -42px rgba(23, 24, 19, 0.45);
   --shadow-float: 0 30px 80px -36px rgba(23, 24, 19, 0.38);
 }
@@ -3032,11 +3035,23 @@ textarea:focus-visible,
    Motion
    ============================================================ */
 
-.reveal {
+/* Entrance is driven by IntersectionObserver; without JS (or with reduced
+   motion) nothing is hidden, so the page can never be left blank. */
+html.motion-ready .reveal,
+html.motion-ready .reveal-item {
   opacity: 0;
-  transform: translateY(18px);
-  animation: reveal-up 0.85s var(--ease-out) forwards;
-  animation-delay: calc(var(--d, 0) * 75ms + 40ms);
+  translate: 0 24px;
+  transition:
+    opacity var(--dur-reveal, 0.5s) var(--ease-out-expo, ease-out),
+    translate var(--dur-reveal, 0.5s) var(--ease-out-expo, ease-out);
+  transition-delay: calc(var(--i, var(--d, 0)) * 80ms);
+  will-change: opacity, translate;
+}
+
+html.motion-ready .reveal.is-in,
+html.motion-ready .reveal-item.is-in {
+  opacity: 1;
+  translate: 0 0;
 }
 
 .reveal-blur {
@@ -3302,10 +3317,13 @@ textarea:focus-visible,
   }
 
   .reveal,
+  .reveal-item,
   .reveal-blur {
     opacity: 1;
     transform: none;
+    translate: none;
     filter: none;
+    transition: none;
   }
 
   .word-title .letter {

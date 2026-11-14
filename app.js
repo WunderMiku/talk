@@ -1556,6 +1556,53 @@
     updateExamplesBlock(word);
   }
 
+  let revealObserver = null;
+
+  function observeReveals(scope) {
+    if (!revealObserver) return;
+    const root = scope || screen;
+    if (!root) return;
+    root.querySelectorAll(".reveal:not(.is-in)").forEach((element) => {
+      revealObserver.observe(element);
+    });
+    root.querySelectorAll(".reveal-item:not(.is-in)").forEach((element) => {
+      revealObserver.observe(element);
+    });
+  }
+
+  function setupReveal() {
+    const html = document.documentElement;
+    if (reduceMotion) {
+      html.classList.add("motion-off");
+      html.classList.remove("motion-ready");
+      return;
+    }
+    if (!("IntersectionObserver" in window)) {
+      html.classList.remove("motion-ready");
+      return;
+    }
+    html.classList.add("motion-ready");
+    window.__talkReveal = true;
+    revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-in");
+        revealObserver.unobserve(entry.target);
+      });
+    }, {
+      root: null,
+      threshold: 0.12,
+      rootMargin: "0px 0px -8% 0px"
+    });
+    observeReveals(screen);
+  }
+
+  function queueReveal(scope) {
+    if (!revealObserver) return;
+    const target = scope || screen;
+    window.requestAnimationFrame(() => observeReveals(target));
+  }
+
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
     const apply = () => {
       state.route = route;
@@ -1570,6 +1617,7 @@
       enhanceWordColumns(screen);
       applyCacheDisplay();
       refreshCacheBorders(screen);
+      queueReveal(screen);
       if (route.name === "word") {
         const word = getWord(route);
         if (word) {
@@ -2061,7 +2109,7 @@
       <div class="translation-list">
         ${result.variants.map((variant, index) => {
           const style = styleMap.get(variant.style) || TRANSLATOR_STYLES[index] || TRANSLATOR_STYLES[0];
-          return `<article class="translation-card tone-${style.tone}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
+          return `<article class="translation-card reveal-item tone-${style.tone}" style="--i:${Math.min(index, 6)}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
             <div class="translation-card-head">
               <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
               <div><h2>${esc(style.name)}</h2><p>${esc(style.hint)}</p></div>
@@ -2074,6 +2122,7 @@
         }).join("")}
       </div>
     </div>`;
+    queueReveal(host);
   }
 
   function translationDetailHtml(variant, style) {
@@ -2161,7 +2210,7 @@
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
     const startedAt = Date.now();
-    diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
+    diagLog("info", "model.start", `translation · ${state.settings?.detailLevel || "standard"}`, { chars: text.length });
     try {
       let content = "";
       try {
@@ -7205,6 +7254,7 @@
 
     const initial = routeFromHash();
     history.replaceState({ route: initial, depth: 0 }, "", routeHash(initial));
+    setupReveal();
     renderRoute(initial, "forward", { instant: true });
     registerServiceWorker();
 
