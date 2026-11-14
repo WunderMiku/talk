@@ -8965,13 +8965,13 @@ html.motion-ready .reveal.reveal-soft.is-in {
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] {
-  --seg-rule: var(--accent);
+  --seg-rule: var(--accent-ink);
   border-bottom: 1.5px solid var(--seg-rule);
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] .seg-no,
 .sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] .seg-arrow {
-  color: var(--accent);
+  color: var(--accent-ink);
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg:last-of-type {
@@ -9214,7 +9214,7 @@ html.motion-ready .reveal.reveal-soft.is-in {
 /* keep keyword marks as an underline, not a box */
 .sentence-page .sentence-line .kw {
   border: 0;
-  border-bottom: 2px solid var(--accent);
+  border-bottom: 2px solid var(--kw-rule, var(--accent-ink));
   border-radius: 0;
   padding: 0 1px;
   background: none;

@@ -25,10 +25,10 @@
   --surface-raised: #fff6e7;
   --surface-soft: rgba(248, 238, 220, 0.72);
   --accent: #d23b2f;
-  --label-accent: #7f2119;
+  --label-accent: var(--accent-ink);
   --accent-strong: #b62c21;
   --accent-wash: #f3c6b9;
-  --accent-ink: #711a13;
+  --accent-ink: #9e1f18;
   --focus-ring: rgba(210, 59, 47, 0.38);
   --font: "Inter", "Helvetica Neue", "PingFang SC", "Noto Sans SC", "Roboto", system-ui, sans-serif;
   --display: var(--font);

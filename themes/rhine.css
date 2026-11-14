@@ -25,10 +25,10 @@
   --surface-raised: #f6f3ec;
   --surface-soft: rgba(241, 238, 231, 0.72);
   --accent: #c46a3b;
-  --label-accent: #6d3a1d;
+  --label-accent: var(--accent-ink);
   --accent-strong: #a94e26;
   --accent-wash: #efd4c0;
-  --accent-ink: #6e2f15;
+  --accent-ink: #8f451f;
   --focus-ring: rgba(196, 106, 59, 0.35);
   --font: "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", sans-serif;
   --display: "Arial Narrow", "Helvetica Neue", "Noto Sans SC", sans-serif;

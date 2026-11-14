@@ -30,10 +30,10 @@
   --surface-raised: #fbfaf6;
   --surface-soft: rgba(251, 250, 246, 0.9);
   --accent: #c8f000;
-  --label-accent: #4f6500;
+  --label-accent: var(--accent-ink);
   --accent-strong: #a9cf00;
   --accent-wash: rgba(200, 240, 0, 0.34);
-  --accent-ink: #131313;
+  --accent-ink: #4f6500;
   --focus-ring: rgba(19, 19, 19, 0.45);
 
   --shadow-card: 4px 4px 0 rgba(19, 19, 19, 0.9);

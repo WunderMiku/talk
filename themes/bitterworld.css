@@ -5,7 +5,9 @@
    ========================================================================== */
 
 [data-theme="bitterworld"] {
-  --label-accent: #7c5f15;
+  --accent-ink: #2f6f6a;
+  --label-accent: var(--accent-ink);
+  --kw-rule: #7a3a24;
   --paper: #f1e6cb;
   --paper-2: #fbf3df;
   --paper-3: #e8dbc0;
