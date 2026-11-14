@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "187";
+  const APP_VERSION = "188";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1591,8 +1591,8 @@
       });
     }, {
       root: null,
-      threshold: 0.12,
-      rootMargin: "0px 0px -8% 0px"
+      threshold: 0.01,
+      rootMargin: "0px 0px -4% 0px"
     });
     observeReveals(screen);
   }
@@ -2082,7 +2082,10 @@
     host.innerHTML = `<div class="translator-empty">
       <span class="translator-empty-mark">!</span>
       <p>翻译需要模型。先连接一个 OpenAI 兼容服务，再回来输入。</p>
-      <button class="btn btn-primary" type="button" data-action="settings">${icon("settings")} 连接模型</button>
+      <div class="translator-empty-actions">
+        <button class="btn btn-primary" type="button" data-action="settings">${icon("settings")} 连接模型</button>
+        <button class="btn btn-secondary" type="button" data-action="demo-translation">先看一段示例</button>
+      </div>
     </div>`;
   }
 
@@ -2094,6 +2097,33 @@
       <p>这次没有翻完：${esc(shorten(message || "未知错误", 160))}</p>
       <button class="btn btn-secondary" type="button" data-action="regenerate-translation">${icon("refresh")} 重试</button>
     </div>`;
+  }
+
+  function demoTranslationResult(text) {
+    const source = String(text || "").trim() || "今天有点累，但我还是想出去走走。";
+    const bodies = [
+      "Tired, but I still want to get out for a bit.",
+      "Beat, but I could still use some fresh air.",
+      "I am somewhat fatigued; nevertheless, I would like to take a walk.",
+      "Low-key wiped, but still down for a walk.",
+      "Weary as I am, a stroll would do me good."
+    ];
+    const nuances = ["短、直接，像日常对话", "像母语者会脱口而出的说法", "邮件、报告、正式场合", "社交平台上的轻松口气", "书面语里的从容"];
+    return {
+      sourceText: source,
+      sourceLanguage: state.translatorMode === "en" ? "en" : "zh",
+      variants: TRANSLATOR_STYLES.map((style, index) => ({
+        style: style.id,
+        text: bodies[index] || bodies[0],
+        nuance: nuances[index] || "",
+        phrases: [],
+        points: []
+      })),
+      model: "示例",
+      cached: false,
+      demo: true,
+      at: Date.now()
+    };
   }
 
   function renderTranslatorResult(result) {
@@ -6228,6 +6258,11 @@
       case "regenerate-translation":
         event.preventDefault();
         if (state.lastTranslationInput) runTranslation(state.lastTranslationInput, { bypassCache: true });
+        break;
+
+      case "demo-translation":
+        event.preventDefault();
+        renderTranslatorResult(demoTranslationResult($("#translator-input")?.value || $("#workspace-translator-input")?.value));
         break;
 
       case "settings-tab":
