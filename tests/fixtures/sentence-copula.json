@@ -1,0 +1,38 @@
+{
+  "text": "The scientist was doubtful but continued his research.",
+  "translation": "这位科学家虽有疑虑，但仍继续研究。",
+  "tone": "克制",
+  "syntax": "主句 + 转折",
+  "summary": "带着疑虑继续研究。",
+  "segments": [
+    {
+      "text": "The scientist",
+      "role": "theme",
+      "gloss": "这位科学家"
+    },
+    {
+      "text": " was",
+      "role": "rheme",
+      "gloss": "是"
+    },
+    {
+      "text": " doubtful",
+      "role": "rheme",
+      "gloss": "心存疑虑"
+    },
+    {
+      "text": " but continued his research.",
+      "role": "focus",
+      "gloss": "但仍继续研究"
+    }
+  ],
+  "orderNote": "",
+  "contrast": null,
+  "keyWords": [
+    {
+      "word": "doubtful",
+      "meaningZh": "怀疑的",
+      "role": "修饰"
+    }
+  ]
+}

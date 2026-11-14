@@ -5,6 +5,10 @@ suite("dictionary · sentence analysis", { timeout: 60_000 }, (s) => {
   function wire(state) {
     const mock = state.env.server.mock;
     mock.setFallback("sentence", { fixture: "sentence-min" });
+    mock.on(
+      { task: "sentence", text: "The scientist was doubtful but continued his research." },
+      { fixture: "sentence-copula" }
+    );
     mock.setFallback("themes", { fixture: "theme-min" });
     mock.setFallback("chunk", { fixture: "chunk-bytheway" });
     mock.on(
@@ -100,6 +104,14 @@ suite("dictionary · sentence analysis", { timeout: 60_000 }, (s) => {
     await page.click("[data-action=sentence-view][data-view=original]");
     await new Promise((resolve) => setTimeout(resolve, 80));
     t.expect(await page.evaluate(() => getComputedStyle(document.querySelector(".sentence-line .kw")).pointerEvents)).toBe("auto");
+  });
+
+  s.test("folds a lone copula into its neighbour", async (state, t) => {
+    const page = await analyse(state, "The scientist was doubtful but continued his research.");
+    t.expect(await page.locator(".sentence-line .seg").count()).toBe(3);
+    t.expect((await page.locator(".sentence-line .seg-no").allInnerTexts()).join(",")).toBe("01,02,03");
+    t.expect(await page.locator(".flow-row").count()).toBe(3);
+    t.expect(page.errors).toEqual([]);
   });
 
   s.test("opens a chunk when a segment carries one", async (state, t) => {

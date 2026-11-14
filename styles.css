@@ -8898,6 +8898,17 @@ html.motion-ready .reveal.reveal-soft.is-in {
   position: relative;
 }
 
+.sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] .seg-arrow {
+  position: absolute;
+  right: -0.3em;
+  top: -0.35em;
+  margin: 0;
+  display: inline-block;
+  font-size: 0.5em;
+  font-style: normal;
+  line-height: 1;
+}
+
 .sentence-line .seg-space {
   display: inline;
   white-space: pre;
@@ -8934,14 +8945,33 @@ html.motion-ready .reveal.reveal-soft.is-in {
 
 
 /* 意群切分：只用托盘与编号，不再插斜杠 */
-.sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] {
-  border-bottom-color: color-mix(in srgb, var(--accent) 60%, var(--ink));
+.sentence-page[data-view="segments"] .sentence-line {
+  line-height: 1.88;
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg {
+  --seg-rule: color-mix(in srgb, var(--ink) 28%, transparent);
   margin-right: 0.9em;
-  border-bottom: 3px solid color-mix(in srgb, var(--ink) 60%, transparent);
-  padding-bottom: 3px;
+  border-bottom: 1px solid var(--seg-rule);
+  padding-bottom: 4px;
+  background-image:
+    linear-gradient(var(--seg-rule), var(--seg-rule)),
+    linear-gradient(var(--seg-rule), var(--seg-rule));
+  background-repeat: no-repeat;
+  background-size: 1px 4px, 1px 4px;
+  background-position: left bottom, right bottom;
+  background-origin: border-box;
+  background-clip: border-box;
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] {
+  --seg-rule: var(--accent);
+  border-bottom: 1.5px solid var(--seg-rule);
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] .seg-no,
+.sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] .seg-arrow {
+  color: var(--accent);
 }
 
 .sentence-page[data-view="segments"] .sentence-line .seg:last-of-type {

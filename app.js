@@ -3875,6 +3875,20 @@
       gloss: String(item?.gloss || "").trim(),
       chunk: String(item?.chunk || "").trim()
     })).filter((item) => item.text.trim());
+    // A one-word function segment ("was", "is", "of") makes a stub of a rule;
+    // fold it into its neighbour so the tray always carries a phrase.
+    const LONE_FUNCTION = /^(is|am|are|was|were|be|been|being|do|does|did|has|have|had|will|would|can|could|may|might|must|shall|should|of|to|in|on|at|by|for|with|and|but|or|so|that|which|who)$/i;
+    for (let index = items.length - 1; index >= 0; index -= 1) {
+      const item = items[index];
+      if (!LONE_FUNCTION.test(String(item.text).trim())) continue;
+      if (index > 0) {
+        items[index - 1].text += item.text;
+        items.splice(index, 1);
+      } else if (items.length > 1) {
+        items[1].text = item.text + items[1].text;
+        items.splice(0, 1);
+      }
+    }
     if (items.length < 1 || items.length > 6) return [];
     const squeeze = (value) => String(value).replace(/\s+/g, " ").replace(/\s+([,.;:!?])/g, "$1").trim();
     const tail = (source.match(/[.!?…]+$/) || [""])[0];
