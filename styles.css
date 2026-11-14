@@ -27,6 +27,9 @@
   --mono: "SF Mono", ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --dur-reveal: 0.36s;
+  --dur-hover: 0.35s;
   --shadow-card: 0 24px 60px -42px rgba(23, 24, 19, 0.45);
   --shadow-float: 0 30px 80px -36px rgba(23, 24, 19, 0.38);
 }
@@ -3032,11 +3035,37 @@ textarea:focus-visible,
    Motion
    ============================================================ */
 
-.reveal {
-  opacity: 0;
-  transform: translateY(18px);
-  animation: reveal-up 0.85s var(--ease-out) forwards;
-  animation-delay: calc(var(--d, 0) * 75ms + 40ms);
+/* Entrance is driven by IntersectionObserver; without JS (or with reduced
+   motion) nothing is hidden, so the page can never be left blank. */
+html.motion-ready .reveal,
+html.motion-ready .reveal-item {
+  opacity: 0.65;
+  translate: 0 18px;
+  scale: 0.96;
+  transform-origin: center top;
+  transition:
+    opacity var(--dur-reveal, 0.36s) var(--ease-out-expo, ease-out),
+    translate var(--dur-reveal, 0.36s) var(--ease-out-expo, ease-out),
+    scale var(--dur-reveal, 0.36s) var(--ease-out-expo, ease-out);
+  will-change: opacity, translate, scale;
+}
+
+html.motion-ready .reveal-item {
+  transition-delay: calc(var(--i, 0) * 40ms);
+}
+
+html.motion-ready .reveal.is-in,
+html.motion-ready .reveal-item.is-in {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+}
+
+html.motion-ready .reveal.is-in .reveal {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+  transition: none;
 }
 
 .reveal-blur {
@@ -3302,10 +3331,14 @@ textarea:focus-visible,
   }
 
   .reveal,
+  .reveal-item,
   .reveal-blur {
     opacity: 1;
     transform: none;
+    translate: none;
+    scale: none;
     filter: none;
+    transition: none;
   }
 
   .word-title .letter {
@@ -8232,4 +8265,175 @@ textarea:focus-visible,
 
 .sentence-part + .sentence-part {
   padding-top: 30px;
+}
+
+.translator-empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* ---------- press & hover: one motion vocabulary ------------------ */
+
+:root {
+  --dur-press: 120ms;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .icon-btn,
+  .btn,
+  .chip,
+  .recent-chip,
+  .module-btn,
+  .translator-mode-btn,
+  .translator-style-chip,
+  .translator-example-btn,
+  .example-action,
+  .level-chip,
+  .theme-row-head,
+  .word-link,
+  .family-card,
+  .relation-card,
+  .rel-chip,
+  .search-submit,
+  .daily-arrow,
+  .brand,
+  .link-btn,
+  .speak-btn,
+  .example-speak,
+  .sheet-close,
+  .copy-btn,
+  .word-head .icon-btn {
+    transition-property: background-color, border-color, color, box-shadow, translate, opacity;
+    transition-duration: var(--dur-hover);
+    transition-timing-function: var(--ease-out-expo);
+  }
+
+  .icon-btn:hover,
+  .btn:hover,
+  .chip:hover,
+  .recent-chip:hover,
+  .module-btn:hover,
+  .translator-mode-btn:hover,
+  .translator-style-chip:hover,
+  .translator-example-btn:hover,
+  .example-action:hover,
+  .level-chip:hover,
+  .word-link:hover,
+  .family-card:hover,
+  .relation-card:hover,
+  .rel-chip:hover,
+  .daily-arrow:hover,
+  .brand:hover,
+  .link-btn:hover,
+  .speak-btn:hover,
+  .example-speak:hover,
+  .sheet-close:hover,
+  .copy-btn:hover {
+    translate: 0 -1px;
+  }
+}
+
+.icon-btn:active,
+.btn:active,
+.chip:active,
+.recent-chip:active,
+.module-btn:active,
+.translator-mode-btn:active,
+.translator-style-chip:active,
+.translator-example-btn:active,
+.example-action:active,
+.level-chip:active,
+.theme-row-head:active,
+.word-link:active,
+.family-card:active,
+.relation-card:active,
+.rel-chip:active,
+.search-submit:active,
+.daily-arrow:active,
+.brand:active {
+  translate: 0 1px;
+  transition-duration: var(--dur-press);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-btn:active,
+  .btn:active,
+  .chip:active,
+  .module-btn:active,
+  .search-submit:active {
+    translate: none;
+  }
+}
+
+/* long-press menus belong to the OS; the app offers explicit copy buttons */
+.app,
+.screen {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.app input,
+.app textarea,
+.app [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.copy-inline {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-left: 2px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.copy-inline svg {
+  width: 13px;
+  height: 13px;
+}
+
+.example-copy {
+  margin-left: 2px;
+}
+
+
+.example-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.example-actions .example-speak {
+  margin: 0;
+}
+
+/* Soft mode: real content replacing a skeleton fades, never scales. */
+html.motion-ready .reveal.reveal-soft {
+  opacity: 0.3;
+  translate: 0 6px;
+  scale: 1;
+  transition:
+    opacity 0.26s var(--ease-out-expo, ease-out),
+    translate 0.26s var(--ease-out-expo, ease-out);
+  will-change: opacity, translate;
+}
+
+html.motion-ready .reveal.reveal-soft.is-in {
+  opacity: 1;
+  translate: 0 0;
+}
+
+/* When a result replaces a skeleton the title is already the same word:
+   skip the letterpress entrance so nothing overlaps itself. */
+.screen.reveal-soft-mode .word-title .letter {
+  animation: none;
+  opacity: 1;
+  transform: none;
 }

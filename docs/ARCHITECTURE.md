@@ -113,6 +113,13 @@ memory                                记法
 
 数值都在 `app.js` 的 `DETAIL_LEVELS` 里，提示词里另有一份同样的数量要求（`prompts.js`）。改深度要两边一起改，否则模型会收到互相矛盾的指令。
 
+
+### 按压与复制
+
+- 所有可点元素共用一套动作：悬停 `translate: 0 -1px`、按下 `0 1px`，时长 160ms / 120ms，缓动 `--ease-out-expo`；触摸设备只有按下态；`prefers-reduced-motion` 下不位移。
+- 禁用长按菜单：`.app`/`.screen` 设 `user-select: none` 与 `-webkit-touch-callout: none`，输入框与文本域例外。
+- 复制入口只有三处：词头操作行的「复制释义」（中文释义 + 英文简义）、每条例句动作组的「复制」（英文 + 中文）、句子页与翻译结果卡原有的复制。统一走 `data-action="copy-text"` + `data-copy`，复制成功弹「已复制」。
+
 ## 主题系统
 
 主题是「基础 token + 覆盖文件」的结构：
@@ -129,6 +136,13 @@ prompts.js           与主题无关，主题不影响提示词
 `theme.js` 的 `apply()` 负责写 `<html data-theme>`、切换 `theme-color`、懒加载对应样式表；`list()` 直接喂给设置面板，所以加一个主题只需要：一个 CSS 文件、一条注册表项、可选的文案块。完整步骤见 [THEME.md](../THEME.md)。
 
 主题**不参与组件布局**。版式差异（比如横屏间距）走 `styles.css` 里的 `--word-*` 变量，而不是在主题文件里写 `!important` 覆写——这是 2026 年 11 月那次重构的核心约束。
+
+## 滚动与入场
+
+- 页面自己滚 `.screen`，不滚 `body`；平滑滚动用 `vendor/lenis.min.js`（1.1.20，随仓库提交，SW 预缓存），在 `setupSmoothScroll()` 里 `wrapper` 与 `content` 都指向 `.screen`，`lerp 0.09`、`smoothWheel true`、`syncTouch false`（触屏保持原生）。
+- 路由切换用 `scrollScreenTo(0, true)` 复位，并在换页后 `lenis.resize()` 重算高度；`reduce-motion` 下完全不创建 Lenis。
+- 嵌套滚动区（设置弹层、翻译结果区）标 `data-lenis-prevent`，滚轮/触摸在其中不会被页面接管。
+- 入场用 `IntersectionObserver`：`.reveal` 按 section 触发，初始上浮 6px、时长 0.28s、无透明度变化；`rootMargin` 底部提前 120px；滚到离底 40px 内时兜底全部 `is-in`。`html.motion-ready` 由 head 里的内联脚本在首帧前加上，3 秒未初始化则摘除，保证 JS 失败时内容仍可见。
 
 ## 发音
 

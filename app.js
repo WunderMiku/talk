@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "186";
+  const APP_VERSION = "187";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1441,6 +1441,7 @@
     } catch (_) {
       /* History can fail in private frames. The screen still works. */
     }
+    if (direction === "back" && route.name === "home") setRevealMode("instant-top");
     renderRoute(route, direction, { instant });
   }
 
@@ -1556,7 +1557,149 @@
     updateExamplesBlock(word);
   }
 
+  let revealObserver = null;
+  let lenis = null;
+
+  function setupSmoothScroll() {
+    if (reduceMotion || !window.Lenis || lenis) return;
+    try {
+      lenis = new Lenis({
+        wrapper: screen,
+        content: screen,
+        lerp: 0.09,
+        smoothWheel: true,
+        syncTouch: false,
+        wheelMultiplier: 1
+      });
+    } catch (_) {
+      lenis = null;
+      return;
+    }
+    const raf = (time) => {
+      lenis?.raf(time);
+      window.requestAnimationFrame(raf);
+    };
+    window.requestAnimationFrame(raf);
+  }
+
+  function scrollScreenTo(top, immediate = false) {
+    if (lenis) {
+      lenis.scrollTo(top, { immediate, force: true });
+      return;
+    }
+    screen.scrollTop = top;
+  }
+
+  function resizeSmoothScroll() {
+    if (!lenis) return;
+    window.requestAnimationFrame(() => lenis?.resize());
+  }
+
+
+
+  function revealAllRemaining() {
+    const pending = $$(".reveal:not(.is-in), .reveal-item:not(.is-in)");
+    pending.forEach((element) => element.classList.add("is-in"));
+  }
+
+  const STAGGER_MS = 55;
+  let revealMode = "normal";
+
+  function setRevealMode(mode) {
+    revealMode = mode;
+  }
+
+  function observeReveals(scope) {
+    if (!revealObserver) return;
+    const root = scope || screen;
+    if (!root) return;
+    // Nested .reveal nodes ride along with their section (CSS handles it).
+    root.querySelectorAll(".reveal").forEach((element) => {
+      if (element.parentElement?.closest(".reveal")) element.classList.add("is-in");
+    });
+    const viewport = window.innerHeight || 800;
+    let order = 0;
+    root.querySelectorAll(".reveal:not(.is-in)").forEach((element) => {
+      if (element.parentElement?.closest(".reveal")) return;
+      const rect = element.getBoundingClientRect();
+      const mode = revealMode;
+      // A route that lands on top of an existing screen does not need to push
+      // in: the top band is simply there.
+      if ((mode === "instant-home" || mode === "instant-top") && rect.top < (mode === "instant-home" ? viewport * 0.92 : 220)) {
+        element.style.transition = "none";
+        element.classList.add("is-in");
+        window.requestAnimationFrame(() => { element.style.transition = ""; });
+        return;
+      }
+      // Content that replaces a skeleton fades in without scale, so the grey
+      // blocks never appear to morph into text.
+      if (mode === "soft" && rect.top < viewport * 0.92) {
+        element.classList.add("reveal-soft");
+        const delay = order * 40;
+        order += 1;
+        window.setTimeout(() => {
+          element.style.transitionDelay = "0ms";
+          element.classList.add("is-in");
+        }, delay);
+        return;
+      }
+      // Anything already on the first screen cascades top-to-bottom, one beat
+      // after another; everything below waits for the observer.
+      if (rect.top < viewport * 0.92) {
+        const delay = order * STAGGER_MS;
+        order += 1;
+        window.setTimeout(() => {
+          element.style.transitionDelay = "0ms";
+          element.classList.add("is-in");
+        }, delay);
+      } else {
+        revealObserver.observe(element);
+      }
+    });
+    root.querySelectorAll(".reveal-item:not(.is-in)").forEach((element) => {
+      revealObserver.observe(element);
+    });
+    revealMode = "normal";
+  }
+
+  function setupReveal() {
+    const html = document.documentElement;
+    if (reduceMotion) {
+      html.classList.add("motion-off");
+      html.classList.remove("motion-ready");
+      return;
+    }
+    if (!("IntersectionObserver" in window)) {
+      html.classList.remove("motion-ready");
+      return;
+    }
+    html.classList.add("motion-ready");
+    window.__talkReveal = true;
+    screen.addEventListener("scroll", () => {
+      if (screen.scrollHeight - screen.scrollTop - screen.clientHeight < 40) revealAllRemaining();
+    }, { passive: true });
+    revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (!entry.isIntersecting) return;
+        entry.target.classList.add("is-in");
+        revealObserver.unobserve(entry.target);
+      });
+    }, {
+      root: null,
+      threshold: 0.01,
+      rootMargin: "0px 0px 120px 0px"
+    });
+    observeReveals(screen);
+  }
+
+  function queueReveal(scope) {
+    if (!revealObserver) return;
+    const target = scope || screen;
+    window.requestAnimationFrame(() => observeReveals(target));
+  }
+
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
+    if (route.name === "home" && revealMode === "normal") setRevealMode("instant-home");
     const apply = () => {
       state.route = route;
       screen.dataset.page = route.name;
@@ -1566,10 +1709,12 @@
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
       screen.innerHTML = pageHtml(route);
+      screen.classList.toggle("reveal-soft-mode", revealMode === "soft");
       applyInputMode($("#search-input"), "en");
       enhanceWordColumns(screen);
       applyCacheDisplay();
       refreshCacheBorders(screen);
+      queueReveal(screen);
       if (route.name === "word") {
         const word = getWord(route);
         if (word) {
@@ -1580,7 +1725,8 @@
         prefetchToken += 1;
         hideCacheCorner();
       }
-      screen.scrollTop = 0;
+      scrollScreenTo(0, true);
+      resizeSmoothScroll();
       screen.classList.remove("is-leaving", "is-back-leaving", "is-entering");
       void screen.offsetWidth;
       screen.classList.add("is-entering");
@@ -1923,7 +2069,7 @@
         </div>
         <button class="icon-btn" type="button" data-action="close-workspace" aria-label="关闭翻译结果">${icon("close")}</button>
       </header>
-      <div class="translation-workspace-body">
+      <div class="translation-workspace-body" data-lenis-prevent>
         <form class="workspace-translator-form" id="workspace-translator-form" novalidate>
           <div class="workspace-input-shell">
             <textarea id="workspace-translator-input" rows="2"  spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
@@ -2034,7 +2180,10 @@
     host.innerHTML = `<div class="translator-empty">
       <span class="translator-empty-mark">!</span>
       <p>翻译需要模型。先连接一个 OpenAI 兼容服务，再回来输入。</p>
-      <button class="btn btn-primary" type="button" data-action="settings">${icon("settings")} 连接模型</button>
+      <div class="translator-empty-actions">
+        <button class="btn btn-primary" type="button" data-action="settings">${icon("settings")} 连接模型</button>
+        <button class="btn btn-secondary" type="button" data-action="demo-translation">先看一段示例</button>
+      </div>
     </div>`;
   }
 
@@ -2046,6 +2195,33 @@
       <p>这次没有翻完：${esc(shorten(message || "未知错误", 160))}</p>
       <button class="btn btn-secondary" type="button" data-action="regenerate-translation">${icon("refresh")} 重试</button>
     </div>`;
+  }
+
+  function demoTranslationResult(text) {
+    const source = String(text || "").trim() || "今天有点累，但我还是想出去走走。";
+    const bodies = [
+      "Tired, but I still want to get out for a bit.",
+      "Beat, but I could still use some fresh air.",
+      "I am somewhat fatigued; nevertheless, I would like to take a walk.",
+      "Low-key wiped, but still down for a walk.",
+      "Weary as I am, a stroll would do me good."
+    ];
+    const nuances = ["短、直接，像日常对话", "像母语者会脱口而出的说法", "邮件、报告、正式场合", "社交平台上的轻松口气", "书面语里的从容"];
+    return {
+      sourceText: source,
+      sourceLanguage: state.translatorMode === "en" ? "en" : "zh",
+      variants: TRANSLATOR_STYLES.map((style, index) => ({
+        style: style.id,
+        text: bodies[index] || bodies[0],
+        nuance: "",
+        phrases: [],
+        points: []
+      })),
+      model: "示例",
+      cached: false,
+      demo: true,
+      at: Date.now()
+    };
   }
 
   function renderTranslatorResult(result) {
@@ -2061,7 +2237,7 @@
       <div class="translation-list">
         ${result.variants.map((variant, index) => {
           const style = styleMap.get(variant.style) || TRANSLATOR_STYLES[index] || TRANSLATOR_STYLES[0];
-          return `<article class="translation-card tone-${style.tone}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
+          return `<article class="translation-card reveal-item tone-${style.tone}" style="--i:${Math.min(index, 4)}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
             <div class="translation-card-head">
               <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
               <div><h2>${esc(style.name)}</h2><p>${esc(style.hint)}</p></div>
@@ -2074,6 +2250,7 @@
         }).join("")}
       </div>
     </div>`;
+    queueReveal(host);
   }
 
   function translationDetailHtml(variant, style) {
@@ -2161,7 +2338,7 @@
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), 60_000);
     const startedAt = Date.now();
-    diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
+    diagLog("info", "model.start", `translation · ${state.settings?.detailLevel || "standard"}`, { chars: text.length });
     try {
       let content = "";
       try {
@@ -2905,7 +3082,10 @@
               ${example.zh ? `<p class="example-zh">${esc(example.zh)}</p>` : ""}
               <div class="example-foot${example.source ? "" : " is-solo"}">
                 ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : ""}
-                <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
+                <div class="example-actions">
+                  <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
+                  <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${example.en}${example.zh ? `\n${example.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
+                </div>
               </div>
             </div>`).join("")}
         </section>`;
@@ -2923,7 +3103,7 @@
     } else {
       section.outerHTML = html;
     }
-    screen.scrollTop = scroll;
+    scrollScreenTo(scroll, true);
     applyCacheDisplay();
     refreshCacheBorders(screen);
     return true;
@@ -2962,6 +3142,7 @@
             ${wordPosSwitchHtml(wordPosGroups(word))}
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(`${word.translation || word.short}${word.short && word.translation ? `\n${word.short}` : ""}`)}" aria-label="复制释义" title="复制释义">${icon("copy")}</button>
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(word.translation || word.short)}</p>
@@ -3577,13 +3758,13 @@
             <span${withPreview ? ' id="loading-status-text"' : ""}>${status}</span>
           </div>
           ${withPreview ? '<div class="live-preview" id="live-preview" hidden></div>' : ""}
-          <div class="skeleton-stack reveal" style="--d:1">
+          <div class="skeleton-stack">
             <div class="skeleton hero"></div>
             <div class="skeleton line"></div>
             <div class="skeleton line short"></div>
           </div>
         </div>
-        <div class="skeleton-blocks reveal" style="--d:1">
+        <div class="skeleton-blocks">
           <div class="skeleton card tall"></div>
           <div class="skeleton card"></div>
           <div class="skeleton line"></div>
@@ -4132,7 +4313,7 @@
           </div>
           <button class="sheet-close" type="button" data-action="close-sheet" aria-label="关闭">${icon("close")}</button>
         </div>
-        <div class="sheet-scroll" id="sheet-scroll"></div>
+        <div class="sheet-scroll" id="sheet-scroll" data-lenis-prevent></div>
       </section>`;
 
     state.sheetOpen = true;
@@ -4887,6 +5068,7 @@
       const route = result.type === "word"
         ? { name: "word", word: result.data.word, result: result.data }
         : { name: "sentence", id: result.data.id, result: result.data };
+      setRevealMode("soft");
       navigate(route, { replace: true, direction: "forward" });
     } catch (error) {
       if (token !== state.searchSeq) return;
@@ -6096,6 +6278,14 @@
         copyCurrentPage();
         break;
 
+      case "copy-text": {
+        event.preventDefault();
+        const text = target.dataset.copy || "";
+        if (!text) break;
+        void copyText(text).then((copied) => toast(copied ? "已复制" : "这个浏览器不允许复制"));
+        break;
+      }
+
       case "translator-style": {
         event.preventDefault();
         const styleId = target.dataset.style;
@@ -6179,6 +6369,11 @@
       case "regenerate-translation":
         event.preventDefault();
         if (state.lastTranslationInput) runTranslation(state.lastTranslationInput, { bypassCache: true });
+        break;
+
+      case "demo-translation":
+        event.preventDefault();
+        renderTranslatorResult(demoTranslationResult($("#translator-input")?.value || $("#workspace-translator-input")?.value));
         break;
 
       case "settings-tab":
@@ -7124,6 +7319,7 @@
 
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+    if (location.hostname === "127.0.0.1" || location.hostname === "localhost") return;
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => {
       console.warn("PWA service worker registration failed.", error);
     });
@@ -7205,7 +7401,9 @@
 
     const initial = routeFromHash();
     history.replaceState({ route: initial, depth: 0 }, "", routeHash(initial));
+    setupReveal();
     renderRoute(initial, "forward", { instant: true });
+    setupSmoothScroll();
     registerServiceWorker();
 
     // Expose a tiny debugging surface for the design review.
