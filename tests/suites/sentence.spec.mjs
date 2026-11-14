@@ -86,6 +86,22 @@ suite("dictionary · sentence analysis", { timeout: 60_000 }, (s) => {
     t.expect(JSON.stringify(await boxes())).toBe(JSON.stringify(original));
   });
 
+  s.test("makes segments clickable and leaves keywords alone in split view", async (state, t) => {
+    const page = await analyse(state, "The scientist who faced doubt continued his research.");
+    await page.click("[data-action=sentence-view][data-view=segments]");
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    t.expect(await page.evaluate(() => getComputedStyle(document.querySelector(".sentence-line .kw")).pointerEvents)).toBe("none");
+    await page.evaluate(() => document.querySelectorAll(".sentence-line .seg")[1]
+      .dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    t.expect(await page.locator(".segment-sheet").count()).toBe(1);
+    t.expect(await page.locator(".segment-sheet .insight-label").first().innerText()).toBe("作用");
+    await page.click(".sheet-close");
+    await page.click("[data-action=sentence-view][data-view=original]");
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    t.expect(await page.evaluate(() => getComputedStyle(document.querySelector(".sentence-line .kw")).pointerEvents)).toBe("auto");
+  });
+
   s.test("opens a chunk when a segment carries one", async (state, t) => {
     const page = await analyse(state, "The scientist continued his research. Critics now admit that they were wrong.");
     await page.click(".construction-row");

@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "198";
+  const APP_VERSION = "199";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3970,6 +3970,35 @@
     </ul>`;
   }
 
+  function openSegmentSheet(seg) {
+    const role = segmentRole(seg.dataset.role);
+    const clone = seg.cloneNode(true);
+    clone.querySelectorAll(".seg-no, .seg-arrow").forEach((node) => node.remove());
+    const text = String(clone.textContent || "").replace(/\s+/g, " ").trim();
+    const gloss = String(seg.dataset.gloss || "").trim();
+    const chunk = String(seg.dataset.chunk || "").trim();
+    openSheetShell({ kicker: "意群", title: text || "这一段在做什么" });
+    const holder = $("#sheet-scroll");
+    if (!holder) return;
+    holder.innerHTML = `
+      <div class="insight-sheet segment-sheet">
+        <div class="insight-rows">
+          <div class="insight-row is-key">
+            <span class="insight-label">作用</span>
+            <p class="insight-value">${esc(role)}</p>
+          </div>
+          ${gloss ? `<div class="insight-row">
+            <span class="insight-label">大意</span>
+            <p class="insight-value">${esc(gloss)}</p>
+          </div>` : ""}
+        </div>
+        ${chunk ? `<button class="segment-open-chunk" type="button" data-action="chunk-jump" data-chunk="${attr(chunk)}">
+          <span>${esc(chunk)}</span><i aria-hidden="true">↗</i>
+        </button>` : ""}
+        <p class="segment-hint">这段在下方「02 信息推进」里对应该编号；可复用的搭配会单独收进意群页。</p>
+      </div>`;
+  }
+
   function openInsightSheet(node) {
     const kind = treeKindLabel(node.kind);
     const depthLabel = Number(node.depth) > 0 ? `第 ${Number(node.depth) + 1} 层` : "";
@@ -4113,7 +4142,7 @@
       const core = tail ? raw.slice(0, -tail.length) : raw;
       const marker = String(index + 1).padStart(2, "0");
       const arrow = segment.chunk ? `<i class="seg-arrow" aria-hidden="true">↗</i>` : "";
-      return `<span class="seg" data-role="${esc(segment.role)}" data-seg="${marker}"${chunk}>`
+      return `<span class="seg" data-action="seg-open" data-role="${esc(segment.role)}" data-seg="${marker}" data-gloss="${attr(segment.gloss || "")}"${chunk}>`
         + `<i class="seg-no" aria-hidden="true">${marker}</i>${annotateSentence(core, keyWords)}${arrow}</span>`
         + `<span class="seg-space" aria-hidden="true">${esc(tail)}</span>`;
     }).join("");
@@ -4158,8 +4187,10 @@
     return `<div class="construction-list">
       ${rows.map((segment) => `
         <button class="construction-row" type="button" data-action="chunk-jump" data-chunk="${attr(segment.chunk)}">
-          <span class="construction-chunk">${esc(segment.chunk)}</span>
-          <span class="construction-gloss">${esc(segment.gloss || "看意群卡片")}</span>
+          <span class="construction-text">
+            <span class="construction-chunk">${esc(segment.chunk)}</span>
+            <span class="construction-gloss">${esc(segment.gloss || "看意群卡片")}</span>
+          </span>
           <span class="construction-go" aria-hidden="true">↗</span>
         </button>`).join("")}
     </div>`;
@@ -6856,6 +6887,24 @@
         tapFeedback();
         openKeySheet(Number(target.dataset.index || 0));
         break;
+
+      case "seg-open": {
+        const seg = target.closest(".seg");
+        const view = document.querySelector(".sentence-page")?.dataset.view;
+        if (!seg || view !== "segments") break;
+        event.preventDefault();
+        if (seg.dataset.chunk) {
+          tapFeedback();
+          if (cacheGetChunk(chunkSlug(seg.dataset.chunk))) {
+            navigate({ name: "chunk", query: seg.dataset.chunk });
+          } else {
+            void runSearch(seg.dataset.chunk, "chunk");
+          }
+          break;
+        }
+        openSegmentSheet(seg);
+        break;
+      }
 
       case "key-toggle": {
         event.preventDefault();
