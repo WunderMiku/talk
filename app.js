@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "195";
+  const APP_VERSION = "196";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4108,7 +4108,11 @@
     if (!segments.length) return `<p class="sentence-line">${annotateSentence(text, keyWords)}</p>`;
     const spans = segments.map((segment) => {
       const chunk = segment.chunk ? ` data-chunk="${attr(segment.chunk)}"` : "";
-      return `<span class="seg" data-role="${esc(segment.role)}"${chunk}>${annotateSentence(segment.text, keyWords)}</span>`;
+      const raw = String(segment.text || "");
+      const tail = raw.match(/\s+$/)?.[0] || "";
+      const core = tail ? raw.slice(0, -tail.length) : raw;
+      return `<span class="seg" data-role="${esc(segment.role)}"${chunk}>${annotateSentence(core, keyWords)}</span>`
+        + `<span class="seg-space" aria-hidden="true">${esc(tail)}</span>`;
     }).join("");
     return `<p class="sentence-line is-segmented">${spans}</p>`;
   }
@@ -4666,7 +4670,11 @@
     if (!scroll) return;
     record.content = content;
     record.shelved = false;
-    scroll.innerHTML = content;
+    // Build off-screen, settle the entrance states, then swap in one paint.
+    const holder = document.createElement("div");
+    holder.innerHTML = content;
+    holder.querySelectorAll(".reveal, .reveal-item").forEach((node) => node.classList.add("is-in"));
+    scroll.replaceChildren(...holder.childNodes);
     enhanceWordColumns(scroll);
     applyCacheDisplay();
     refreshCacheBorders(scroll);

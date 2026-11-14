@@ -95,6 +95,7 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 
 规则：
 1. segments 按阅读顺序切分原句，2–5 段（少于 5 个词的短句可以 1–2 段）。所有 segments[].text 拼接后必须与原句逐字符相同——不增删空格或标点。
+1b. Never isolate a single function word (linking verbs such as is/was, prepositions, conjunctions, articles) as its own segment; always merge it into the adjacent sense group. 单个功能词绝不允许独立成段，必须并入相邻意群。
 2. role 只能是 theme / rheme / focus / modifier：theme 是句子在讲什么（主语、话题或句首状语）；rheme 是对它说了什么（主要陈述）；focus 是全句唯一的焦点段，通常是最后一个非修饰成分，承载新信息；modifier 是背景（时间、地点、方式、让步、插入语）。最多一个 focus，若两段都像焦点取靠后的。
 3. gloss 用 2–8 个中文字符做直觉顺译，不要逐词直译，不加句号。
 4. chunk 只在该段是可复用的固定搭配、动词短语或框架时填写，用词典形式、小写；否则不要这个键。

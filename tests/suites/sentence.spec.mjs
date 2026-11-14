@@ -62,6 +62,23 @@ suite("dictionary · sentence analysis", { timeout: 60_000 }, (s) => {
     t.expect(await page.locator(".seg-switch-btn.is-active").innerText()).toBe("信息焦点");
   });
 
+  s.test("keeps the line geometry identical in every view", async (state, t) => {
+    const page = await analyse(state, "The scientist who faced doubt continued his research.");
+    const boxes = () => page.evaluate(() => [...document.querySelectorAll(".sentence-line .seg")].map((node) => {
+      const rect = node.getBoundingClientRect();
+      return [Math.round(rect.x), Math.round(rect.y), Math.round(rect.width)];
+    }));
+
+    const original = await boxes();
+    await page.click("[data-action=sentence-view][data-view=segments]");
+    t.expect(JSON.stringify(await boxes())).toBe(JSON.stringify(original));
+    const slashes = await page.evaluate(() => [...document.querySelectorAll(".seg-space")]
+      .map((node) => getComputedStyle(node, "::before").content));
+    t.expect(slashes.filter((value) => value === "\"/\"").length).toBe(2);
+    await page.click("[data-action=sentence-view][data-view=focus]");
+    t.expect(JSON.stringify(await boxes())).toBe(JSON.stringify(original));
+  });
+
   s.test("opens a chunk when a segment carries one", async (state, t) => {
     const page = await analyse(state, "The scientist continued his research. Critics now admit that they were wrong.");
     await page.click(".construction-row");

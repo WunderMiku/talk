@@ -8898,30 +8898,6 @@ html.motion-ready .reveal.reveal-soft.is-in {
   position: relative;
 }
 
-.sentence-line .seg + .seg::before {
-  content: "/";
-  position: absolute;
-  left: -0.52em;
-  top: 0;
-  color: var(--line-strong, var(--line));
-  opacity: 0;
-  transition: opacity 0.18s var(--ease-out-expo, ease);
-}
-
-.sentence-page[data-view="segments"] .sentence-line .seg + .seg::before {
-  opacity: 0.7;
-}
-
-.sentence-page[data-view="segments"] .sentence-line .seg::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: -3px;
-  border-bottom: 1px dashed var(--line-strong, var(--line));
-  opacity: 0.55;
-}
-
 .sentence-page[data-view="focus"] .sentence-line .seg[data-role="modifier"] {
   opacity: 0.28;
 }
@@ -9117,12 +9093,6 @@ html.motion-ready .reveal.reveal-soft.is-in {
   font-size: 20px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sentence-line .seg + .seg::before {
-    transition: none;
-  }
-}
-
 /* keep keyword marks as an underline, not a box */
 .sentence-page .sentence-line .kw {
   border: 0;
@@ -9130,4 +9100,41 @@ html.motion-ready .reveal.reveal-soft.is-in {
   border-radius: 0;
   padding: 0 1px;
   background: none;
+}
+
+/* sense-group view: separated by slashes that hug the word, never the trailing space */
+.sentence-line .seg-space {
+  position: relative;
+  display: inline;
+  white-space: pre;
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -4px;
+  border-bottom: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg-space::before {
+  content: "/";
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform: translateX(-0.02em);
+  font-weight: 500;
+  color: color-mix(in srgb, var(--ink) 55%, transparent);
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg-space:last-child::before {
+  content: none;
+}
+
+/* keep keyword emphasis from fighting the segment rules */
+.sentence-page[data-view="segments"] .sentence-line .kw {
+  border-bottom-color: transparent;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-radius: 2px;
 }
