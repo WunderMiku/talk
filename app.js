@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "199";
+  const APP_VERSION = "1.0"; // display version; build numbers live in index.html/sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4138,11 +4138,14 @@
     const spans = segments.map((segment, index) => {
       const chunk = segment.chunk ? ` data-chunk="${attr(segment.chunk)}"` : "";
       const raw = String(segment.text || "");
-      const tail = raw.match(/\s+$/)?.[0] || "";
-      const core = tail ? raw.slice(0, -tail.length) : raw;
+      const lead = raw.match(/^\s+/)?.[0] || "";
+      const rest = lead ? raw.slice(lead.length) : raw;
+      const tail = rest.match(/\s+$/)?.[0] || "";
+      const core = tail ? rest.slice(0, -tail.length) : rest;
       const marker = String(index + 1).padStart(2, "0");
       const arrow = segment.chunk ? `<i class="seg-arrow" aria-hidden="true">↗</i>` : "";
-      return `<span class="seg" data-action="seg-open" data-role="${esc(segment.role)}" data-seg="${marker}" data-gloss="${attr(segment.gloss || "")}"${chunk}>`
+      return (lead ? `<span class="seg-space" aria-hidden="true">${esc(lead)}</span>` : "")
+        + `<span class="seg" data-action="seg-open" data-role="${esc(segment.role)}" data-seg="${marker}" data-gloss="${attr(segment.gloss || "")}"${chunk}>`
         + `<i class="seg-no" aria-hidden="true">${marker}</i>${annotateSentence(core, keyWords)}${arrow}</span>`
         + `<span class="seg-space" aria-hidden="true">${esc(tail)}</span>`;
     }).join("");

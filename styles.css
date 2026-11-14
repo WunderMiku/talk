@@ -8909,21 +8909,19 @@ html.motion-ready .reveal.reveal-soft.is-in {
 }
 
 .seg-no {
-  width: 0;
-  overflow: visible;
-  white-space: nowrap;
-  font-family: var(--mono);
-  font-size: 8px;
+  display: none;
+  margin-right: 0.45em;
+  font-family: inherit;
+  font-size: 0.46em;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: 0.08em;
-  color: var(--text-tertiary, var(--muted));
-  transform: translateY(15px);
+  letter-spacing: 0;
+  color: inherit;
 }
 
 .seg-arrow {
-  width: 0;
-  overflow: visible;
-  white-space: nowrap;
+  display: none;
+  margin-left: 0.25em;
   font-size: 0.5em;
   font-style: normal;
   line-height: 1;
@@ -8931,11 +8929,13 @@ html.motion-ready .reveal.reveal-soft.is-in {
   transform: translate(0.1em, -0.85em);
 }
 
-.part-stage .seg-no {
-  transform: translateY(9px);
-}
+
 
 /* 意群切分：只用托盘与编号，不再插斜杠 */
+.sentence-page[data-view="segments"] .sentence-line .seg[data-chunk] {
+  border-bottom-color: color-mix(in srgb, var(--accent) 60%, var(--ink));
+}
+
 .sentence-page[data-view="segments"] .sentence-line .seg {
   margin-right: 0.9em;
   border-bottom: 3px solid color-mix(in srgb, var(--ink) 60%, transparent);
@@ -8948,8 +8948,7 @@ html.motion-ready .reveal.reveal-soft.is-in {
 
 .sentence-page[data-view="segments"] .seg-no,
 .sentence-page[data-view="segments"] .seg[data-chunk] .seg-arrow {
-  display: inline-block;
-  vertical-align: baseline;
+  display: inline;
 }
 
 .sentence-page[data-view="segments"] .sentence-line .kw,
