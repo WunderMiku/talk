@@ -2325,7 +2325,7 @@
     const body = stage.querySelector(".share-compose-body");
     for (const node of parts) {
       const clone = node.cloneNode(true);
-      clone.querySelectorAll(".example-actions, .speak-btn, .copy-inline, .word-copy, .quote-mark, .example-toolbar, .chunk-toolbar, .sentence-tools, .page-actions, .reclassify").forEach((el) => el.remove());
+      clone.querySelectorAll(".example-actions, .speak-btn, .copy-inline, .word-copy, .quote-mark, .example-quote, .example-toolbar, .chunk-toolbar, .sentence-tools, .page-actions, .reclassify").forEach((el) => el.remove());
       clone.querySelectorAll(".reveal, .is-in").forEach((el) => el.classList.remove("reveal", "is-in"));
       clone.classList.remove("reveal", "is-in");
       clone.style.opacity = "1";
