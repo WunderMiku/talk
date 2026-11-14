@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "189";
+  const APP_VERSION = "191";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1591,8 +1591,8 @@
       });
     }, {
       root: null,
-      threshold: 0.01,
-      rootMargin: "0px 0px -4% 0px"
+      threshold: 0,
+      rootMargin: "0px 0px 8% 0px"
     });
     observeReveals(screen);
   }
