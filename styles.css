@@ -13,9 +13,9 @@
   --muted-2: #9b9b8e;
   --line: rgba(23, 24, 19, 0.12);
   --line-strong: rgba(23, 24, 19, 0.24);
-  --lime: #d9ff6b;
-  --lime-deep: #b9e63b;
-  --lime-wash: #f0ffcb;
+  --lime: #c9f052;
+  --lime-deep: #9dc61e;
+  --lime-wash: #e7f6c2;
   --coral: #ff6e4a;
   --coral-wash: #ffe6de;
   --lavender: #cfc8ff;
@@ -1908,7 +1908,7 @@ textarea:focus-visible,
   display: flex;
   align-items: center;
   gap: 6px;
-  color: var(--lime);
+  color: var(--label-accent, var(--accent-strong));
   font-family: var(--sans);
   font-size: 9.5px;
   font-weight: 600;
