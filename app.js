@@ -1625,7 +1625,7 @@
       const mode = revealMode;
       // A route that lands on top of an existing screen does not need to push
       // in: the top band is simply there.
-      if (mode === "instant-top" && rect.top < 220) {
+      if ((mode === "instant-home" || mode === "instant-top") && rect.top < (mode === "instant-home" ? viewport * 0.92 : 220)) {
         element.style.transition = "none";
         element.classList.add("is-in");
         window.requestAnimationFrame(() => { element.style.transition = ""; });
@@ -1699,6 +1699,7 @@
   }
 
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
+    if (route.name === "home" && revealMode === "normal") setRevealMode("instant-home");
     const apply = () => {
       state.route = route;
       screen.dataset.page = route.name;
