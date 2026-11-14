@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "192";
+  const APP_VERSION = "193";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1591,8 +1591,8 @@
       });
     }, {
       root: null,
-      threshold: 0,
-      rootMargin: "0px 0px 8% 0px"
+      threshold: 0.01,
+      rootMargin: "0px 0px 40px 0px"
     });
     observeReveals(screen);
   }
@@ -2139,7 +2139,7 @@
       <div class="translation-list">
         ${result.variants.map((variant, index) => {
           const style = styleMap.get(variant.style) || TRANSLATOR_STYLES[index] || TRANSLATOR_STYLES[0];
-          return `<article class="translation-card reveal-item tone-${style.tone}" style="--i:${Math.min(index, 6)}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
+          return `<article class="translation-card reveal-item tone-${style.tone}" style="--i:${Math.min(index, 4)}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
             <div class="translation-card-head">
               <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
               <div><h2>${esc(style.name)}</h2><p>${esc(style.hint)}</p></div>
