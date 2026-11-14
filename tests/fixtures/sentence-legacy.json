@@ -1,0 +1,13 @@
+{
+  "text": "The quiet scientist kept going.",
+  "translation": "安静的科学家继续前行。",
+  "tone": "平实",
+  "structure": "主谓 + 分词",
+  "summary": "他没有停下。",
+  "tree": [
+    { "id": "c1", "kind": "phrase", "text": "kept going", "anchor": "scientist", "label": "分词短语" }
+  ],
+  "keyWords": [
+    { "word": "kept", "pos": "v.", "meaningZh": "保持" }
+  ]
+}

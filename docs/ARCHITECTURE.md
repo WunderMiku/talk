@@ -28,7 +28,7 @@
 | --- | --- | --- | --- |
 | 单个词 | 词 | `word` | 词条页（报刊卡片） |
 | 2–5 个词、无句末标点 | 意群 | `chunk` | 意群页：整体意思 / 词眼 / 槽位 / 变形 / 来历 / 例句 |
-| 有句末标点或 ≥6 词 | 句子 | `sentence` | 句子页（洋葱式折叠） |
+| 有句末标点或 ≥6 词 | 句子 | `sentence` | 句子页（意群切分） |
 | 中文或「how do you say…」 | 语境寻词 | `reverse` | 选词手记：一句概述 + 3–5 个候选，按 `paradigm` 精确跳转 |
 
 意群缓存与词条共用 `talk.words.v1`，键前缀 `chunk:`，单独限 **60 条**，不挤占 300 条词条额度；`talk.reverse.v1` 只存最近 20 次手记、7 天过期。
@@ -202,7 +202,7 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 ## 自动化测试
 
-`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、离线降级与主题覆盖，共 13 例。细节见 [TESTING.md](TESTING.md)。
+`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、离线降级与主题覆盖，共 16 例。细节见 [TESTING.md](TESTING.md)。
 
 ## 手工验收清单
 
@@ -237,22 +237,33 @@ python3 -m http.server 8080     # 或任意静态服务器
 | --- | --- | --- |
 | `examplesByTheme` | word | 每套主题 1–2 条例句；缺失主题在渲染后一次性补齐并写回缓存 |
 | `summary` | sentence | 一句话主旨 |
-| `tree` | sentence | 句法树，节点 `kind` 只允许 main / clause / phrase / modifier，默认只展开主干 |
+| `segments` | sentence / part | 2–6 个意群，`text` 拼接必须等于原句；`role` 只允许 theme / rheme / focus / modifier |
+| `orderNote` | sentence / part | 仅当语序有明显特征（被动、倒装、尾重、强调句）时出现 |
+| `contrast` | sentence / part | 「最小内核」或「口语说法」对照 |
 | `sentences` | sentence | 多句分别拆解 |
 | `level` / `sentenceIndex` / `externalExample` | keyWord | 学习阶段、所在句、本句用法不典型时的补充例句 |
 
 - 主题的例句风格存在 `talk.exampleStyles.v1`，默认值来自 `TALK_THEME` 的 `exampleStyle`，设置里可按主题改写。
 - `SENTENCE_LEVELS` 是唯一的阶段表（中考 3 / 高考 4 / CET4 5 / CET6 6 / 考研 7 / 雅思 7 / 托福 8），设置里选择后写进 `talk.prefs.v1`。
-- 单词缓存 `talk.words.v1` 的 `WORD_CACHE_SCHEMA` 升到 3，但读取时接受 schema ≥ 2，旧记录在下次写入时就地升级；句子不落 IndexedDB，只在内存中缓存。
+- 单词缓存 `talk.words.v1` 的 `WORD_CACHE_SCHEMA` 升到 3，但读取时接受 schema ≥ 2，旧记录在下次写入时就地升级。
+- 句子缓存存 `talk.sentences.v1`（IndexedDB），`SENTENCE_CACHE_SCHEMA` 升到 2，读取时接受 schema ≥ 1：旧记录没有 `segments`，页面降级成「原句 + 译文 + 语气/句式」，不重算也不报错。
 
 
-## 句子拆解（洋葱式折叠）
+## 句子拆解（意群与信息结构）
 
-句子页不在正文里堆语法标签，而是把整句渲染成一行连续文字：主干直接显示，每层修饰在锚点词后留一个 `[+]`。点开后，该层以 `onion-clause` 内联插回原句（字号小一档、颜色更淡、虚线框），再点这一层就打开知识点卡片（作用 / 大意 / 阅读提示）。
+句子页不再把语法树渲染成可点击的嵌套块。模型把一句话切成 2–6 个**意群**，每个意群带一个信息结构角色：
 
-- 数据：`sentence.tree` 的每个非 main 节点带 `anchor`（父级 text 里的词），前端按锚点把子节点插回父级文本，再递归渲染。
-- 结构：`onionCompose()` 组合文本与插槽，`onionSlot()` 生成 `[+]` 与可展开片段，`openInsightSheet()` 渲染卡片。
-- 动效：纯 CSS。展开时 `onion-clause` 做透明度 + 字距过渡，避免 `clip-path` 影响行盒；折叠为即时隐藏，不阻塞布局。
+| role | 中文标签 | 含义 |
+| --- | --- | --- |
+| `theme` | 起点 | 句子在讲什么（主语、话题、句首状语） |
+| `rheme` | 推进 | 对它说了什么（主要陈述） |
+| `focus` | 焦点 | 全句唯一的落点，通常是最后一个非修饰成分 |
+| `modifier` | 背景 | 时间、地点、方式、让步、插入语 |
+
+- 校验：`segments.map(s => s.text).join("")` 必须等于原句（允许句末标点落在最后一段内或外）；拼接不上就丢弃这一层，退回纯文本。
+- 三态切换（纯 CSS，无布局位移）：`原句` / `意群切分`（插入虚线与微刻度）/ `信息焦点`（`modifier` 降到 28% 不透明度，`focus` 加底部强调线）。
+- 四个编号块：`整句意译`（译文 + 语气/句式）、`信息推进`（编号 + 角色 + 顺译 + 语序说明）、`句中构式`（带 `chunk` 的意群，点开调用 `cacheGetChunk` 或 `runSearch(chunk, "chunk")`）、`结构对照`；有重点词时再追加 `值得注意的词`。
+- 多句段落仍走 `parts[]`，每句各自一套 `segments` 与四个块，外层保留整段意译与主旨。
 
 ## 意群与语境寻词的模型侧
 

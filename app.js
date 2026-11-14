@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "193";
+  const APP_VERSION = "194";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -112,7 +112,7 @@
   const WORD_DB_NAME = "talk.words.v1";
   const WORD_DB_STORE = "entries";
   const SENTENCE_DB_STORE = "sentences";
-  const SENTENCE_CACHE_SCHEMA = 1;
+  const SENTENCE_CACHE_SCHEMA = 2;
   const SENTENCE_LIMIT = 120;
   const sentenceCache = new Map();
   const DEFAULT_CACHE_MAX = 300;
@@ -1109,7 +1109,7 @@
 
   function cacheGetSentence(key) {
     const record = sentenceCache.get(key);
-    if (!record || record.schema !== SENTENCE_CACHE_SCHEMA) return null;
+    if (!record || !(record.schema >= 1)) return null;
     return record.data || null;
   }
 
@@ -3846,9 +3846,44 @@
         translation: String(part.translation || "").trim(),
         summary: String(part.summary || "").trim(),
         tree: normalizeStructureTree(part.tree || part.structure),
+        segments: normalizeSegments(part.segments, text),
+        orderNote: String(part.orderNote || part.order_note || "").trim(),
+        contrast: normalizeContrast(part.contrast),
         keyWords: normalizeKeyWords(part.keyWords || part.key_words || part.words)
       };
     }).filter(Boolean);
+  }
+
+  const SEGMENT_ROLES = ["theme", "rheme", "focus", "modifier"];
+  const SEGMENT_ROLE_LABELS = { theme: "起点", rheme: "推进", focus: "焦点", modifier: "背景" };
+
+  function normalizeContrast(value) {
+    if (!value || typeof value !== "object" || !value.text) return null;
+    return {
+      label: String(value.label || "结构对照").trim(),
+      text: String(value.text).trim(),
+      zh: String(value.zh || "").trim()
+    };
+  }
+
+  function normalizeSegments(value, text = "") {
+    const source = String(text || "").trim();
+    if (!Array.isArray(value) || !source) return [];
+    const items = value.map((item) => ({
+      text: String(item?.text ?? ""),
+      role: SEGMENT_ROLES.includes(item?.role) ? item.role : "rheme",
+      gloss: String(item?.gloss || "").trim(),
+      chunk: String(item?.chunk || "").trim()
+    })).filter((item) => item.text.trim());
+    if (items.length < 1 || items.length > 6) return [];
+    const squeeze = (value) => String(value).replace(/\s+/g, " ").replace(/\s+([,.;:!?])/g, "$1").trim();
+    const tail = (source.match(/[.!?…]+$/) || [""])[0];
+    const body = tail ? source.slice(0, -tail.length) : source;
+    const joined = squeeze(items.map((item) => item.text).join(""));
+    if (joined === squeeze(source)) return items;
+    if (joined !== squeeze(body)) return [];
+    if (tail) items[items.length - 1].text += tail;
+    return items;
   }
 
   function alignSentenceParts(parts, pieces) {
@@ -3871,6 +3906,9 @@
         translation: matches ? hit.translation || "" : "",
         summary: matches ? hit.summary || "" : "",
         tree: matches ? hit.tree || [] : [],
+        segments: matches ? hit.segments || [] : [],
+        orderNote: matches ? hit.orderNote || "" : "",
+        contrast: matches ? hit.contrast || null : null,
         keyWords: matches ? hit.keyWords || [] : [],
         incomplete: Boolean(hit && !matches)
       };
@@ -3890,6 +3928,10 @@
       structure: String(raw.structure || ""),
       source: String(raw.source || "Talk demo corpus"),
       summary: String(raw.summary || raw.gist || "").trim(),
+      syntax: String(raw.syntax || "").trim(),
+      segments: normalizeSegments(raw.segments, String(raw.text || raw.sentence || "")),
+      orderNote: String(raw.orderNote || raw.order_note || "").trim(),
+      contrast: normalizeContrast(raw.contrast),
       tree: normalizeStructureTree(raw.tree || raw.structureTree || (raw.structure && raw.structure.tree)),
       sentences: normalizeSentenceParts(raw.sentences || raw.parts),
       keyWords,
@@ -4056,10 +4098,82 @@
     return onionCompose(text, children, keyWords, 1);
   }
 
-  function onionSentenceBlock(part, index, keyWords) {
-    const tree = Array.isArray(part.tree) ? part.tree : [];
-    const count = tree.reduce((total, node) => total + 1 + (node.children?.length || 0), 0);
-    return `<div class="onion-block" data-onion-block="${index}" data-fold="${state.settings?.foldMode === "inline" ? "inline" : "block"}"><p class="sentence-text onion-line">${onionLine(part.text || "", tree, keyWords)}</p>${count > 1 ? `<div class="onion-tools"><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="expand">全部展开</button><button class="link-btn" type="button" data-action="onion-toggle-all" data-mode="collapse">收起到主干</button></div>` : ""}</div>`;
+  function segmentRole(role) {
+    return SEGMENT_ROLE_LABELS[role] || "推进";
+  }
+
+  function segmentLine(part, keyWords) {
+    const text = String(part.text || "");
+    const segments = Array.isArray(part.segments) ? part.segments : [];
+    if (!segments.length) return `<p class="sentence-line">${annotateSentence(text, keyWords)}</p>`;
+    const spans = segments.map((segment) => {
+      const chunk = segment.chunk ? ` data-chunk="${attr(segment.chunk)}"` : "";
+      return `<span class="seg" data-role="${esc(segment.role)}"${chunk}>${annotateSentence(segment.text, keyWords)}</span>`;
+    }).join("");
+    return `<p class="sentence-line is-segmented">${spans}</p>`;
+  }
+
+  function sentenceViewSwitch() {
+    return `<div class="seg-switch" role="group" aria-label="句子显示方式">
+      <button class="seg-switch-btn is-active" type="button" data-action="sentence-view" data-view="original">原句</button>
+      <button class="seg-switch-btn" type="button" data-action="sentence-view" data-view="segments">意群切分</button>
+      <button class="seg-switch-btn" type="button" data-action="sentence-view" data-view="focus">信息焦点</button>
+    </div>`;
+  }
+
+  function sentenceFlow(part) {
+    const segments = Array.isArray(part.segments) ? part.segments : [];
+    if (!segments.length) return "";
+    return `<ol class="flow">
+      ${segments.map((segment, index) => `
+        <li class="flow-row" data-role="${esc(segment.role)}">
+          <span class="flow-no">${String(index + 1).padStart(2, "0")}</span>
+          <div class="flow-body">
+            <div class="flow-line">
+              <span class="flow-role">${segmentRole(segment.role)}</span>
+              <span class="flow-text">${esc(segment.text.trim())}</span>
+            </div>
+            ${segment.gloss ? `<p class="flow-gloss">${esc(segment.gloss)}</p>` : ""}
+          </div>
+        </li>`).join("")}
+    </ol>
+    ${part.orderNote ? `<p class="flow-note">${esc(part.orderNote)}</p>` : ""}`;
+  }
+
+  function sentenceConstructions(part) {
+    const rows = (Array.isArray(part.segments) ? part.segments : []).filter((segment) => segment.chunk);
+    if (!rows.length) return "";
+    return `<div class="construction-list">
+      ${rows.map((segment) => `
+        <button class="construction-row" type="button" data-action="chunk-jump" data-chunk="${attr(segment.chunk)}">
+          <span class="construction-chunk">${esc(segment.chunk)}</span>
+          <span class="construction-gloss">${esc(segment.gloss || "看意群卡片")}</span>
+          <span class="construction-go" aria-hidden="true">↗</span>
+        </button>`).join("")}
+    </div>`;
+  }
+
+  function contrastCard(part) {
+    const contrast = part.contrast;
+    if (!contrast?.text) return "";
+    return `<div class="contrast-card">
+      <span class="contrast-label">${esc(contrast.label || "结构对照")}</span>
+      <p class="contrast-en">${esc(contrast.text)}</p>
+      ${contrast.zh ? `<p class="contrast-zh">${esc(contrast.zh)}</p>` : ""}
+    </div>`;
+  }
+
+  function sentencePartBlocks(part, index, keyWords, nextNo) {
+    return `<section class="block sentence-part reveal">
+      ${blockHead(nextNo(), `句子 ${index + 1}`, part.segments?.length ? "意群" : "分析")}
+      <div class="sentence-stage part-stage">${segmentLine(part, keyWords)}</div>
+      ${part.translation ? `<p class="sentence-part-zh">${esc(part.translation)}</p>` : ""}
+      ${sentenceFlow(part)}
+      ${sentenceConstructions(part)}
+      ${contrastCard(part)}
+      ${part.incomplete ? `<p class="sentence-part-missing">模型把这几句并成了一段，这一句没有单独分析；重试或逐句查询即可。</p>` : ""}
+      ${part.keyWords?.length ? `<div class="key-list">${part.keyWords.map((keyWord, n) => keyCard(keyWord, index * 100 + n)).join("")}</div>` : ""}
+    </section>`;
   }
 
   function sentencePage(sentence) {
@@ -4067,26 +4181,39 @@
     const nextNo = () => String(++blockNo).padStart(2, "0");
     const parts = Array.isArray(sentence.sentences) && sentence.sentences.length
       ? sentence.sentences
-      : [{ text: sentence.text, translation: sentence.translation, summary: sentence.summary || "", tree: sentence.tree || [] }];
-    const tree = sentence.tree?.length ? sentence.tree : (parts[0]?.tree || []);
+      : [{
+        text: sentence.text,
+        translation: sentence.translation,
+        summary: sentence.summary || "",
+        segments: sentence.segments || [],
+        orderNote: sentence.orderNote || "",
+        contrast: sentence.contrast || null
+      }];
+    const multi = parts.length > 1;
     const topKeyWords = Array.isArray(sentence.keyWords) ? sentence.keyWords : [];
     const renderParts = parts.map((part, index) => ({
       ...part,
       keyWords: Array.isArray(part.keyWords) ? part.keyWords : [],
-      tree: (part.tree && part.tree.length) ? part.tree : (index === 0 ? tree : [])
+      segments: Array.isArray(part.segments) && part.segments.length
+        ? part.segments
+        : (index === 0 && Array.isArray(sentence.segments) ? sentence.segments : []),
+      orderNote: String(part.orderNote || ""),
+      contrast: part.contrast || null
     }));
-    state.structureNodes = registerTreeNodes(tree.concat(...parts.map((part) => part.tree || [])), {});
+    const primary = renderParts[0];
+    const primaryKeyWords = primary.keyWords.length ? primary.keyWords : topKeyWords;
     const bookmark = `sentence:${sentence.id}`;
-    const multi = renderParts.length > 1;
+    const single = !multi;
     return `
-      ${backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${sentence.keyWords.length} 个重点词`, bookmark })}
-      <main class="result-page">
+      ${backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`, bookmark })}
+      <main class="result-page sentence-page" data-view="original">
         <section class="sentence-hero">
           <div class="result-kicker reveal" style="--d:0">
             <span class="kicker-pill accent">句子</span>
-            <span class="kicker-pill">${multi ? `${renderParts.length} 句` : `${sentence.keyWords.length} 个重点词`}</span>
+            <span class="kicker-pill">${multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`}</span>
           </div>
-          ${multi ? "" : `<div class="onion reveal" style="--d:0.6">${onionSentenceBlock(renderParts[0], 0, sentence.keyWords)}</div>`}
+          ${single ? `<div class="sentence-stage reveal" style="--d:0.4">${segmentLine(primary, primaryKeyWords)}</div>
+          ${primary.segments?.length ? `<div class="reveal" style="--d:0.55">${sentenceViewSwitch()}</div>` : ""}` : ""}
           <div class="sentence-source reveal" style="--d:1">
             <span>${esc(sentence.source || "Talk corpus")}</span>
             <span class="wave"></span>
@@ -4095,14 +4222,14 @@
           </div>
         </section>
 
-        <section class="block reveal" style="--d:1.3">
-          ${blockHead(nextNo(), multi ? "整段意思" : "整句意思", "中文翻译")}
+        <section class="block reveal" style="--d:1.2">
+          ${blockHead(nextNo(), multi ? "整段意译" : "整句意译", "中文翻译")}
           <div class="translation-card">
             <span class="translation-label">${icon("quote")} ${multi ? "整段理解" : "整句理解"}</span>
             <p class="translation-text">${esc(sentence.translation || "连接模型后生成翻译。")}</p>
             ${sentence.tone ? `<span class="translation-tone">${esc(sentence.tone)}</span>` : ""}
           </div>
-          ${(sentence.tone || sentence.structure) ? `
+          ${(sentence.tone || sentence.syntax || sentence.structure) ? `
           <div class="insight-grid">
             <div class="insight">
               <span class="mono">语气</span>
@@ -4110,33 +4237,45 @@
             </div>
             <div class="insight">
               <span class="mono">句式</span>
-              <p>${esc(sentence.structure || "—")}</p>
+              <p>${esc(sentence.syntax || sentence.structure || "—")}</p>
             </div>
           </div>` : ""}
         </section>
 
-        ${multi ? renderParts.map((part, index) => `
-        <section class="block sentence-part reveal" style="--d:1.3">
-          ${blockHead(nextNo(), `句子 ${index + 1}`, part.translation ? "中文翻译" : "结构")}
-          <div class="onion">${onionSentenceBlock(part, index, part.keyWords.length ? part.keyWords : sentence.keyWords)}</div>
-          ${part.translation ? `<p class="sentence-part-zh">${esc(part.translation)}</p>` : ""}
-          ${part.summary ? `<div class="summary-card">${esc(part.summary)}</div>` : ""}
-          ${part.incomplete ? `<p class="sentence-part-missing">模型把这几句并成了一段，这一句没有单独分析；重试或逐句查询即可。</p>` : ""}
-          ${part.keyWords.length ? `<div class="key-list">${part.keyWords.map((keyWord, n) => keyCard(keyWord, index * 100 + n)).join("")}</div>` : ""}
-        </section>`).join("") : ""}
+        ${single && primary.segments?.length ? `
+        <section class="block reveal" style="--d:1.4">
+          ${blockHead(nextNo(), "信息推进", "从起点到焦点")}
+          ${sentence.summary ? `<p class="flow-lead">${esc(sentence.summary)}</p>` : ""}
+          ${sentenceFlow(primary)}
+        </section>` : ""}
 
-        ${sentence.summary ? `
-        <section class="block reveal" style="--d:1.35">
-          ${blockHead(nextNo(), multi ? "整段主旨" : "浓缩主旨", "一句话记住")}
+        ${single && sentenceConstructions(primary) ? `
+        <section class="block reveal" style="--d:1.55">
+          ${blockHead(nextNo(), "句中构式", "点开看意群")}
+          ${sentenceConstructions(primary)}
+        </section>` : ""}
+
+        ${single && contrastCard(primary) ? `
+        <section class="block reveal" style="--d:1.7">
+          ${blockHead(nextNo(), "结构对照", "换一种说法")}
+          ${contrastCard(primary)}
+        </section>` : ""}
+
+        ${multi ? renderParts.map((part, index) => sentencePartBlocks(part, index, part.keyWords.length ? part.keyWords : topKeyWords, nextNo)).join("") : ""}
+
+        ${sentence.summary && multi ? `
+        <section class="block reveal" style="--d:1.8">
+          ${blockHead(nextNo(), "整段主旨", "一句话记住")}
           <div class="summary-card">${esc(sentence.summary)}</div>
         </section>` : ""}
 
-        ${multi ? "" : `<section class="block reveal" style="--d:1.5">
+        ${single && topKeyWords.length ? `
+        <section class="block reveal" style="--d:1.85">
           ${blockHead(nextNo(), "值得注意的词", "点击展开")}
           <div class="key-list">
             ${topKeyWords.map((keyWord, index) => keyCard(keyWord, index)).join("")}
           </div>
-        </section>`}
+        </section>` : ""}
 
         ${reclassifyRow("sentence")}
         <div class="page-actions reveal" style="--d:2">
@@ -6345,6 +6484,10 @@
       tone: String(base.tone || ""),
       structure: typeof base.structure === "string" ? base.structure : String(base.structure?.note || ""),
       summary: String(base.summary || base.gist || "").trim(),
+      syntax: String(base.syntax || "").trim(),
+      segments: normalizeSegments(base.segments, text),
+      orderNote: String(base.orderNote || base.order_note || "").trim(),
+      contrast: normalizeContrast(base.contrast),
       tree: normalizeStructureTree(base.tree || base.structureTree || (base.structure && base.structure.tree)),
       sentences,
       keyWords,
@@ -6863,28 +7006,27 @@
         break;
       }
 
-      case "onion-toggle": {
+      case "sentence-view": {
         event.preventDefault();
-        event.stopPropagation();
-        const slot = target.closest(".onion-slot");
-        if (!slot) break;
-        setOnionOpen(slot, !slot.classList.contains("is-open"));
+        const page = target.closest(".sentence-page");
+        if (!page) break;
+        const view = ["original", "segments", "focus"].includes(target.dataset.view) ? target.dataset.view : "original";
+        page.dataset.view = view;
+        $$(".seg-switch-btn", page).forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
         break;
       }
 
-      case "onion-toggle-all": {
+      case "chunk-jump": {
         event.preventDefault();
-        const mode = target.dataset.mode === "collapse" ? "collapse" : "expand";
-        const open = mode === "expand";
-        $$(".onion-slot", screen || document).forEach((slot) => setOnionOpen(slot, open));
-        break;
-      }
-
-      case "onion-open": {
-        event.preventDefault();
-        const node = state.structureNodes?.[target.dataset.nodeId];
-        if (!node) break;
-        openInsightSheet(node);
+        const row = target.closest("[data-action='chunk-jump']");
+        const chunk = String(row?.dataset.chunk || "").trim();
+        if (!chunk) break;
+        tapFeedback();
+        if (cacheGetChunk(chunkSlug(chunk))) {
+          navigate({ name: "chunk", query: chunk });
+        } else {
+          void runSearch(chunk, "chunk");
+        }
         break;
       }
 

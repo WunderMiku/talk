@@ -8877,3 +8877,257 @@ html.motion-ready .reveal.reveal-soft.is-in {
   font-size: 13px;
   line-height: 1.65;
 }
+
+/* ---------- sentence: segments, flow, constructions ---------- */
+
+.sentence-stage {
+  margin: 16px 0 0;
+}
+
+.sentence-line {
+  margin: 0;
+  font-size: clamp(21px, 5.6vw, 26px);
+  line-height: 1.55;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.sentence-line .seg {
+  position: relative;
+}
+
+.sentence-line .seg + .seg::before {
+  content: "/";
+  position: absolute;
+  left: -0.52em;
+  top: 0;
+  color: var(--line-strong, var(--line));
+  opacity: 0;
+  transition: opacity 0.18s var(--ease-out-expo, ease);
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg + .seg::before {
+  opacity: 0.7;
+}
+
+.sentence-page[data-view="segments"] .sentence-line .seg::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -3px;
+  border-bottom: 1px dashed var(--line-strong, var(--line));
+  opacity: 0.55;
+}
+
+.sentence-page[data-view="focus"] .sentence-line .seg[data-role="modifier"] {
+  opacity: 0.28;
+}
+
+.sentence-page[data-view="focus"] .sentence-line .seg[data-role="focus"] {
+  box-shadow: inset 0 -3px 0 var(--accent);
+}
+
+.sentence-line .seg[data-chunk] {
+  cursor: pointer;
+}
+
+.seg-switch {
+  display: inline-flex;
+  gap: 2px;
+  margin-top: 16px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+}
+
+.seg-switch-btn {
+  border: 0;
+  background: none;
+  padding: 6px 11px;
+  border-radius: 999px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+.seg-switch-btn.is-active {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.flow {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+
+.flow-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+
+.flow-row[data-role="theme"] {
+  border-left-color: var(--muted);
+}
+
+.flow-row[data-role="focus"] {
+  border-left-color: var(--accent);
+}
+
+.flow-row[data-role="modifier"] {
+  border-left-style: dashed;
+}
+
+.flow-no {
+  padding-top: 2px;
+  color: var(--muted);
+  font-family: var(--mono, ui-monospace);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+}
+
+.flow-line {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.flow-role {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+.flow-text {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.flow-gloss {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.flow-note {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--accent);
+  background: var(--field, var(--card));
+  color: var(--ink);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+
+.flow-lead {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.construction-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.construction-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 2px 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md, 14px);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.construction-row:hover {
+  border-color: var(--ink);
+}
+
+.construction-chunk {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.construction-gloss {
+  grid-column: 1;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.construction-go {
+  grid-row: 1 / 3;
+  color: var(--muted);
+}
+
+.contrast-card {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px dashed var(--line-strong, var(--line));
+  border-radius: var(--radius-md, 14px);
+  background: var(--field, var(--card));
+}
+
+.contrast-label {
+  color: var(--muted);
+  font-family: var(--mono, ui-monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.contrast-en {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.55;
+  color: var(--ink);
+}
+
+.contrast-zh {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.part-stage .sentence-line {
+  font-size: 20px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sentence-line .seg + .seg::before {
+    transition: none;
+  }
+}
+
+/* keep keyword marks as an underline, not a box */
+.sentence-page .sentence-line .kw {
+  border: 0;
+  border-bottom: 2px solid var(--accent);
+  border-radius: 0;
+  padding: 0 1px;
+  background: none;
+}

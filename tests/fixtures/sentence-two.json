@@ -4,7 +4,6 @@
   "tone": "平实",
   "structure": "两句并列",
   "summary": "坚持最终说服了批评者。",
-  "tree": [],
   "keyWords": [
     {
       "word": "research",
@@ -25,7 +24,28 @@
       "text": "The scientist continued his research.",
       "translation": "科学家继续研究。",
       "summary": "他坚持研究。",
-      "tree": [],
+      "segments": [
+        {
+          "text": "The scientist",
+          "role": "theme",
+          "gloss": "科学家"
+        },
+        {
+          "text": " continued",
+          "role": "rheme",
+          "gloss": "继续"
+        },
+        {
+          "text": " his research.",
+          "role": "focus",
+          "gloss": "他的研究"
+        }
+      ],
+      "contrast": {
+        "label": "最小内核",
+        "text": "He kept researching.",
+        "zh": "他一直在研究。"
+      },
       "keyWords": [
         {
           "word": "research",
@@ -39,15 +59,20 @@
       "text": "Critics now admit that they were wrong.",
       "translation": "批评者如今承认自己错了。",
       "summary": "批评者认错。",
-      "tree": [
+      "segments": [
         {
-          "id": "c1",
-          "kind": "clause",
-          "text": "that they were wrong",
-          "anchor": "admit",
-          "label": "宾语从句"
+          "text": "Critics now admit ",
+          "role": "theme",
+          "gloss": "批评者如今承认",
+          "chunk": "admit that"
+        },
+        {
+          "text": "that they were wrong.",
+          "role": "focus",
+          "gloss": "他们错了"
         }
       ],
+      "orderNote": "宾语从句后移，把「错了」放在句末，成为真正的落点。",
       "keyWords": [
         {
           "word": "admit",

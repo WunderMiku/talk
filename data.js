@@ -659,6 +659,14 @@ window.TALK_DATA = (() => {
       translation: "我们都只是这颗星球上转瞬即逝的过客，而星球将比我们存续得更久。",
       tone: "诗意 · 令人谦卑",
       structure: "主语 + 系动词 + 形容词 + 名词 + 介词短语 + 定语从句。",
+      syntax: "主句 + 定语从句",
+      segments: [
+        { text: "We are all ephemeral guests", role: "theme", gloss: "我们都只是短暂过客" },
+        { text: " on a planet", role: "modifier", gloss: "在这颗星球上" },
+        { text: " that will outlast us.", role: "focus", gloss: "而它比我们活得更久" }
+      ],
+      orderNote: "定语从句后置，把「星球比我们存续得更久」留到句末，让短暂与长久的对照落在最后。",
+      contrast: { label: "最小内核", text: "We are guests; the planet outlasts us.", zh: "我们是过客，星球更长久。" },
       source: "Talk 示例语料 · 随笔",
       keyWords: [
         {

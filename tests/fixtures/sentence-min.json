@@ -1,23 +1,17 @@
 {
   "text": "The scientist who faced doubt continued his research.",
   "translation": "面对质疑的科学家继续他的研究。",
-  "tone": "克制",
-  "structure": "主谓宾 + 定语从句",
+  "tone": "克制，书面语",
+  "syntax": "主句 + 定语从句",
   "summary": "他顶着质疑继续研究。",
-  "tree": [
-    {
-      "id": "c1",
-      "kind": "clause",
-      "text": "who faced doubt",
-      "anchor": "scientist",
-      "label": "定语从句"
-    }
+  "segments": [
+    { "text": "The scientist who faced doubt", "role": "theme", "gloss": "面对质疑的科学家" },
+    { "text": " continued", "role": "rheme", "gloss": "继续" },
+    { "text": " his research.", "role": "focus", "gloss": "他的研究" }
   ],
+  "orderNote": "定语从句紧贴 scientist，把「面对质疑」当成主语的临时标签，重心留在句末的 research。",
+  "contrast": { "label": "最小内核", "text": "The scientist continued his research.", "zh": "科学家继续他的研究。" },
   "keyWords": [
-    {
-      "word": "doubt",
-      "pos": "n.",
-      "meaningZh": "质疑"
-    }
+    { "word": "doubt", "pos": "n.", "meaningZh": "质疑" }
   ]
 }
