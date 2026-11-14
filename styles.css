@@ -8911,9 +8911,11 @@ html.motion-ready .reveal.reveal-soft.is-in {
 .seg-no {
   display: none;
   margin-right: 0.45em;
-  font-family: inherit;
+  font-style: normal;
+  font-family: var(--font);
   font-size: 0.46em;
-  font-weight: 600;
+  font-weight: inherit;
+  font-variant-numeric: tabular-nums;
   line-height: 1;
   letter-spacing: 0;
   color: inherit;
