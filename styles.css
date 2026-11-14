@@ -8815,3 +8815,65 @@ html.motion-ready .reveal.reveal-soft.is-in {
   color: var(--paper);
   cursor: default;
 }
+
+/* the question itself belongs at the top of the hand note */
+.reverse-query {
+  margin: 20px 0 0;
+  padding: 16px 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--card);
+}
+
+.reverse-query-label {
+  font-family: var(--mono, ui-monospace);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.reverse-query-text {
+  margin-top: 8px;
+  font-size: 17px;
+  line-height: 1.65;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.reverse-overview {
+  margin-top: 16px;
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+
+.reverse-list {
+  gap: 16px;
+  margin-top: 22px;
+}
+
+.reverse-card {
+  padding: 20px 18px;
+  gap: 16px;
+}
+
+.reverse-body {
+  gap: 9px;
+}
+
+.reverse-expression {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.reverse-scene {
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+.reverse-gloss {
+  font-size: 13px;
+  line-height: 1.65;
+}

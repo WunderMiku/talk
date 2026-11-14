@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "192";
+  const APP_VERSION = "193";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3728,6 +3728,10 @@
           <span class="reverse-desk">${esc(copy.masthead || "编辑部")} · ${esc(copy.desk || "WORD DESK")}</span>
           <span class="reverse-count">${result.candidates.length} 个候选</span>
         </header>
+        <section class="reverse-query reveal" style="--d:0.25">
+          <span class="reverse-query-label">你问</span>
+          <p class="reverse-query-text">${esc(result.text)}</p>
+        </section>
         ${result.overview ? `<p class="reverse-overview reveal" style="--d:0.4">${esc(result.overview)}</p>` : ""}
         <div class="reverse-list">
           ${result.candidates.map((candidate, index) => `
