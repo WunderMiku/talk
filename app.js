@@ -5389,7 +5389,7 @@
             const active = window.TALK_THEME.current().id === theme.id;
             return `<div class="theme-row${active ? " is-active open" : ""}" role="listitem" data-theme-row="${attr(theme.id)}">
               <button class="theme-row-head" type="button" data-action="theme-toggle" data-theme="${attr(theme.id)}" aria-expanded="${active}">
-                <span class="theme-swatch" aria-hidden="true"><i style="background:${attr(theme.themeColor || "#f3f0e7")}"></i><i style="background:${attr(theme.accent || "#171813")}"></i></span>
+                <span class="theme-swatch" aria-hidden="true"><i style="background:${attr(theme.themeColor || "#f3f0e7")}"></i><i style="background:${attr(theme.accentFill || theme.accent || "#171813")}"></i></span>
                 <span class="theme-row-copy"><strong>${esc(theme.label)}</strong><small>${esc(theme.description || "")}</small></span>
                 <span class="theme-row-state">${active ? "使用中" : ""}</span>
                 <span class="theme-row-chevron" aria-hidden="true">▾</span>

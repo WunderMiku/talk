@@ -28,6 +28,9 @@
   --label-accent: var(--accent-ink);
   --accent-strong: #a94e26;
   --accent-wash: #efd4c0;
+  --lime: #c46a3b;
+  --lime-deep: #a8552c;
+  --lime-wash: #f0d9cc;
   --accent-ink: #8f451f;
   --focus-ring: rgba(196, 106, 59, 0.35);
   --font: "Helvetica Neue", Arial, "Noto Sans SC", "PingFang SC", sans-serif;

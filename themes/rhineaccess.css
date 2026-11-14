@@ -33,6 +33,9 @@
   --label-accent: var(--accent-ink);
   --accent-strong: #a9cf00;
   --accent-wash: rgba(200, 240, 0, 0.34);
+  --lime: #c8f000;
+  --lime-deep: #a9cd00;
+  --lime-wash: #eaf7c6;
   --accent-ink: #4f6500;
   --focus-ring: rgba(19, 19, 19, 0.45);
 

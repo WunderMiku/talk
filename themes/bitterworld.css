@@ -5,6 +5,9 @@
    ========================================================================== */
 
 [data-theme="bitterworld"] {
+  --lime: #be3a28;
+  --lime-deep: #9c2f22;
+  --lime-wash: #f2ddd4;
   --accent-ink: #2f6f6a;
   --label-accent: var(--accent-ink);
   --kw-rule: #7a3a24;
@@ -171,7 +174,7 @@
 [data-theme="bitterworld"] .workspace-kicker,
 [data-theme="bitterworld"] .section-kicker,
 [data-theme="bitterworld"] .daily-section-kicker {
-  color: var(--red);
+  color: var(--kw-rule);
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.14em;
