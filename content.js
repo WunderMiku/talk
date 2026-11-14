@@ -15,6 +15,7 @@ window.TALK_CONTENT = {
     modes: {
       auto: "自动",
       word: "单词",
+      chunk: "意群",
       sentence: "句子"
     },
     dailySectionKicker: "每天一个小仪式",
@@ -56,9 +57,42 @@ window.TALK_CONTENT = {
       { id: "slang", name: "网络流行", emoji: "icons/style/slang.svg", tone: "coral", hint: "社交媒体、轻松俚语" },
       { id: "elegant", name: "优雅文句", emoji: "icons/style/elegant.svg", tone: "lavender", hint: "有节奏和文学感" }
     ]
+  },
+  chunk: {
+    label: "意群",
+    kicker: "意群 · 多词表达",
+    backLabel: "意群解析",
+    forms: {
+      idiom: "习语",
+      "phrasal-verb": "动词短语",
+      collocation: "固定搭配",
+      "chunk-skeleton": "词块骨架"
+    },
+    sections: {
+      senses: ["整体意思", "先记整体，再拆局部"],
+      keyWords: ["词眼", "点开看单词"],
+      slots: ["句法槽位", "可以往里填什么"],
+      variants: ["变形与替换", "换一种说法"],
+      origin: ["来历", "这个说法从哪来"],
+      examples: ["例句", "拿去就能用"]
+    },
+    emptyOrigin: "",
+    copy: "复制意群",
+    bookmark: "收藏意群"
+  },
+  reverse: {
+    label: "语境寻词",
+    masthead: "编辑部",
+    desk: "WORD DESK",
+    backLabel: "选词手记",
+    overviewLabel: "编辑总述",
+    candidatesLabel: "候选表达",
+    paradigms: { word: "词", chunk: "意群", sentence: "句" },
+    retry: "换个说法再问",
+    empty: "没找到贴切的表达，换个更具体的场景再试。",
+    copy: "复制手记"
   }
 };
-
 /* Per-theme voice. Missing keys fall back to the base copy above. */
 window.TALK_CONTENT.themeCopy = {
   constructivist: {

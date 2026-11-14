@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "189";
+  const APP_VERSION = "190";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -589,11 +589,75 @@
       .toLowerCase();
   }
 
+  function normalizeChunk(value) {
+    let query = String(value ?? "")
+      .replace(/[\u200B-\u200D\uFEFF]/g, "")
+      .replace(/[“”]/g, '"')
+      .replace(/[‘’]/g, "'")
+      .replace(/\s+/g, " ")
+      .trim();
+    query = query.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
+    return query.toLowerCase();
+  }
+
+  function chunkSlug(value) {
+    return normalizeChunk(value).replace(/\s+/g, "+");
+  }
+
+  function chunkFromSlug(slug) {
+    let raw = String(slug || "");
+    try {
+      raw = decodeURIComponent(raw);
+    } catch (_) {
+      /* keep the raw slug */
+    }
+    return normalizeChunk(raw.replace(/\+/g, " "));
+  }
+
+  function chunkCacheKey(value) {
+    return CHUNK_CACHE_PREFIX + normalizeChunk(value);
+  }
+
+  function hasCJK(value) {
+    return /[\u3400-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/.test(String(value || ""));
+  }
+
+  function hashText(value) {
+    let hash = 2166136261;
+    const text = String(value ?? "");
+    for (let index = 0; index < text.length; index += 1) {
+      hash ^= text.charCodeAt(index);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(36);
+  }
+
+  function reverseIdFor(text) {
+    return `r${hashText(normalizeSentence(text))}`;
+  }
+
+  function countWords(value) {
+    return String(value || "").split(/\s+/).filter(Boolean).length;
+  }
+
+  // 三范式分流：中文/情境描述 → 语境寻词；单词 → 词；完整句 → 句子；
+  // 其余 2-5 个词、无句末标点 → 意群。启发式，不引入 NLP；手动 chip 可覆盖。
+  function detectParadigm(value) {
+    const query = sanitizeQuery(value);
+    if (!query) return "word";
+    if (hasCJK(query)) return "reverse";
+    if (/^(how (?:do|can|could|would) (?:you|i|we) (?:say|express|put)|what(?:'s| is) the (?:word|phrase|english) for|how to say)/i.test(query)) {
+      return "reverse";
+    }
+    const words = query.split(/\s+/).filter(Boolean);
+    if (words.length <= 1) return "word";
+    if (/[.!?…]$/.test(query) || words.length >= 6) return "sentence";
+    return "chunk";
+  }
+
   function detectType(value) {
-    const q = sanitizeQuery(value);
-    if (!q) return "word";
-    const wordCount = q.split(/\s+/).filter(Boolean).length;
-    return /[.!?。！？]/.test(q) || wordCount >= 3 ? "sentence" : "word";
+    const paradigm = detectParadigm(value);
+    return paradigm === "chunk" ? "word" : paradigm === "reverse" ? "sentence" : paradigm;
   }
 
   function escapeRegExp(value) {
@@ -673,6 +737,9 @@
     const key = String(value || "").toLowerCase();
     return ({
       common: "常用",
+      neutral: "通用",
+      spoken: "口语",
+      slang: "俚语",
       formal: "正式",
       literary: "书面",
       informal: "口语",
@@ -851,7 +918,7 @@
 
   function sanitizeHistory(items) {
     return items
-      .filter((item) => item && (item.type === "word" || item.type === "sentence" || item.type === "translation") && item.query)
+      .filter((item) => item && ["word", "chunk", "sentence", "translation"].includes(item.type) && item.query)
       .map((item) => ({
         type: item.type,
         query: String(item.query),
@@ -1084,6 +1151,74 @@
       return null;
     }
     return { ...hit.data, cached: true };
+  }
+
+  function cacheGetChunk(query) {
+    const key = chunkCacheKey(query);
+    const hit = wordCache.get(key);
+    if (!hit?.data || hit.data.kind !== "chunk") return null;
+    if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
+      void removeWordRecord(key);
+      return null;
+    }
+    return { ...ensureChunk(hit.data), cached: true };
+  }
+
+  async function pruneChunkCache() {
+    const chunks = [...wordCache.entries()]
+      .filter(([key]) => key.startsWith(CHUNK_CACHE_PREFIX))
+      .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
+    for (const [key] of chunks.slice(CHUNK_CACHE_LIMIT)) {
+      if (wordCache.has(key)) await removeWordRecord(key);
+    }
+  }
+
+  function cachePutChunk(query, data, detail = state.settings?.detailLevel || "standard") {
+    const key = chunkCacheKey(query);
+    if (!chunkCacheKey(query) || !data) return;
+    const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, data: { ...data, kind: "chunk" } };
+    wordCache.set(key, record);
+    if (wordDb) {
+      wordDb.put(WORD_DB_STORE, record).catch((error) => {
+        console.warn("Could not write chunk cache to IndexedDB.", error);
+      });
+    } else if (wordStoreFallback) {
+      persistFallbackWordCache();
+    }
+    void pruneChunkCache();
+  }
+
+  function loadReverseStore() {
+    try {
+      const raw = localStorage.getItem(REVERSE_KEY);
+      const parsed = raw ? JSON.parse(raw) : {};
+      const now = Date.now();
+      const entries = Object.entries(parsed)
+        .filter(([, entry]) => entry?.result && now - Number(entry.at || 0) <= REVERSE_TTL)
+        .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0))
+        .slice(0, REVERSE_LIMIT);
+      return Object.fromEntries(entries);
+    } catch (_) {
+      return {};
+    }
+  }
+
+  function saveReverseStore() {
+    const entries = Object.entries(reverseStore || {})
+      .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0))
+      .slice(0, REVERSE_LIMIT);
+    try {
+      localStorage.setItem(REVERSE_KEY, JSON.stringify(Object.fromEntries(entries)));
+    } catch (_) {
+      /* storage may be full or blocked */
+    }
+  }
+
+  const reverseStore = loadReverseStore();
+
+  function cachePutReverse(id, text, data) {
+    reverseStore[id] = { at: Date.now(), text, result: data };
+    saveReverseStore();
   }
 
   function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard") {
@@ -1401,6 +1536,8 @@
   function routeHash(route) {
     if (route.name === "word") return `#/word/${encodeURIComponent(route.word || "")}`;
     if (route.name === "sentence") return `#/sentence/${encodeURIComponent(route.id || route.result?.id || "")}`;
+    if (route.name === "chunk") return `#/chunk/${encodeURIComponent(chunkSlug(route.query || route.result?.chunk || ""))}`;
+    if (route.name === "reverse") return `#/reverse/${encodeURIComponent(route.id || route.result?.id || "")}`;
     if (route.name === "translator") return "#/translate";
     if (route.name === "loading") return "#/search";
     if (route.name === "miss" || route.name === "error") {
@@ -1423,6 +1560,14 @@
         const result = DATA.sentences.find((item) => item.id === id);
         if (result) return { name: "sentence", id, result };
         if (id.startsWith("model-")) return { name: "sentence", id };
+      }
+      if (decoded.startsWith("chunk/")) {
+        const query = chunkFromSlug(decoded.slice(6));
+        if (query) return { name: "chunk", query };
+      }
+      if (decoded.startsWith("reverse/")) {
+        const id = decoded.slice(8);
+        if (id) return { name: "reverse", id };
       }
       if (decoded === "translate" || decoded === "translator") return { name: "translator" };
     } catch (_) {
@@ -1810,6 +1955,14 @@
         const sentence = getSentence(route);
         return sentence ? sentencePage(sentence) : missPage("sentence", route.query || "", []);
       }
+      case "chunk": {
+        const chunk = getChunk(route);
+        return chunk ? chunkPage(chunk) : missPage("chunk", route.query || "", ["by and large", "take off", "in the end"]);
+      }
+      case "reverse": {
+        const reverse = getReverse(route);
+        return reverse ? reversePage(reverse) : missPage("reverse", route.query || "", []);
+      }
       case "translator":
         return translatorPage();
       case "loading":
@@ -1826,6 +1979,20 @@
   function getWord(route) {
     if (route?.result) return ensureWord(route.result);
     return ensureWord(DATA.words[normalizeWord(route?.word || "")]);
+  }
+
+  function getChunk(route) {
+    if (route?.result) return ensureChunk(route.result);
+    return cacheGetChunk(route?.query || "");
+  }
+
+  function getReverse(route) {
+    if (route?.result) return route.result;
+    return reverseStore[idSafe(route?.id)] || null;
+  }
+
+  function idSafe(value) {
+    return String(value || "").replace(/[^a-z0-9]/gi, "").slice(0, 24);
   }
 
   function getSentence(route) {
@@ -2818,6 +2985,7 @@
             <div class="mode-switch" role="group" aria-label="查询模式">
               <button class="mode-btn ${state.mode === "auto" ? "active" : ""}" type="button" data-action="mode" data-mode="auto" aria-pressed="${state.mode === "auto"}">${esc(copy.modes.auto)}</button>
               <button class="mode-btn ${state.mode === "word" ? "active" : ""}" type="button" data-action="mode" data-mode="word" aria-pressed="${state.mode === "word"}">${esc(copy.modes.word)}</button>
+              <button class="mode-btn ${state.mode === "chunk" ? "active" : ""}" type="button" data-action="mode" data-mode="chunk" aria-pressed="${state.mode === "chunk"}">${esc(copy.modes.chunk || "意群")}</button>
               <button class="mode-btn ${state.mode === "sentence" ? "active" : ""}" type="button" data-action="mode" data-mode="sentence" aria-pressed="${state.mode === "sentence"}">${esc(copy.modes.sentence)}</button>
             </div>
           </div>
@@ -2938,6 +3106,104 @@
   /* ============================================================
      Word page
      ============================================================ */
+
+  const CHUNK_FORMS = ["idiom", "phrasal-verb", "collocation", "chunk-skeleton"];
+
+  function ensureChunk(raw) {
+    if (!raw) return null;
+    const chunk = normalizeChunk(raw.chunk || raw.query || raw.word || "");
+    if (!chunk) return null;
+    const form = CHUNK_FORMS.includes(raw.form) ? raw.form : "collocation";
+    const senses = (Array.isArray(raw.senses) ? raw.senses : [])
+      .map((sense) => ({
+        zh: String(sense?.zh || sense?.translation || "").trim(),
+        en: String(sense?.en || sense?.definition || "").trim(),
+        when: String(sense?.when || sense?.usage || "").trim()
+      }))
+      .filter((sense) => sense.zh || sense.en)
+      .slice(0, 3);
+    const keyWords = (Array.isArray(raw.keyWords) ? raw.keyWords : [])
+      .map((item) => ({
+        word: String(item?.word || "").trim(),
+        pos: posAbbr(item?.pos),
+        gloss: String(item?.gloss || item?.zh || "").trim(),
+        why: String(item?.why || "").trim()
+      }))
+      .filter((item) => item.word && chunk.includes(item.word.toLowerCase()))
+      .slice(0, 2);
+    const example = (value) => {
+      if (!value || (!value.en && !value.zh)) return null;
+      return { en: String(value.en || "").trim(), zh: String(value.zh || "").trim() };
+    };
+    const slots = (Array.isArray(raw.slots) ? raw.slots : [])
+      .map((item) => ({
+        slot: String(item?.slot || "").trim(),
+        role: String(item?.role || item?.why || "").trim(),
+        example: example(item?.example)
+      }))
+      .filter((item) => item.slot)
+      .slice(0, 3);
+    const variants = (Array.isArray(raw.variants) ? raw.variants : [])
+      .map((item) => ({
+        form: String(item?.form || "").trim(),
+        example: example(item?.example)
+      }))
+      .filter((item) => item.form)
+      .slice(0, 3);
+    const origin = raw.origin && (raw.origin.story || raw.origin.era)
+      ? { story: String(raw.origin.story || "").trim(), era: String(raw.origin.era || "").trim() }
+      : null;
+    return {
+      kind: "chunk",
+      chunk,
+      form,
+      phonetic: String(raw.phonetic || "").trim(),
+      translation: String(raw.translation || senses[0]?.zh || "").trim(),
+      short: String(raw.short || senses[0]?.en || "").trim(),
+      register: String(raw.register || "neutral").trim(),
+      note: String(raw.note || "").trim(),
+      senses,
+      keyWords,
+      slots,
+      variants,
+      origin,
+      examples: normalizeExamples(raw.examples).slice(0, 4),
+      cached: Boolean(raw.cached),
+      source: raw.source || ""
+    };
+  }
+
+  function ensureReverse(raw, text) {
+    const source = String(text || raw?.text || "").trim();
+    const candidates = (Array.isArray(raw?.candidates) ? raw.candidates : [])
+      .map((item) => {
+        let expression = String(item?.expression || "").trim().replace(/\s+/g, " ");
+        if (!expression) return null;
+        let paradigm = ["word", "chunk", "sentence"].includes(item?.paradigm) ? item.paradigm : "chunk";
+        const words = countWords(expression);
+        if (paradigm === "word" && words > 1) paradigm = "chunk";
+        if (paradigm === "sentence" && words > REVERSE_MAX_SENTENCE_WORDS) {
+          paradigm = words === 1 ? "word" : "chunk";
+        }
+        return {
+          expression,
+          paradigm,
+          phonetic: String(item?.phonetic || "").trim(),
+          whenToUse: String(item?.whenToUse || item?.when || "").trim(),
+          gloss: String(item?.gloss || "").trim()
+        };
+      })
+      .filter(Boolean)
+      .slice(0, 5);
+    return {
+      kind: "reverse",
+      id: reverseIdFor(source),
+      text: source,
+      overview: String(raw?.overview || "").trim(),
+      candidates,
+      source: raw?.source || ""
+    };
+  }
 
   function ensureWord(raw) {
     if (!raw) return null;
@@ -3283,6 +3549,179 @@
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
           ${word.source !== "demo" ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-word-cache" data-word="${attr(word.word)}">${icon("trash")} 删除缓存</button>` : ""}
+        </div>
+      </main>`;
+  }
+
+  /* ============================================================
+     Chunk page (sense group)
+     ============================================================ */
+
+  function chunkPage(chunk) {
+    let blockNo = 0;
+    const nextNo = () => String(++blockNo).padStart(2, "0");
+    const copy = copyFor("chunk");
+    const sections = copy.sections || {};
+    const formLabel = copy.forms?.[chunk.form] || "固定搭配";
+    const bookmark = `chunk:${chunkSlug(chunk.chunk)}`;
+    const note = chunk.note ? rich(chunk.note) : "";
+    const cachePill = chunk.source === "demo"
+      ? "内置意群"
+      : chunk.cached
+        ? "本机缓存"
+        : "本次生成";
+    const exampleRow = (item, index) => `
+      <article class="chunk-example reveal" style="--d:0">
+        <div class="chunk-example-head">
+          <span class="chunk-example-index">${String(index + 1).padStart(2, "0")}</span>
+          <p class="chunk-example-en">${esc(item.en)}</p>
+        </div>
+        ${item.zh ? `<p class="chunk-example-zh">${esc(item.zh)}</p>` : ""}
+        <div class="example-actions">
+          <button class="example-speak" type="button" data-action="speak" data-text="${attr(item.en)}" aria-label="朗读例句">${icon("volume")}</button>
+          <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${item.en}${item.zh ? `\n${item.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
+        </div>
+      </article>`;
+
+    return `
+      ${backTopbar({ label: `${copy.label || "意群"} · ${formLabel}`, title: shorten(chunk.chunk, 26), bookmark })}
+      <main class="result-page chunk-page">
+        <section class="result-hero chunk-hero">
+          <div class="result-kicker reveal" style="--d:0">
+            <span class="kicker-pill accent">${esc(copy.label || "意群")}</span>
+            <span class="kicker-pill">${esc(formLabel)}</span>
+            <span class="kicker-pill">${esc(registerLabel(chunk.register))}</span>
+            <span class="cache-state-pill ${chunk.cached ? "is-cached" : "is-generated"}">${esc(cachePill)}</span>
+          </div>
+          <h1 class="chunk-title reveal" style="--d:0.4">${esc(chunk.chunk)}</h1>
+          <div class="word-subrow reveal" style="--d:1">
+            <span class="ipa">${esc(chunk.phonetic || "—")}</span>
+            <span class="dot-sep"></span>
+            <button class="speak-btn" type="button" data-action="speak" data-text="${attr(chunk.chunk)}">${icon("volume")} 发音</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(`${chunk.translation}${chunk.short ? `\n${chunk.short}` : ""}`)}" aria-label="复制释义" title="复制释义">${icon("copy")}</button>
+          </div>
+          <div class="word-gloss-row reveal" style="--d:1.1">
+            <p class="word-gloss">${esc(chunk.translation || chunk.chunk)}</p>
+          </div>
+          ${chunk.short ? `<p class="word-short reveal" style="--d:1.2">${esc(chunk.short)}</p>` : ""}
+          ${note ? `<div class="hero-note reveal" style="--d:1.5">${note}</div>` : ""}
+        </section>
+
+        ${chunk.senses.length ? `
+        <section class="block chunk-senses reveal" style="--d:1.8">
+          ${blockHead(nextNo(), sections.senses?.[0] || "整体意思", sections.senses?.[1] || "")}
+          <div class="sense-list">
+            ${chunk.senses.map((sense) => `
+              <article class="sense-card">
+                <p class="sense-zh">${esc(sense.zh)}</p>
+                ${sense.en ? `<p class="sense-en">${esc(sense.en)}</p>` : ""}
+                ${sense.when ? `<p class="sense-when">${esc(sense.when)}</p>` : ""}
+              </article>`).join("")}
+          </div>
+        </section>` : ""}
+
+        ${chunk.keyWords.length ? `
+        <section class="block chunk-keywords reveal" style="--d:2">
+          ${blockHead(nextNo(), sections.keyWords?.[0] || "词眼", sections.keyWords?.[1] || "")}
+          <div class="keyeye-row">
+            ${chunk.keyWords.map((item) => `
+              <button class="keyeye" type="button" data-action="word-layer"
+                data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}"
+                data-gloss="${attr(item.gloss)}" data-pos="${attr(item.pos)}" data-relation="词眼">
+                <span class="keyeye-word">${esc(item.word)}</span>
+                <span class="keyeye-pos">${esc(item.pos || "—")}</span>
+                <span class="keyeye-gloss">${esc(item.gloss)}</span>
+                ${icon("arrowUpRight")}
+              </button>`).join("")}
+          </div>
+        </section>` : ""}
+
+        ${chunk.slots.length ? `
+        <section class="block chunk-slots reveal" style="--d:2.2">
+          ${blockHead(nextNo(), sections.slots?.[0] || "句法槽位", sections.slots?.[1] || "")}
+          <div class="slot-list">
+            ${chunk.slots.map((slot) => `
+              <div class="slot-row">
+                <code class="slot-code">${esc(slot.slot)}</code>
+                <span class="slot-role">${esc(slot.role)}</span>
+                ${slot.example ? `<p class="slot-example"><span>${esc(slot.example.en)}</span><em>${esc(slot.example.zh)}</em></p>` : ""}
+              </div>`).join("")}
+          </div>
+        </section>` : ""}
+
+        ${chunk.variants.length ? `
+        <section class="block chunk-variants reveal" style="--d:2.4">
+          ${blockHead(nextNo(), sections.variants?.[0] || "变形与替换", sections.variants?.[1] || "")}
+          <div class="variant-list">
+            ${chunk.variants.map((variant) => `
+              <div class="variant-row">
+                <p class="variant-form">${esc(variant.form)}</p>
+                ${variant.example ? `<p class="variant-example"><span>${esc(variant.example.en)}</span><em>${esc(variant.example.zh)}</em></p>` : ""}
+              </div>`).join("")}
+          </div>
+        </section>` : ""}
+
+        ${chunk.origin ? `
+        <section class="block chunk-origin reveal" style="--d:2.6">
+          ${blockHead(nextNo(), sections.origin?.[0] || "来历", sections.origin?.[1] || "")}
+          <div class="origin-story">
+            ${chunk.origin.era ? `<span class="origin-era">${esc(chunk.origin.era)}</span>` : ""}
+            <p>${esc(chunk.origin.story)}</p>
+          </div>
+        </section>` : ""}
+
+        ${chunk.examples.length ? `
+        <section class="block chunk-examples reveal" style="--d:2.8">
+          ${blockHead(nextNo(), sections.examples?.[0] || "例句", sections.examples?.[1] || "")}
+          <div class="chunk-example-list">
+            ${chunk.examples.map(exampleRow).join("")}
+          </div>
+        </section>` : ""}
+
+        <div class="page-actions reveal" style="--d:3">
+          <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} ${esc(copy.bookmark || "收藏")}</button>
+          <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} ${esc(copy.copy || "复制")}</button>
+          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-chunk">${icon("refresh")} 重新生成意群</button>` : ""}
+          ${chunk.cached ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-chunk-cache">${icon("trash")} 删除缓存</button>` : ""}
+        </div>
+      </main>`;
+  }
+
+  /* ============================================================
+     Reverse search (context → candidates)
+     ============================================================ */
+
+  function reversePage(result) {
+    const copy = copyFor("reverse");
+    const paradigms = copy.paradigms || { word: "词", chunk: "意群", sentence: "句" };
+    return `
+      ${backTopbar({ label: copy.label || "语境寻词", title: "选词手记" })}
+      <main class="result-page reverse-page">
+        <header class="reverse-masthead reveal" style="--d:0">
+          <span class="reverse-desk">${esc(copy.masthead || "编辑部")} · ${esc(copy.desk || "WORD DESK")}</span>
+          <span class="reverse-count">${result.candidates.length} 个候选</span>
+        </header>
+        ${result.overview ? `<p class="reverse-overview reveal" style="--d:0.4">${esc(result.overview)}</p>` : ""}
+        <div class="reverse-list">
+          ${result.candidates.map((candidate, index) => `
+            <button class="reverse-card reveal" type="button" style="--d:${(0.6 + index * 0.2).toFixed(1)}"
+              data-action="reverse-pick" data-expression="${attr(candidate.expression)}" data-paradigm="${attr(candidate.paradigm)}">
+              <span class="reverse-index">${String(index + 1).padStart(2, "0")}</span>
+              <span class="reverse-body">
+                <span class="reverse-line">
+                  <span class="reverse-expression">${esc(candidate.expression)}</span>
+                  <span class="paradigm-tag">${esc(paradigms[candidate.paradigm] || "意群")}</span>
+                </span>
+                ${candidate.phonetic ? `<span class="reverse-phonetic">${esc(candidate.phonetic)}</span>` : ""}
+                <span class="reverse-scene">${esc(candidate.whenToUse)}</span>
+                ${candidate.gloss ? `<span class="reverse-gloss">${esc(candidate.gloss)}</span>` : ""}
+              </span>
+              ${icon("arrowUpRight")}
+            </button>`).join("")}
+        </div>
+        ${result.candidates.length ? "" : `<p class="reverse-empty">${esc(copy.empty || "没找到贴切的表达，换个更具体的场景再试。")}</p>`}
+        <div class="reverse-foot reveal" style="--d:1.4">
+          <button class="link-btn" type="button" data-action="reverse-again">${esc(copy.retry || "换个说法再问")}</button>
         </div>
       </main>`;
   }
@@ -3757,12 +4196,19 @@
      ============================================================ */
 
   function loadingBody(query, type, { statusText, withPreview = false } = {}) {
-    const status = statusText || (type === "sentence" ? "找出真正重要的词" : "正在理解词义");
+    const statusByName = {
+      sentence: "找出真正重要的词",
+      chunk: "拆开它的槽位",
+      reverse: "翻找贴切的表达",
+      word: "正在理解词义"
+    };
+    const status = statusText || statusByName[type] || statusByName.word;
+    const typePill = type === "sentence" ? "句子" : type === "chunk" ? "意群" : type === "reverse" ? "寻词" : "单词";
     return `
       <main class="result-page loading-page">
         <div class="loading-lead">
           <div class="result-kicker reveal" style="--d:0">
-            <span class="kicker-pill accent">${type === "sentence" ? "句子" : "单词"}</span>
+            <span class="kicker-pill accent">${typePill}</span>
             <span class="kicker-pill">正在整理</span>
           </div>
           <h1 class="loading-query reveal" style="--d:0.4">${esc(query)}</h1>
@@ -3787,31 +4233,38 @@
 
   function loadingPage(query, type) {
     return `
-      ${backTopbar({ label: type === "sentence" ? "正在理解句子" : "正在查询单词", title: shorten(query, 28) })}
+      ${backTopbar({ label: type === "sentence" ? "正在理解句子" : type === "chunk" ? "正在辨认意群" : type === "reverse" ? "正在挑选说法" : "正在查询单词", title: shorten(query, 28) })}
       ${loadingBody(query, type, { withPreview: true })}`;
   }
 
   function missPage(type, query, suggestions = []) {
     const isSentence = type === "sentence";
+    const isChunk = type === "chunk";
+    const isReverse = type === "reverse";
     const fallback = suggestions.length
       ? suggestions
       : isSentence
         ? DATA.sentences.slice(0, 2).map((item) => item.text)
-        : ["serendipity", "ephemeral", "resilient"];
+        : isChunk
+          ? ["by and large", "take off", "in the end"]
+          : isReverse
+            ? ["怎么礼貌地拒绝", "表达“顺便说一下”", "形容雨很小"]
+            : ["serendipity", "ephemeral", "resilient"];
+    const typeForChip = isSentence ? "sentence" : "auto";
     return `
-      ${backTopbar({ label: "离线演示", title: isSentence ? "句子尚未收录" : "单词尚未收录" })}
+      ${backTopbar({ label: "离线演示", title: isSentence ? "句子尚未收录" : isChunk ? "意群尚未收录" : isReverse ? "还没连上模型" : "单词尚未收录" })}
       <main class="result-page state-page">
         <div class="state-orb reveal" style="--d:0">?</div>
         <h1 class="state-title reveal" style="--d:0.4">离线词库还没收录。</h1>
-        <p class="state-copy reveal" style="--d:0.6">离线词库很小。连接模型后，可以${isSentence ? "把任何句子拆成重点词，读懂语气与结构" : "查任何单词，连带近义词、反义和例句"}。也可以先看下面的示例。</p>
+        <p class="state-copy reveal" style="--d:0.6">离线词库很小。连接模型后，可以${isSentence ? "把任何句子拆成重点词，读懂语气与结构" : isChunk ? "拆开任何固定搭配，看它的槽位与来历" : isReverse ? "用一句中文描述，找到最贴切的英文说法" : "查任何单词，连带近义词、反义和例句"}。也可以先看下面的示例。</p>
         <span class="state-query reveal" style="--d:0.8">${esc(shorten(query, 88))}</span>
         <div class="state-actions reveal" style="--d:1">
           <button class="btn btn-primary" type="button" data-action="settings">${icon("wand")} 连接模型</button>
-          <button class="btn btn-secondary" type="button" data-action="lookup" data-query="${attr(fallback[0])}" data-type="${isSentence ? "sentence" : "word"}">先看示例</button>
+          <button class="btn btn-secondary" type="button" data-action="lookup" data-query="${attr(fallback[0])}" data-type="${typeForChip}">先看示例</button>
         </div>
         <div class="recent-row reveal" style="--d:1.2; padding-left:0; padding-right:0; margin-top:22px; flex-wrap:wrap;">
           ${fallback.slice(0, 3).map((item) => `
-            <button class="chip" type="button" data-action="lookup" data-query="${attr(item)}" data-type="${isSentence ? "sentence" : "word"}">
+            <button class="chip" type="button" data-action="lookup" data-query="${attr(item)}" data-type="${typeForChip}">
               ${isSentence ? '<span class="quote-dot"></span>' : ""}${esc(shorten(item, 43))}
             </button>`).join("")}
         </div>
@@ -5061,7 +5514,7 @@
       return;
     }
 
-    const type = requestedMode === "auto" ? detectType(query) : requestedMode;
+    const type = requestedMode === "auto" ? detectParadigm(query) : requestedMode;
     state.lastAttempt = { query, type };
     const token = ++state.searchSeq;
     navigate({ name: "loading", query, type });
@@ -5074,16 +5527,26 @@
         result = type === "word"
           ? await lookupWordDeduped(query, { onPreview })
           : await modelLookup(query, type, state.settings, { ...options, onPreview });
+      } else if (type === "chunk") {
+        await wait(620);
+        throw new DemoMiss("chunk", query, ["by and large", "take off", "in the end"]);
+      } else if (type === "reverse") {
+        await wait(620);
+        throw new DemoMiss("reverse", query, []);
       } else {
         await wait(820);
         result = lookupDemo(query, type);
       }
       if (token !== state.searchSeq) return;
       clearLoadingTimer();
-      addHistory(type, query);
+      if (result.type !== "reverse") addHistory(result.type, query);
       const route = result.type === "word"
         ? { name: "word", word: result.data.word, result: result.data }
-        : { name: "sentence", id: result.data.id, result: result.data };
+        : result.type === "chunk"
+          ? { name: "chunk", query: result.data.chunk, result: result.data }
+          : result.type === "reverse"
+            ? { name: "reverse", id: result.data.id, result: result.data }
+            : { name: "sentence", id: result.data.id, result: result.data };
       setRevealMode("soft");
       navigate(route, { replace: true, direction: "forward" });
     } catch (error) {
@@ -5104,7 +5567,11 @@
     clearLoadingTimer();
     const messages = type === "sentence"
       ? ["正在读这句话", "找出真正重要的词", "整理语气与含义"]
-      : ["正在理解词义", "收集同根词", "寻找自然例句"];
+      : type === "chunk"
+        ? ["正在辨认这个意群", "拆开它的槽位", "找出关键的那个词"]
+        : type === "reverse"
+          ? ["正在读你描述的场景", "翻找贴切的表达", "把候选写进手记"]
+          : ["正在理解词义", "收集同根词", "寻找自然例句"];
     let index = 0;
     const timer = window.setInterval(() => {
       index = (index + 1) % messages.length;
@@ -5195,11 +5662,22 @@
   // A sentence to analyse can be a paragraph; the word lookup path stays short.
   const SEARCH_MAX_CHARS = 800;
   const TRANSLATOR_SYSTEM_PROMPT = window.TALK_PROMPTS.translator;
+  const CHUNK_SYSTEM_PROMPT = window.TALK_PROMPTS.chunk;
+  const REVERSE_SYSTEM_PROMPT = window.TALK_PROMPTS.reverse;
+  const CHUNK_CACHE_PREFIX = "chunk:";
+  const CHUNK_CACHE_LIMIT = 60;
+  const REVERSE_KEY = "talk.reverse.v1";
+  const REVERSE_LIMIT = 20;
+  const REVERSE_TTL = 7 * 24 * 60 * 60 * 1000;
+  const REVERSE_MAX_SENTENCE_WORDS = 20;
 
   state.translatorStyles = TRANSLATOR_STYLES.map((style) => style.id);
 
   function systemPrompt(type) {
-    return type === "sentence" ? SENTENCE_SYSTEM_PROMPT : WORD_SYSTEM_PROMPT;
+    if (type === "sentence") return SENTENCE_SYSTEM_PROMPT;
+    if (type === "chunk") return CHUNK_SYSTEM_PROMPT;
+    if (type === "reverse") return REVERSE_SYSTEM_PROMPT;
+    return WORD_SYSTEM_PROMPT;
   }
 
   function themeBriefs() {
@@ -5223,6 +5701,15 @@
     });
   }
 
+  function chunkPrompt(query, detail = "standard") {
+    return JSON.stringify({ task: "chunk", detail, query: String(query) });
+  }
+
+  function reversePrompt(text, detail = "standard") {
+    const level = sentenceLevelOf(state.settings?.sentenceLevel);
+    return JSON.stringify({ task: "reverse", detail, level: level.id, text: String(text) });
+  }
+
   function sentencePrompt(query, detail = "standard", pieces = []) {
     const level = sentenceLevelOf(state.settings?.sentenceLevel);
     const sentences = pieces.length ? pieces.map((text, index) => ({ index, text })) : undefined;
@@ -5244,6 +5731,14 @@
       const cached = cacheGetWord(query, detail);
       if (cached) return { type: "word", data: cached };
     }
+    if (type === "chunk" && !options.skipCache) {
+      const cached = cacheGetChunk(query);
+      if (cached) return { type: "chunk", data: cached };
+    }
+    if (type === "reverse") {
+      const cached = reverseStore[reverseIdFor(query)];
+      if (cached?.result) return { type: "reverse", data: cached.result };
+    }
     const pieces = type === "sentence" ? splitSentences(query) : [];
     const sentenceCacheKey = type === "sentence"
       ? await sentenceKey(query, sentenceLevelOf(cfg.sentenceLevel).id, detail)
@@ -5256,7 +5751,13 @@
       }
     }
     const endpoint = endpointFor(cfg.baseUrl, cfg);
-    const prompt = type === "sentence" ? sentencePrompt(query, detail, pieces) : wordPrompt(query, detail);
+    const prompt = type === "sentence"
+      ? sentencePrompt(query, detail, pieces)
+      : type === "chunk"
+        ? chunkPrompt(query, detail)
+        : type === "reverse"
+          ? reversePrompt(query, detail)
+          : wordPrompt(query, detail);
     const messages = [
       { role: "system", content: systemPrompt(type) },
       { role: "user", content: prompt }
@@ -5274,7 +5775,11 @@
     const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
     const wanted = type === "sentence"
       ? Math.max(detailTokens, SENTENCE_MAX_TOKENS[detail] || SENTENCE_MAX_TOKENS.standard)
-      : detailTokens;
+      : type === "chunk"
+        ? Math.max(detailTokens, 2400)
+        : type === "reverse"
+          ? 1200
+          : detailTokens;
     const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";
     const startedAt = Date.now();
@@ -5374,6 +5879,20 @@
       }
     }
     diagLog("info", "model.ok", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt, retried: retryLength !== null });
+    if (type === "chunk") {
+      const data = ensureChunk({ ...parsed, chunk: parsed?.chunk || query });
+      data.source = "model";
+      data.model = cfg.model;
+      cachePutChunk(query, data, detail);
+      return { type: "chunk", data };
+    }
+    if (type === "reverse") {
+      const data = ensureReverse(parsed, query);
+      data.source = "model";
+      data.model = cfg.model;
+      cachePutReverse(data.id, query, data);
+      return { type: "reverse", data };
+    }
     if (type === "word") {
       const data = normalizeModelWord(parsed, query);
       data.source = "model";
@@ -5596,6 +6115,7 @@
   }
 
   function streamPreviewFromJson(text, type, query) {
+    if (type === "chunk" || type === "reverse") return null;
     if (type === "sentence") {
       const translation = partialJsonString(text, "translation");
       const tone = partialJsonString(text, "tone");
@@ -6057,6 +6577,41 @@
           button.setAttribute("aria-pressed", String(active));
         });
         updateSearchMeta();
+        break;
+      }
+
+      case "reverse-pick": {
+        event.preventDefault();
+        const expression = target.dataset.expression || "";
+        const paradigm = target.dataset.paradigm || "chunk";
+        if (!expression) break;
+        runSearch(expression, paradigm);
+        break;
+      }
+
+      case "reverse-again": {
+        event.preventDefault();
+        navigate({ name: "home" });
+        const field = $("#search-input");
+        if (field) requestAnimationFrame(() => field.focus());
+        break;
+      }
+
+      case "regenerate-chunk": {
+        event.preventDefault();
+        const route = state.route;
+        if (route?.name !== "chunk") break;
+        void removeWordRecord(chunkCacheKey(route.query || ""));
+        runSearch(route.query || "", "chunk", { skipCache: true });
+        break;
+      }
+
+      case "delete-chunk-cache": {
+        event.preventDefault();
+        const route = state.route;
+        if (route?.name !== "chunk") break;
+        void removeWordRecord(chunkCacheKey(route.query || ""));
+        toast("已删除这份意群缓存");
         break;
       }
 
@@ -6807,15 +7362,18 @@
     const input = $("#search-input");
     const label = $("#detect-label");
     if (!input || !label) return;
-    const detected = state.mode === "auto" ? detectType(input.value) : state.mode;
+    const paradigmLabels = { word: "单词", chunk: "意群", sentence: "句子", reverse: "语境寻词" };
+    const detected = state.mode === "auto" ? detectParadigm(input.value) : state.mode;
     label.textContent = state.mode === "auto"
-      ? `自动 · ${detected === "sentence" ? "句子" : "单词"}`
-      : `${state.mode === "sentence" ? "句子" : "单词"}模式`;
+      ? `自动 · ${paradigmLabels[detected] || "单词"}`
+      : `${paradigmLabels[state.mode] || "单词"}模式`;
     input.placeholder = state.mode === "sentence"
       ? "粘贴一句想读懂的英文…"
       : state.mode === "word"
         ? "输入一个想查的单词…"
-        : "输入一个单词，或一整句话…";
+        : state.mode === "chunk"
+          ? "输入一个搭配或短语，例如 take off…"
+          : "输入一个单词、一个搭配，或一句中文…";
   }
 
   function openWordRoute(word) {
@@ -6856,6 +7414,7 @@
     const active = activeWordData();
     if (active?.word) return `word:${normalizeWord(active.word)}`;
     if (state.route.name === "sentence") return `sentence:${state.route.result?.id || state.route.id}`;
+    if (state.route.name === "chunk") return `chunk:${chunkSlug(state.route.query || "")}`;
     return null;
   }
 

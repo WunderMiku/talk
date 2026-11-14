@@ -20,15 +20,30 @@
 
 句子查词走同一条链路，只是任务换成 `sentence`，输出结构不同。
 
+## 三种颗粒度
+
+同一个搜索框按输入自动分流（`detectParadigm()`，启发式，手动 chip 可覆盖）：
+
+| 输入 | 判为 | 任务 | 页面 |
+| --- | --- | --- | --- |
+| 单个词 | 词 | `word` | 词条页（报刊卡片） |
+| 2–5 个词、无句末标点 | 意群 | `chunk` | 意群页：整体意思 / 词眼 / 槽位 / 变形 / 来历 / 例句 |
+| 有句末标点或 ≥6 词 | 句子 | `sentence` | 句子页（洋葱式折叠） |
+| 中文或「how do you say…」 | 语境寻词 | `reverse` | 选词手记：一句概述 + 3–5 个候选，按 `paradigm` 精确跳转 |
+
+意群缓存与词条共用 `talk.words.v1`，键前缀 `chunk:`，单独限 **60 条**，不挤占 300 条词条额度；`talk.reverse.v1` 只存最近 20 次手记、7 天过期。
+
 ## 提示词：静态前缀，动态尾巴
 
-`prompts.js` 里三个系统提示词（单词 / 句子 / 主题沙龙）都是**完全静态**的字符串：角色、JSON schema、规则、各深度的数量要求、few-shot 示例全在里面。
+`prompts.js` 里七个系统提示词（单词 / 句子 / 意群 / 语境寻词 / 例句 / 翻译 / 主题沙龙）都是**完全静态**的字符串：角色、JSON schema、规则、各深度的数量要求、few-shot 示例全在里面。
 
 用户消息只放会变的东西：
 
 ```text
 单词   {"task":"word","detail":"fast","query":"serendipity"}
 句子   {"task":"sentence","detail":"fast","text":"Hope is not a prediction."}
+意群   {"task":"chunk","detail":"standard","query":"take off"}
+寻词   {"task":"reverse","detail":"standard","level":"gaokao","text":"怎么礼貌地顺便问一句"}
 主题   {"task":"theme","detail":"standard","exclude":["雨夜的天文台","..."]}
 ```
 
@@ -65,7 +80,7 @@ memory                                记法
 
 | 位置 | 键 | 内容 | 上限 |
 | --- | --- | --- | --- |
-| IndexedDB | `talk.words.v1` | 完整词条 JSON | 300 条 / 90 天（可在设置里改） |
+| IndexedDB | `talk.words.v1` | 完整词条与意群 JSON（意群键前缀 `chunk:`） | 词条 300 条 / 90 天；意群单独 60 条 |
 | IndexedDB | `talk.audio.v1` | Qwen 语音音频 | 键里带版本，可一键清空 |
 | IndexedDB | `talk.themeDecks.v1` | 主题沙龙版本库 | 全量保留；首页展示队列最多 8 版 |
 | localStorage | `talk.model.v1` | 模型配置与 API key | — |
@@ -73,7 +88,8 @@ memory                                记法
 | localStorage | `talk.prefs.v1` | 深度、缓存上限、发音引擎等偏好 | — |
 | localStorage | `talk.theme.v1` | 当前主题 id | — |
 | IndexedDB | `talk.vault.v1` | 用于解封密钥的 AES-GCM `CryptoKey` | 不可导出（`extractable: false`） |
-| localStorage | `talk.history.v1` / `talk.saved.v1` | 最近查词 / 收藏 | — |
+| localStorage | `talk.history.v1` / `talk.saved.v1` | 最近查词（含意群）/ 收藏 | — |
+| localStorage | `talk.reverse.v1` | 语境寻词手记（按下文短哈希） | 20 条 / 7 天 |
 
 几条规则：
 
@@ -233,3 +249,11 @@ python3 -m http.server 8080     # 或任意静态服务器
 - 数据：`sentence.tree` 的每个非 main 节点带 `anchor`（父级 text 里的词），前端按锚点把子节点插回父级文本，再递归渲染。
 - 结构：`onionCompose()` 组合文本与插槽，`onionSlot()` 生成 `[+]` 与可展开片段，`openInsightSheet()` 渲染卡片。
 - 动效：纯 CSS。展开时 `onion-clause` 做透明度 + 字距过渡，避免 `clip-path` 影响行盒；折叠为即时隐藏，不阻塞布局。
+
+## 意群与语境寻词的模型侧
+
+意群（`chunk`）不是「词典里的短语」，而是一个**语块**：整体意象释义、语体、1–2 个核心词眼、句法槽位与可替换变形、可选的典故来源、1–4 条地道例句。客户端只保留逐字出现在 `chunk` 里的词眼——模型编出来的词组不会变成可点的按钮。
+
+语境寻词（`reverse`）先给一句 `overview`，再给 3–5 个候选，每个候选带 `paradigm`。服务端强制三条降级：单 token 不能标 `sentence`；多 token 不能标 `word`；候选句超过 20 词时降为 `chunk`（单 token 降为 `word`），避免手记卡里出现读不完的长句。点候选时用它的 `paradigm` 直接路由，而不是再跑一次分流。
+
+两条路径都沿用同一套请求与重试：`response_format` 只用于非流式；流式时不做渐进预览（结构是嵌套的，解析成本高于收益）。
