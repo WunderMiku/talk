@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "197";
+  const APP_VERSION = "187";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -7260,6 +7260,7 @@
 
   function registerServiceWorker() {
     if (!("serviceWorker" in navigator) || !window.isSecureContext) return;
+    if (location.hostname === "127.0.0.1" || location.hostname === "localhost") return;
     navigator.serviceWorker.register("./sw.js", { scope: "./" }).catch((error) => {
       console.warn("PWA service worker registration failed.", error);
     });
