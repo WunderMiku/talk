@@ -8,7 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "188";
+  const APP_VERSION = "189";
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1604,6 +1604,7 @@
 
   const STAGGER_MS = 55;
   let revealMode = "normal";
+  let revealWatcher = null;
 
   function setRevealMode(mode) {
     revealMode = mode;
@@ -1638,6 +1639,7 @@
         const delay = order * 40;
         order += 1;
         window.setTimeout(() => {
+          if (element.classList.contains("is-in")) return;
           element.style.transitionDelay = "0ms";
           element.classList.add("is-in");
         }, delay);
@@ -1649,6 +1651,7 @@
         const delay = order * STAGGER_MS;
         order += 1;
         window.setTimeout(() => {
+          if (element.classList.contains("is-in")) return;
           element.style.transitionDelay = "0ms";
           element.classList.add("is-in");
         }, delay);
@@ -1690,6 +1693,16 @@
       rootMargin: "0px 0px 120px 0px"
     });
     observeReveals(screen);
+    if (!revealWatcher) {
+      revealWatcher = new MutationObserver((mutations) => {
+        const fresh = mutations.some((mutation) =>
+          [...mutation.addedNodes].some((node) =>
+            node.nodeType === 1 && (node.matches?.(".reveal, .reveal-item") || node.querySelector?.(".reveal, .reveal-item"))));
+        if (!fresh) return;
+        window.requestAnimationFrame(() => observeReveals(document));
+      });
+      revealWatcher.observe(document.body, { childList: true, subtree: true });
+    }
   }
 
   function queueReveal(scope) {
@@ -4214,6 +4227,9 @@
     if (!scroll) return;
     record.shelved = false;
     scroll.innerHTML = record.content || "";
+    // The layer already played its entrance once; restoring it should not
+    // replay a cascade the reader has already seen.
+    scroll.querySelectorAll(".reveal, .reveal-item").forEach((element) => element.classList.add("is-in"));
     enhanceWordColumns(scroll);
     applyCacheDisplay();
     refreshCacheBorders(scroll);
