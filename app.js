@@ -1601,17 +1601,33 @@
     pending.forEach((element) => element.classList.add("is-in"));
   }
 
+  const STAGGER_MS = 55;
+
   function observeReveals(scope) {
     if (!revealObserver) return;
     const root = scope || screen;
     if (!root) return;
-    // Sections animate as one block: nested .reveal nodes settle with their
-    // parent instead of drifting in a beat later.
+    // Nested .reveal nodes ride along with their section (CSS handles it).
     root.querySelectorAll(".reveal").forEach((element) => {
       if (element.parentElement?.closest(".reveal")) element.classList.add("is-in");
     });
+    const viewport = window.innerHeight || 800;
+    let order = 0;
     root.querySelectorAll(".reveal:not(.is-in)").forEach((element) => {
-      if (!element.parentElement?.closest(".reveal")) revealObserver.observe(element);
+      if (element.parentElement?.closest(".reveal")) return;
+      const rect = element.getBoundingClientRect();
+      // Anything already on the first screen cascades top-to-bottom, one beat
+      // after another; everything below waits for the observer.
+      if (rect.top < viewport * 0.92) {
+        const delay = order * STAGGER_MS;
+        order += 1;
+        window.setTimeout(() => {
+          element.style.transitionDelay = "0ms";
+          element.classList.add("is-in");
+        }, delay);
+      } else {
+        revealObserver.observe(element);
+      }
     });
     root.querySelectorAll(".reveal-item:not(.is-in)").forEach((element) => {
       revealObserver.observe(element);
