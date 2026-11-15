@@ -3775,7 +3775,7 @@
     const showGen = state.settings?.showGenMeta !== false;
     const gen = word.gen || null;
     const genChip = showGen && gen && !word.cached ? genMetaChipHtml(gen) : "";
-    const genFooter = showGen && gen && word.cached ? `<p class="page-gen-note">生成模型 · ${esc(gen.model || "—")}</p>` : "";
+    const genFooter = showGen && gen && word.cached ? `<p class="page-gen-note">By ${esc(gen.model || "—")}</p>` : "";
     let blockNo = 0;
     const nextNo = () => String(++blockNo).padStart(2, "0");
     const bookmark = `word:${normalizeWord(word.word)}`;
