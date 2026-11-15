@@ -3793,8 +3793,8 @@
     return `
       ${header}
       <main class="result-page">
-        ${word.spelling ? spellingBanner(word.spelling) : ""}
         <section class="result-hero">
+          ${word.spelling ? spellingBanner(word.spelling) : ""}
           <div class="result-kicker reveal" style="--d:0">
             <span class="kicker-pill accent">单词</span>
             <span class="kicker-pill">${esc(word.level)}</span>

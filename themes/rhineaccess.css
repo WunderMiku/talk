@@ -411,10 +411,7 @@
 }
 
 [data-theme="rhineaccess"] .theme-manifesto::after {
-  content: "▌";
-  margin-left: 6px;
-  color: var(--ra-green);
-  animation: ra-blink 1s steps(1) infinite;
+  content: none;
 }
 
 [data-theme="rhineaccess"] .theme-manifesto {

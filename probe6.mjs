@@ -1,0 +1,35 @@
+import { chromium } from "playwright";
+import { startServer } from "./tests/lib/server.mjs";
+import { readFileSync } from "node:fs";
+const server = await startServer();
+const word = JSON.parse(readFileSync("tests/fixtures/word-obfuscate.json", "utf8"));
+const browser = await chromium.launch({ args: ["--no-sandbox"] });
+const ctx = await browser.newContext({ viewport: { width: 1366, height: 1024 }, serviceWorkers: "block" });
+await ctx.addInitScript(() => {
+  localStorage.setItem("talk.theme.v1", "rhineaccess");
+  localStorage.setItem("talk.model.v1", JSON.stringify({ remember: true, baseUrl: "https://stub.local/v1", apiKey: "sk-test-1234567890", model: "mock-model", activeProfileId: "stub", profiles: [{ id: "stub", name: "stub", baseUrl: "https://stub.local/v1", apiKey: "sk-test-1234567890", model: "mock-model", protocol: "openai" }] }));
+});
+const page = await ctx.newPage();
+await page.route("https://stub.local/**", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ choices: [{ message: { content: JSON.stringify(word) } }], usage: { total_tokens: 460 } }) }));
+await page.goto(server.origin + "/", { waitUntil: "domcontentloaded" });
+await page.waitForSelector(".screen");
+await page.fill("#search-input", "obfuscate"); await page.press("#search-input", "Enter");
+await page.waitForSelector(".result-page", { timeout: 15000 }); await page.waitForTimeout(700);
+await page.goBack(); await page.waitForTimeout(400);
+await page.fill("#search-input", "obfuscate"); await page.press("#search-input", "Enter");
+await page.waitForSelector(".result-page", { timeout: 15000 }); await page.waitForTimeout(1200);
+const info = await page.evaluate(() => {
+  const s = document.querySelector(".screen");
+  s.scrollTop = s.scrollHeight;
+  const n = document.querySelector(".page-gen-note");
+  const m = document.querySelector(".theme-manifesto");
+  const pick = (el) => { if (!el) return null; const cs = getComputedStyle(el); return { t: cs.transform, rotate: cs.rotate, fs: cs.fontStyle, ff: cs.fontFamily.slice(0, 40), r: el.getBoundingClientRect().toJSON() }; };
+  return { note: pick(n), manifesto: pick(m) };
+});
+console.log(JSON.stringify(info));
+await page.waitForTimeout(600);
+await page.screenshot({ path: "preview/acc6-foot.png" });
+await page.evaluate(() => { const m = document.querySelector(".theme-manifesto"); m && m.scrollIntoView({ block: "center" }); });
+await page.waitForTimeout(500);
+await page.screenshot({ path: "preview/acc6-manifesto.png", clip: { x: 80, y: 380, width: 1200, height: 260 } });
+await browser.close(); await server.stop();

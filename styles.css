@@ -3656,6 +3656,10 @@ html.motion-ready .reveal.is-in .reveal {
    Spelling correction line
    ============================================================ */
 
+.result-hero .spelling-banner {
+  margin: 6px 0 16px;
+}
+
 .spelling-banner {
   display: flex;
   align-items: center;
@@ -7519,6 +7523,16 @@ html.motion-ready .reveal.is-in .reveal {
   .screen[data-page="word"] .spelling-banner,
   .word-layer .spelling-banner {
     grid-column: 1 / -1;
+    margin-bottom: 14px;
+  }
+
+  /* The receipt line belongs to the page, not to the left column. */
+  .screen[data-page="word"] .page-gen-note,
+  .word-layer .page-gen-note {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    margin-top: 26px;
+    text-align: right;
   }
 
   /* The two-column block cluster under the family row. */
@@ -9423,4 +9437,51 @@ html.motion-ready .reveal.reveal-soft.is-in {
   font-size: 10px;
   letter-spacing: 0.04em;
   color: var(--muted);
+}
+
+/* Very wide screens: keep the editorial column a sane width instead of
+   stretching every card across the whole monitor. */
+@media (orientation: landscape) and (min-width: 1280px) {
+  .screen {
+    width: 100%;
+    max-width: 1240px;
+    margin-inline: auto;
+  }
+}
+
+@media (orientation: landscape) and (min-width: 720px) {
+  /* Give the home grid explicit rows: hero, manifesto, then search + daily. */
+  .screen[data-page="home"] > .topbar { grid-row: 1; grid-column: 1 / -1; }
+  .screen[data-page="home"] .home-hero { grid-row: 2; grid-column: 1 / -1; }
+  .screen[data-page="home"] .theme-manifesto { grid-row: 3; grid-column: 1 / -1; }
+  .screen[data-page="home"] .search-wrap { grid-row: 4; grid-column: 1; }
+  .screen[data-page="home"] .daily-section { grid-row: 4; grid-column: 2; }
+  .screen[data-page="home"] .home-footer { grid-row: 5; grid-column: 1 / -1; }
+
+  /* The action bar should not become a 2000px black slab. */
+  .screen .page-actions,
+  .word-layer .page-actions {
+    max-width: 760px;
+  }
+}
+
+/* Beyond a desktop monitor the app itself becomes the centred window, so the
+   rail stays attached to the column it belongs to. */
+@media (min-width: 1600px) {
+  html,
+  body,
+  .stage,
+  .device {
+    background: var(--paper);
+  }
+
+  .app {
+    max-width: 1480px;
+    margin-inline: auto;
+  }
+
+  .screen {
+    max-width: none;
+    margin-inline: 0;
+  }
 }
