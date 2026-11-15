@@ -9384,3 +9384,43 @@ html.motion-ready .reveal.reveal-soft.is-in {
   display: none !important;
   content: none !important;
 }
+
+/* Generation receipt: how long the last entry took, which model wrote it, and
+   the tokens it billed. Dismissible, and hidden entirely from settings. */
+.gen-meta {
+  margin-left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.gen-meta-close {
+  border: 0;
+  background: none;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  padding: 0 2px;
+  cursor: pointer;
+  opacity: 0.7;
+}
+
+.gen-meta-close:hover,
+.gen-meta-close:focus-visible {
+  color: var(--ink);
+  opacity: 1;
+}
+
+.page-gen-note {
+  margin: 30px 0 2px;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}

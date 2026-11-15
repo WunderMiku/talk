@@ -30,7 +30,7 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel", "foldMode"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel", "foldMode", "showGenMeta"];
   const EXAMPLE_STYLE_KEY = "talk.exampleStyles.v1";
   // One table drives the prompt, the settings picker and the on-page slicing.
   const SENTENCE_LEVELS = [
@@ -235,7 +235,8 @@
     detailLevel: "standard",
     ttsEngine: "native",
     qwenTtsModel: "qwen-audio-3.1-tts-plus",
-    qwenTtsVoice: "longanhuan_v3.1"
+    qwenTtsVoice: "longanhuan_v3.1",
+    showGenMeta: true
   };
 
   const DETAIL_LEVELS = {
@@ -1153,7 +1154,7 @@
       void removeWordRecord(key);
       return null;
     }
-    return { ...hit.data, cached: true };
+    return { ...hit.data, gen: hit.gen || hit.data.gen || null, cached: true };
   }
 
   function cacheGetChunk(query) {
@@ -1224,11 +1225,11 @@
     saveReverseStore();
   }
 
-  function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard") {
+  function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard", gen = null) {
     const key = normalizeWord(word);
     if (!key || !data) return;
     const { context, ...clean } = data;
-    const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, data: clean };
+    const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, gen: gen || data.gen || null, data: clean };
     wordCache.set(key, record);
     if (wordDb) {
       wordDb.put(WORD_DB_STORE, record).catch((error) => {
@@ -1700,7 +1701,9 @@
     const cached = cacheGetWord(word.word);
     if (cached) {
       cached.examplesByTheme = merged;
-      cachePutWord(normalizeWord(word.word), cached, state.settings.detailLevel || "standard");
+      // Keep the original receipt: refilling examples must not erase when,
+      // by which model, or for how many tokens the entry was written.
+      cachePutWord(normalizeWord(word.word), cached, state.settings.detailLevel || "standard", cached.gen || null);
     }
     updateExamplesBlock(word);
   }
@@ -3753,7 +3756,26 @@
     return true;
   }
 
+  function genMetaText(gen) {
+    const parts = [];
+    const ms = Number(gen?.ms || 0);
+    if (ms > 0) parts.push(`${Math.round(ms)} ms`);
+    if (gen?.model) parts.push(String(gen.model));
+    if (gen?.tokens != null && Number(gen.tokens) > 0) parts.push(`${Number(gen.tokens).toLocaleString("zh-CN")} tok`);
+    return parts.join(" · ");
+  }
+
+  function genMetaChipHtml(gen) {
+    const text = genMetaText(gen);
+    if (!text) return "";
+    return `<span class="gen-meta" title="本次生成：耗时 · 模型 · token">${esc(text)}<button class="gen-meta-close" type="button" data-action="hide-gen-meta" aria-label="隐藏生成信息" title="关闭生成信息">×</button></span>`;
+  }
+
   function wordPage(word, layer = null) {
+    const showGen = state.settings?.showGenMeta !== false;
+    const gen = word.gen || null;
+    const genChip = showGen && gen && !word.cached ? genMetaChipHtml(gen) : "";
+    const genFooter = showGen && gen && word.cached ? `<p class="page-gen-note">生成模型 · ${esc(gen.model || "—")}</p>` : "";
     let blockNo = 0;
     const nextNo = () => String(++blockNo).padStart(2, "0");
     const bookmark = `word:${normalizeWord(word.word)}`;
@@ -3777,7 +3799,8 @@
             <span class="kicker-pill accent">单词</span>
             <span class="kicker-pill">${esc(word.level)}</span>
             <span class="kicker-pill">${esc(registerLabel(word.register))}</span>
-            <span class="cache-state-pill ${word.source === "demo" ? "is-builtin" : word.cached ? "is-cached" : "is-generated"}">${word.source === "demo" ? "内置词条" : word.cached ? "本机缓存" : "本次生成"}</span>
+            <span class="cache-state-pill ${word.source === "demo" ? "is-builtin" : word.cached ? "is-cached" : "is-generated"}">${word.source === "demo" ? "内置词条" : word.cached ? "本机缓存" : "本次生成"}</span>${genChip ? `
+            ${genChip}` : ""}
           </div>
           <h1 class="word-title" aria-label="${attr(word.word)}">${letterTitle(word.word)}</h1>
           <div class="word-subrow reveal" style="--d:1">
@@ -3916,6 +3939,7 @@
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
           ${word.source !== "demo" ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-word-cache" data-word="${attr(word.word)}">${icon("trash")} 删除缓存</button>` : ""}
         </div>
+        ${genFooter}
       </main>`;
   }
 
@@ -5786,6 +5810,13 @@
         </div>
       </div>
       <div class="setting-group">
+        <span class="settings-subhead">生成信息</span>
+        <div class="level-row">
+          <button class="level-chip${draft.showGenMeta !== false ? " active" : ""}" type="button" data-action="gen-meta" data-on="1" aria-pressed="${draft.showGenMeta !== false}">显示</button>
+          <button class="level-chip${draft.showGenMeta === false ? " active" : ""}" type="button" data-action="gen-meta" data-on="0" aria-pressed="${draft.showGenMeta === false}">隐藏</button>
+        </div>
+      </div>
+      <div class="setting-group">
         <span class="settings-subhead">例句风格</span>
         <p class="settings-note">只影响之后生成的例句</p>
         <div class="example-style-list">
@@ -6381,13 +6412,27 @@
           : detailTokens;
     const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";
+    let usage = null;
+    const addUsage = (u) => {
+      if (!u || typeof u !== "object") return;
+      const next = {
+        prompt: Number(u.prompt_tokens ?? u.promptTokenCount ?? 0) || 0,
+        completion: Number(u.completion_tokens ?? u.candidatesTokenCount ?? 0) || 0,
+        total: Number(u.total_tokens ?? u.totalTokenCount ?? 0) || 0
+      };
+      if (!next.total) next.total = next.prompt + next.completion;
+      if (!next.total) return;
+      usage = usage
+        ? { prompt: usage.prompt + next.prompt, completion: usage.completion + next.completion, total: usage.total + next.total }
+        : next;
+    };
     const startedAt = Date.now();
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     const streamOnce = () => postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
       if (typeof options.onPreview === "function") {
         try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
       }
-    });
+    }, addUsage);
     try {
       // Do not combine streaming with response_format by default: some
       // OpenAI-compatible gateways silently return one buffered JSON response
@@ -6422,6 +6467,7 @@
           throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
         }
         const json = await readJsonResponse(response);
+        addUsage(json?.usage || json?.usageMetadata);
         const message = json?.choices?.[0]?.message;
         content = message?.content;
         if (Array.isArray(content)) {
@@ -6462,6 +6508,7 @@
       const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
       if (!retry.ok) throw parseError;
       const retryJson = await readJsonResponse(retry);
+      addUsage(retryJson?.usage || retryJson?.usageMetadata);
       const retryMessage = retryJson?.choices?.[0]?.message;
       let retryContent = retryMessage?.content;
       if (Array.isArray(retryContent)) {
@@ -6496,8 +6543,9 @@
       const data = normalizeModelWord(parsed, query);
       data.source = "model";
       data.model = cfg.model;
-      cachePutWord(normalizeWord(data.word), data, detail);
-      if (normalizeWord(query) !== normalizeWord(data.word)) cachePutWord(query, data, detail);
+      data.gen = { ms: Math.max(0, Date.now() - startedAt), model: cfg.model || "", tokens: usage?.total ?? null, at: Date.now() };
+      cachePutWord(normalizeWord(data.word), data, detail, data.gen);
+      if (normalizeWord(query) !== normalizeWord(data.word)) cachePutWord(query, data, detail, data.gen);
       return { type: "word", data };
     }
     const data = normalizeModelSentence(parsed, query);
@@ -6523,7 +6571,7 @@
     return "";
   }
 
-  async function googleChatStream(cfg, messages, signal, maxTokens, onDelta) {
+  async function googleChatStream(cfg, messages, signal, maxTokens, onDelta, onUsage) {
     const url = googleModelUrl(cfg, true);
     const post = () => fetch(url, {
       method: "POST",
@@ -6551,7 +6599,9 @@
       const data = line.slice(5).trim();
       if (!data || data === "[DONE]") return;
       try {
-        const text = googleText(JSON.parse(data));
+        const parsed = JSON.parse(data);
+        if (parsed?.usageMetadata) onUsage?.(parsed.usageMetadata);
+        const text = googleText(parsed);
         if (text) {
           content += text;
           if (typeof onDelta === "function") onDelta(content);
@@ -6606,9 +6656,9 @@
     };
   }
 
-  async function postChatStream(endpoint, cfg, messages, signal, allowJsonMode, maxTokens, onDelta) {
+  async function postChatStream(endpoint, cfg, messages, signal, allowJsonMode, maxTokens, onDelta, onUsage) {
     if (isGoogleProvider(cfg)) {
-      return googleChatStream(cfg, messages, signal, maxTokens, onDelta);
+      return googleChatStream(cfg, messages, signal, maxTokens, onDelta, onUsage);
     }
     const body = {
       model: cfg.model,
@@ -6616,13 +6666,15 @@
       temperature: 0.3,
       max_tokens: maxTokens,
       stream: true,
+      stream_options: { include_usage: true },
       ...thinkingParams(cfg)
     };
     if (allowJsonMode) body.response_format = { type: "json_object" };
 
-    const send = async (withJsonMode) => {
+    const send = async (withJsonMode, withUsage = true) => {
       const payload = { ...body };
       if (!withJsonMode) delete payload.response_format;
+      if (!withUsage) delete payload.stream_options;
       return fetch(endpoint, {
         method: "POST",
         headers: {
@@ -6639,6 +6691,10 @@
     if (!response.ok && allowJsonMode && [400, 422].includes(response.status)) {
       response = await send(false);
     }
+    if (!response.ok && [400, 422].includes(response.status)) {
+      // Gateways that do not know stream_options reject the whole request.
+      response = await send(false, false);
+    }
     if (!response.ok) {
       const text = await response.text().catch(() => "");
       throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
@@ -6651,6 +6707,7 @@
         console.info("Provider returned a buffered JSON response despite stream=true.");
       }
       const json = await readJsonResponse(response, "流式接口");
+      if (json?.usage) onUsage?.(json.usage);
       const message = json?.choices?.[0]?.message;
       let content = message?.content;
       if (Array.isArray(content)) {
@@ -6681,6 +6738,7 @@
         if (!payload || payload === "[DONE]") continue;
         try {
           const json = JSON.parse(payload);
+          if (json?.usage) onUsage?.(json.usage);
           const choice = json?.choices?.[0];
           const piece = streamDeltaText(choice?.delta) || (typeof choice?.message?.content === "string" ? choice.message.content : "");
           if (piece) {
@@ -7387,6 +7445,22 @@
           chip.classList.toggle("active", active);
           chip.setAttribute("aria-pressed", String(active));
         });
+        break;
+      }
+
+      case "gen-meta": {
+        event.preventDefault();
+        const on = target.dataset.on === "1";
+        if (state.draft) state.draft.showGenMeta = on;
+        promise = scheduleSettingsCommit();
+        break;
+      }
+
+      case "hide-gen-meta": {
+        event.preventDefault();
+        state.settings = { ...(state.settings || {}), showGenMeta: false };
+        persistSettings(state.settings);
+        refreshThemedPage();
         break;
       }
 

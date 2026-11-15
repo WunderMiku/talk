@@ -58,3 +58,38 @@ suite("dictionary · word lookup", { timeout: 45_000 }, (s) => {
     t.expect(await page.locator(".word-layer").count()).toBe(1);
   });
 });
+
+suite("dictionary · generation receipt", { timeout: 45_000 }, (s) => {
+  s.beforeAll(async (state) => {
+    state.env = await startEnv();
+    state.env.server.mock.setFallback("word", { fixture: "word-obfuscate" });
+    state.env.server.mock.setFallback("themes", { fixture: "theme-min" });
+  });
+
+  s.afterAll(async (state) => {
+    if (state.env) await state.env.close();
+  });
+
+  s.test("shows ms, model and tokens once, then the model at the foot of a cached page", async (state, t) => {
+    const page = await state.env.newPage();
+    await page.open("/");
+    await page.fill("#search-input", "obfuscate");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("word");
+
+    const meta = await page.textContent(".gen-meta");
+    t.expect(meta).toContain("ms");
+    t.expect(meta).toContain("mock-model");
+    t.expect(meta).toContain("tok");
+    t.expect(await page.locator(".page-gen-note").count()).toBe(0);
+
+    const before = state.env.server.mock.requestsOf("word").length;
+    await page.open("/");
+    await page.fill("#search-input", "obfuscate");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("word");
+    t.expect(state.env.server.mock.requestsOf("word").length).toBe(before);
+    t.expect(await page.locator(".gen-meta").count()).toBe(0);
+    t.expect(await page.textContent(".page-gen-note")).toContain("mock-model");
+  });
+});

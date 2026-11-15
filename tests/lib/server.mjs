@@ -480,7 +480,18 @@ export class MockServer {
       write(`${frameFor(chunks[index])}${frameSep}`);
       if (respond.frameDelayMs) await sleep(respond.frameDelayMs);
     }
-    if (!respond.omitDone && !google) write(`data: [DONE]${frameSep}`);
+    if (!respond.omitDone && !google) {
+      // Mirror OpenAI's include_usage frame so the client can bill the call.
+      write(`data: ${JSON.stringify({
+        id: "chatcmpl-mock",
+        object: "chat.completion.chunk",
+        created: 1_700_000_000,
+        model: record.model || "mock",
+        choices: [],
+        usage: { prompt_tokens: 120, completion_tokens: 340, total_tokens: 460 },
+      })}${frameSep}`);
+      write(`data: [DONE]${frameSep}`);
+    }
     res.end();
   }
 }
