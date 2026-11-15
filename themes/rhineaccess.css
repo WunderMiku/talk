@@ -737,3 +737,17 @@
   background: rgba(200, 62, 40, 0.18);
   box-shadow: 2px 2px 0 rgba(19, 19, 19, 0.9), 0 0 14px rgba(200, 62, 40, 0.35);
 }
+
+/* Masthead labels sit on the black bar: muted greys on ink read as smeared,
+   so lift them to paper and give the tiny caps a little more air. */
+[data-theme="rhineaccess"] .poster-masthead .poster-brand-section,
+[data-theme="rhineaccess"] .poster-masthead .poster-edition {
+  color: color-mix(in srgb, var(--paper) 86%, transparent);
+  font-size: 8px;
+  letter-spacing: 0.12em;
+}
+
+[data-theme="rhineaccess"] .poster-masthead .poster-nav button {
+  color: inherit;
+  border-color: color-mix(in srgb, var(--paper) 42%, transparent);
+}

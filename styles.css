@@ -9434,8 +9434,9 @@ html.motion-ready .reveal.reveal-soft.is-in {
   margin: 30px 0 2px;
   text-align: right;
   font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.04em;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
   color: var(--muted);
 }
 
