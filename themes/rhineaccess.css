@@ -751,3 +751,10 @@
   color: inherit;
   border-color: color-mix(in srgb, var(--paper) 42%, transparent);
 }
+
+/* The wordmark inherited ink and vanished into the ink bar, which made the
+   section label look pushed toward the middle. Keep it on paper. */
+[data-theme="rhineaccess"] .poster-masthead .poster-brand-mark {
+  color: var(--paper);
+  letter-spacing: -0.02em;
+}
