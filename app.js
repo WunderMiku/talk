@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "234"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "235"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4291,7 +4291,9 @@
           <div class="reverse-turn reverse-turn-mine reveal" style="--d:0">
             <div class="reverse-bubble">${esc(result.text)}</div>
           </div>
-          <article class="reverse-narrative reveal" style="--d:0.12">${renderAnchoredText(result.narrative, result.cards || {})}</article>
+          <article class="reverse-narrative reveal" style="--d:0.12">${result.pending
+            ? `<p class="desk-lead" id="reverse-stream">正在组织语言…</p>`
+            : renderAnchoredText(result.narrative, result.cards || {})}</article>
           <div class="reverse-actions reveal" style="--d:0.2">
             ${(result.followups || []).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
             <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
@@ -4342,7 +4344,7 @@
 
   function reversePage(result) {
     const copy = copyFor("reverse");
-    if (result.narrative) return reverseAnnotatedPage(result);
+    if (result.narrative || result.pending) return reverseAnnotatedPage(result);
     const paradigms = copy.paradigms || { word: "词", chunk: "意群", sentence: "句" };
     return `
       ${backTopbar({ label: copy.label || "语境寻词", title: "选词手记" })}
@@ -6545,8 +6547,12 @@
     const type = requestedMode === "auto" ? detectParadigm(query) : requestedMode;
     state.lastAttempt = { query, type };
     const token = ++state.searchSeq;
-    navigate({ name: "loading", query, type });
-    startLoadingStatus(type);
+    if (type === "reverse" && hasModelConfig()) {
+      navigate({ name: "reverse", query, pending: true, result: { text: query, narrative: "", cards: {}, pending: true } });
+    } else {
+      navigate({ name: "loading", query, type });
+      startLoadingStatus(type);
+    }
 
     try {
       let result;
@@ -7235,6 +7241,11 @@
     const skeleton = $(".skeleton-stack");
     if (skeleton) skeleton.classList.add("is-streaming");
     if (preview.kind === "reverse") {
+      const stream = $("#reverse-stream");
+      if (stream) {
+        stream.textContent = preview.narrative;
+        return;
+      }
       host.innerHTML = `
         <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
         <p class="live-preview-narrative">${esc(preview.narrative)}</p>`;

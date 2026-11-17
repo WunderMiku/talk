@@ -10220,3 +10220,8 @@ html.motion-ready .reveal.reveal-soft.is-in {
   font-size: 16px;
   line-height: 1.7;
 }
+
+.reverse-composer {
+  position: fixed;
+  bottom: 14px;
+}
