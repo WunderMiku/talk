@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "229"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "230"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -6751,7 +6751,7 @@
       const retryTokens = Math.min(outputCeiling(cfg), Math.round(maxTokens * 1.5));
       const retryMessages = messages.concat([{
         role: "user",
-        content: "上一次输出在中途被截断了（或几乎没有内容）。请保持同样的详细程度重写，但务必输出完整闭合的 JSON：如果确实太长，只省略 family/synonyms/antonyms 里的嵌套细节，不要删掉义项、句子分析或重点词。"
+        content: '上一次输出不是合法 JSON（常见原因：字符串里出现未转义的双引号或真实换行，或者中途被截断）。请重写：所有字符串内的双引号必须转义，不要输出换行符；保持同样的详细程度，但务必输出完整闭合的 JSON；如果确实太长，只省略 family/synonyms/antonyms 里的嵌套细节，不要删掉义项、句子分析或重点词。'
       }]);
       const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
       if (!retry.ok) throw parseError;
