@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "228"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "229"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -83,7 +83,11 @@
       `model ${redact(state.settings?.model || "")} · ${redact(state.settings?.baseUrl || "")}`
     ].join("\n");
     const body = list.map((e) => `${e.at} ${e.level.toUpperCase()} ${e.code} · ${e.message}${e.meta && e.meta !== "{}" ? " · " + e.meta : ""}`).join("\n");
-    return head + "\n" + body;
+    const raw = state.lastModelRaw;
+    const rawBlock = raw
+      ? `\n\n--- last model reply (${raw.type} · ${raw.detail} · ${raw.chars} chars${raw.cut ? ", truncated" : ""}) ---\n${redact(raw.text)}`
+      : "";
+    return head + "\n" + body + rawBlock;
   }
   window.addEventListener("error", (event) => diagLog("error", "window", event.message || "script error", { source: event.filename, line: event.lineno }));
   window.addEventListener("unhandledrejection", (event) => {
@@ -6725,6 +6729,13 @@
     }
     if (!content) throw new Error("模型返回了空消息。");
     diagLog("info", "model.content", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
+    state.lastModelRaw = {
+      type,
+      detail,
+      chars: content.length,
+      cut: content.length > 2400,
+      text: String(content).slice(0, 2400)
+    };
     let parsed;
     let retryLength = null;
     const emptyish = content.trim().length < 12;
