@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "224"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "225"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -6963,7 +6963,7 @@
     if (skeleton) skeleton.classList.add("is-streaming");
     if (type === "sentence") {
       host.innerHTML = `
-        <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 已收 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
+        <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
         <h2 class="live-preview-word">${esc(shorten(preview.text || "", 80))}</h2>
         ${preview.tone ? `<span class="live-preview-meta">${esc(preview.tone)}</span>` : ""}
         ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理译文…</p>`}
@@ -6971,7 +6971,7 @@
       return;
     }
     host.innerHTML = `
-      <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 已收 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
+      <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
       <h2 class="live-preview-word">${esc(preview.word || "")}</h2>
       <div class="live-preview-meta">${esc(preview.phonetic || "")}${preview.pos ? ` · ${esc(posLabel(preview.pos))}` : ""}</div>
       ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理第一段…</p>`}
