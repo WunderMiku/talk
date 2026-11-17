@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "231"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "232"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4285,7 +4285,10 @@
     if (!pop || pop.hidden) return;
     pop.hidden = true;
     pop.innerHTML = "";
-    $$(".anchor[aria-expanded='true']").forEach((el) => el.setAttribute("aria-expanded", "false"));
+    $$(".anchor[aria-expanded='true']").forEach((el) => {
+      el.setAttribute("aria-expanded", "false");
+      el.classList.remove("is-active");
+    });
   }
 
   function openDecisionPopover(button) {
@@ -4300,22 +4303,16 @@
     if (same) return;
     pop.dataset.anchor = id;
     pop.innerHTML = `
-      <div class="popover-head">
-        <span class="popover-vibe">${esc(card.vibe || "")}</span>
-        <button class="popover-drill" type="button" data-action="anchor-drill" data-type="${attr(card.type || button.dataset.type || "chunk")}" data-text="${attr(card.text || button.dataset.text || "")}" aria-label="查看完整档案">↗</button>
+      <div class="dock-line">
+        <span class="dock-text">${esc(card.text || button.dataset.text || "")}</span>
+        ${card.vibe ? `<span class="dock-vibe">${esc(card.vibe)}</span>` : ""}
+        <button class="dock-drill" type="button" data-action="anchor-drill" data-type="${attr(card.type || button.dataset.type || "chunk")}" data-text="${attr(card.text || button.dataset.text || "")}" aria-label="查看完整档案">↗</button>
+        <button class="dock-close" type="button" data-action="anchor-close" aria-label="收起">×</button>
       </div>
-      <p class="popover-verdict">${esc(card.verdict || "")}</p>`;
+      <p class="dock-verdict">${esc(card.verdict || "")}</p>`;
     pop.hidden = false;
     button.setAttribute("aria-expanded", "true");
-    const rect = button.getBoundingClientRect();
-    const width = Math.min(240, window.innerWidth - 24);
-    const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
-    const popHeight = pop.offsetHeight || 96;
-    let top = rect.bottom + 8;
-    if (top + popHeight > window.innerHeight - 12) top = Math.max(12, rect.top - popHeight - 8);
-    pop.style.left = `${left}px`;
-    pop.style.top = `${top}px`;
-    pop.style.width = `${width}px`;
+    button.classList.add("is-active");
   }
 
   function reversePage(result) {
@@ -6871,7 +6868,8 @@
       text: String(content).slice(0, 2400)
     };
 
-    if (type === "reverse") {
+    const annotatedProtocol = /<(?:s|c|w)\s+id=|```json:cards/.test(content);
+    if (type === "reverse" && annotatedProtocol) {
       const annotated = parseAnnotatedStream(content);
       const data = ensureReverse(annotated, query);
       data.source = "model";
@@ -7694,6 +7692,12 @@
         event.preventDefault();
         const anchor = target.closest("[data-action='anchor-open']");
         if (anchor) openDecisionPopover(anchor);
+        break;
+      }
+
+      case "anchor-close": {
+        event.preventDefault();
+        closeDecisionPopover();
         break;
       }
 
