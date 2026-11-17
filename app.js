@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "236"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "237"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4295,7 +4295,16 @@
               return `<div class="reverse-turn reverse-turn-mine"><div class="reverse-bubble">${esc(turn.text)}</div></div>`;
             }
             if (turn.pending) {
-              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-lead" id="reverse-stream">正在组织语言…</p></article>`;
+              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}">
+                <div class="reverse-typing" id="reverse-typing">
+                  <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                  <p class="desk-lead" id="reverse-stream">正在组织语言</p>
+                </div>
+                <div class="typing-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
+              </article>`;
+            }
+            if (turn.typing) {
+              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-lead" id="reverse-stream">${esc(turn.typingText || "")}</p></article>`;
             }
             if (turn.error) {
               return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-note">${esc(turn.error)}</p></article>`;
@@ -4305,6 +4314,7 @@
           ${last?.role === "assistant" && !last.pending && !last.error ? `
             <div class="reverse-actions">
               ${(last.result.followups || []).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
+              <button class="reverse-action" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
               <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
             </div>
             <p class="reverse-hint">点画线的片段，看语气判断；↗ 进完整档案。</p>` : ""}
@@ -4334,6 +4344,61 @@
     if (stickToBottom) screen.scrollTop = screen.scrollHeight;
   }
 
+  function plainNarrative(value) {
+    return String(value || "")
+      .replace(/```json:cards[\s\S]*$/i, "")
+      .replace(/<\s*\/?\s*[scw]\b[^>]*>/gi, "")
+      .trim();
+  }
+
+  async function typeReverse(placeholder, data) {
+    placeholder.pending = false;
+    placeholder.result = data;
+    placeholder.typing = true;
+    placeholder.typingText = "";
+    redrawReverse();
+    const text = plainNarrative(data.narrative);
+    const stream = $("#reverse-stream");
+    if (!stream || !text) {
+      placeholder.typing = false;
+      redrawReverse();
+      return;
+    }
+    const step = Math.max(1, Math.ceil(text.length / 55));
+    await new Promise((done) => {
+      let index = 0;
+      const tick = () => {
+        index = Math.min(text.length, index + step);
+        stream.textContent = text.slice(0, index);
+        if (index < text.length) setTimeout(tick, 16);
+        else done();
+      };
+      tick();
+    });
+    placeholder.typing = false;
+    redrawReverse();
+  }
+
+  async function regenerateReverse() {
+    const thread = state.reverseThread || [];
+    const user = [...thread].reverse().find((turn) => turn.role === "user");
+    if (!user) return;
+    if (thread[thread.length - 1]?.role === "assistant") thread.pop();
+    const placeholder = { role: "assistant", pending: true };
+    thread.push(placeholder);
+    redrawReverse();
+    const onPreview = (preview) => updateStreamPreview(preview, "reverse");
+    try {
+      const result = await modelLookup(user.text, "reverse", state.settings, { onPreview, skipCache: true });
+      result.data.text = result.data.text || user.text;
+      await typeReverse(placeholder, result.data);
+    } catch (error) {
+      placeholder.pending = false;
+      placeholder.error = error?.message || "这次没有写完，再试一次。";
+      redrawReverse();
+    }
+  }
+
   async function askReverseFollowUp(text) {
     const query = String(text || "").trim();
     if (!query) return;
@@ -4345,10 +4410,8 @@
     const onPreview = (preview) => updateStreamPreview(preview, "reverse");
     try {
       const result = await modelLookup(query, "reverse", state.settings, { onPreview });
-      placeholder.pending = false;
-      placeholder.result = result.data;
-      placeholder.result.text = placeholder.result.text || query;
-      redrawReverse();
+      result.data.text = result.data.text || query;
+      await typeReverse(placeholder, result.data);
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
@@ -6830,7 +6893,7 @@
       const cached = cacheGetChunk(query);
       if (cached) return { type: "chunk", data: cached };
     }
-    if (type === "reverse") {
+    if (type === "reverse" && !options.skipCache) {
       const cached = reverseStore[reverseIdFor(query)];
       if (cached?.result) return { type: "reverse", data: cached.result };
     }
@@ -7299,6 +7362,8 @@
       if (stream) {
         const next = preview.narrative || "";
         if (stream.textContent !== next) stream.textContent = next;
+        const wrap = stream.closest(".reverse-typing");
+        if (wrap) wrap.classList.toggle("has-text", Boolean(next.trim()));
         return;
       }
     }
@@ -7842,6 +7907,10 @@
         break;
       }
 
+      case "reverse-regen": {
+        void regenerateReverse();
+        break;
+      }
       case "reverse-follow": {
         event.preventDefault();
         void askReverseFollowUp(target.dataset.prompt || "");
