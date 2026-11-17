@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "226"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "227"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -86,7 +86,13 @@
     return head + "\n" + body;
   }
   window.addEventListener("error", (event) => diagLog("error", "window", event.message || "script error", { source: event.filename, line: event.lineno }));
-  window.addEventListener("unhandledrejection", (event) => diagLog("error", "promise", event.reason?.message || String(event.reason || "")));
+  window.addEventListener("unhandledrejection", (event) => {
+    const message = event.reason?.message || String(event.reason || "");
+    // Starting a new view transition aborts the previous one; that rejection is
+    // expected and would otherwise drown the diagnostics in noise.
+    if (/Transition was (skipped|aborted)/i.test(message)) return;
+    diagLog("error", "promise", message);
+  });
 
   // Sentences now carry a summary, a parse tree and level-tagged key words,
   // which no longer fits in the old per-detail ceiling.
@@ -480,6 +486,8 @@
   let ttsAudio = null;
   let suppressNextPopstate = false;
   const SILENT_AUDIO = "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+
+  let activeViewTransition = null;
 
   const state = {
     mode: "auto",
@@ -1898,8 +1906,14 @@
     };
 
     if (!instant && !reduceMotion && document.startViewTransition) {
+      if (activeViewTransition) {
+        apply();
+        return;
+      }
       try {
-        document.startViewTransition(apply);
+        const transition = document.startViewTransition(apply);
+        activeViewTransition = transition;
+        transition.finished.catch(() => {}).finally(() => { activeViewTransition = null; });
         return;
       } catch (_) {
         /* Fall through to the static render. */
@@ -6661,7 +6675,7 @@
       // when both are present. The static prompt already requires JSON.
       content = await streamOnce();
     } catch (error) {
-      diagLog("error", "model.fail", error?.message || String(error), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
+      diagLog("error", "model.fail", timedOut ? "请求超时（60 秒）" : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
       // Mobile networks drop long streams and gateways sometimes cut our 60s
       // deadline. Both are worth one silent retry with a fresh signal.
       const retriable = timedOut || error?.name !== "AbortError" || /不是 JSON|空响应|Failed to fetch|network error/i.test(String(error?.message || ""));
@@ -6696,7 +6710,7 @@
           content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
         }
       }
-      if (!content) throw error;
+      if (!content) throw timedOut ? new Error("请求超时（60 秒），网关没有返回内容，可以重试或换一个模型。") : error;
     } finally {
       window.clearTimeout(timer);
     }
@@ -6722,6 +6736,7 @@
       // A truncated answer is the most common cause here: retry once with a
       // larger ceiling instead of showing a raw JSON error to the reader.
       if (!emptyish && !/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
+      armDeadline();
       const retryTokens = Math.min(outputCeiling(cfg), Math.round(maxTokens * 1.5));
       const retryMessages = messages.concat([{
         role: "user",
