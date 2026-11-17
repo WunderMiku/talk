@@ -5778,7 +5778,7 @@
     const name = String(read("name") ?? previous.name ?? "").trim();
     return {
       id: previous.id || `channel-${Date.now()}`,
-      name: name || profileHost({ baseUrl }),
+      name,
       protocol: previous.protocol || "openai",
       provider: previous.provider || ((previous.protocol === "google") ? "google" : "custom"),
       baseUrl,
@@ -5788,6 +5788,16 @@
       note: previous.note || "",
       isNew: Boolean(previous.isNew)
     };
+  }
+
+  const CHANNEL_PICKS = {
+    google: ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+    openai: ["deepseek-chat", "gpt-4o-mini", "qwen3.7-flash", "moonshot-v1-8k"]
+  };
+
+  function channelPicks(profile, models) {
+    const picks = CHANNEL_PICKS[(profile.protocol || "openai") === "google" ? "google" : "openai"] || [];
+    return picks.filter((id) => models.includes(id));
   }
 
   function openProviderSheet(profileId) {
@@ -5832,6 +5842,10 @@
             ${(d.models || []).map((id) => `<option value="${attr(id)}"></option>`).join("")}
           </datalist>
           <p class="provider-hint">${(d.models || []).length ? `${d.models.length} 个可用模型` : "填好地址与密钥后点「获取模型」"}</p>
+          ${channelPicks(d, d.models || []).length ? `<div class="provider-picks">${channelPicks(d, d.models || []).map((id, index) => `<button class="provider-pick ${index === 0 ? "primary" : ""}" type="button" data-action="provider-pick" data-model="${attr(id)}">${esc(id)}${index === 0 ? " · 推荐" : ""}</button>`).join("")}</div>` : ""}
+          ${(d.models || []).length ? `<div class="provider-models" role="listbox" aria-label="可选模型">
+            ${d.models.map((id) => `<button class="provider-model-option ${id === d.model ? "is-current" : ""}" type="button" role="option" aria-selected="${id === d.model}" data-action="provider-pick" data-model="${attr(id)}">${esc(id)}</button>`).join("")}
+          </div>` : ""}
         </div>
         <p class="provider-status ${status.tone || ""}">${esc(status.text || "先获取模型，再点测试确认能连通。")}</p>
         <div class="provider-actions">
@@ -7847,6 +7861,15 @@
         break;
       }
 
+      case "provider-pick":
+        event.preventDefault();
+        if (state.providerDraft && target.dataset.model) {
+          state.providerDraft.model = target.dataset.model;
+          const input = $('[data-provider-field="model"]');
+          if (input) input.value = target.dataset.model;
+        }
+        break;
+
       case "provider-fetch": {
         event.preventDefault();
         const profile = readProviderForm(state.providerDraft);
@@ -7888,6 +7911,7 @@
         if (!profile.baseUrl || !profile.model) { toast("地址与模型都要填"); break; }
         const clean = { ...profile };
         delete clean.isNew;
+        if (!clean.name) clean.name = profileHost(clean);
         const draft = state.draft;
         const index = draft.profiles.findIndex((item) => item.id === clean.id);
         if (index >= 0) draft.profiles[index] = clean;

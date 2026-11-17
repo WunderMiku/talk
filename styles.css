@@ -9666,3 +9666,65 @@ html.motion-ready .reveal.reveal-soft.is-in {
   align-self: flex-start;
   margin-top: 4px;
 }
+
+.provider-picks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.provider-pick {
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.provider-pick.primary {
+  border-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.provider-pick:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.provider-models {
+  display: flex;
+  flex-direction: column;
+  max-height: 232px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  overscroll-behavior: contain;
+}
+
+.provider-model-option {
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: none;
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.provider-model-option:last-child { border-bottom: 0; }
+
+.provider-model-option:hover { color: var(--ink); background: var(--card-soft, rgba(0,0,0,.03)); }
+
+.provider-model-option.is-current {
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
