@@ -10174,3 +10174,16 @@ html.motion-ready .reveal.reveal-soft.is-in {
   background: var(--ink);
   color: var(--paper);
 }
+
+.reverse-thread {
+  animation: desk-in 260ms var(--ease-out) both;
+}
+
+@keyframes desk-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reverse-thread { animation: none; }
+}

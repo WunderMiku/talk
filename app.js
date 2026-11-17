@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "232"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "233"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3657,7 +3657,14 @@
       }
     }
     const order = Array.from(narrative.matchAll(/<([scw])\s+id="([^"]+)"/g)).map((match) => match[2]);
-    return { narrative: narrative.trim(), cards, order, phase: at === -1 ? "narrative" : ok ? "ready" : "cards" };
+    let followups = [];
+    if (ok) {
+      const rawFollowups = Array.isArray(cards.followups) ? cards.followups : Array.isArray(cards._followups) ? cards._followups : [];
+      followups = rawFollowups.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3);
+      delete cards.followups;
+      delete cards._followups;
+    }
+    return { narrative: narrative.trim(), cards, order, followups, phase: at === -1 ? "narrative" : ok ? "ready" : "cards" };
   }
 
   function renderAnchoredText(narrative, cards) {
@@ -3717,6 +3724,7 @@
       text: source,
       narrative,
       cards,
+      followups: Array.isArray(raw?.followups) ? raw.followups : [],
       order,
       overview: String(raw?.overview || "").trim(),
       candidates,
@@ -4267,8 +4275,7 @@
           </div>
           <article class="reverse-narrative reveal" style="--d:0.12">${renderAnchoredText(result.narrative, result.cards || {})}</article>
           <div class="reverse-actions reveal" style="--d:0.2">
-            <button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="换一个更委婉的说法">换个更委婉的词</button>
-            <button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="放在雅思作文里怎么改？">放在雅思作文里怎么改？</button>
+            ${(result.followups || []).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
             <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
           </div>
           <p class="reverse-hint">点画线的片段，看语气判断；↗ 进完整档案。</p>
@@ -7167,8 +7174,15 @@
   function streamPreviewFromJson(text, type, query) {
     if (type === "reverse") {
       const partial = parseAnnotatedStream(text);
-      if (!partial.narrative) return null;
-      return { kind: "reverse", narrative: partial.narrative, received: String(text).length };
+      let clean = String(partial.narrative || "")
+        .replace(/```[\s\S]*$/, "")
+        .replace(/<([scw])\b[^>]*>([\s\S]*?)<\/\1>/g, "$2");
+      // A half-arrived tag must never surface as `w1">` gibberish in the preview.
+      const dangling = clean.indexOf("<");
+      if (dangling !== -1) clean = clean.slice(0, dangling);
+      clean = clean.replace(/[{}]/g, "").trim();
+      if (!clean || /"type"\s*:|"verdict"\s*:/.test(clean)) return null;
+      return { kind: "reverse", narrative: clean, received: String(text).length };
     }
     if (type === "chunk") return null;
     if (type === "sentence") {

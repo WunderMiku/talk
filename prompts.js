@@ -244,7 +244,7 @@ Few-shot（只示意字段与语气）：
 - <w id="w1">单个核心词眼</w>
 全篇标签总数 3–5 个，id 不重复，每个 id 只出现一次；标签外只写中文。
 
-【第二段】紧接正文空一行，输出一个语言标记为 json:cards 的代码块，内容是 {id: {type, text, vibe, verdict}}，key 必须与正文标签 id 一一对应：
+【第二段】紧接正文空一行，输出一个语言标记为 json:cards 的代码块，内容是 {id: {type, text, vibe, verdict}, "followups": ["追问1", "追问2"]}，key 必须与正文标签 id 一一对应；followups 是两条针对本次输入的具体追问（6–14 个汉字，不要写死套话）：
 - type：sentence | chunk | word
 - text：与标签内英文逐字一致
 - vibe：4–7 个字的语气/文体标签（如「学术硬核 · 极强」「委婉书面」）
