@@ -379,40 +379,27 @@
 
 
   function defaultModelProfiles() {
-    return MODEL_PRESETS.map((preset) => ({
-      ...preset,
-      protocol: preset.protocol || "openai",
-      templateId: preset.id,
-      apiKey: "",
-      thinkingCapable: Boolean(preset.thinkingCapable),
-      enableThinking: Boolean(preset.enableThinking),
-      thinkingBudget: Number(preset.thinkingBudget) || 0
-    }));
+    return [];
   }
 
   function legacyModelProfiles(parsed = {}) {
-    const profiles = defaultModelProfiles();
     const baseUrl = String(parsed.baseUrl || "").trim();
     const model = String(parsed.model || "").trim();
     const apiKey = String(parsed.apiKey || "");
-    if (!baseUrl && !model && !apiKey) return { profiles, activeProfileId: profiles[0].id };
-    const matched = profiles.find((profile) => profile.baseUrl && profile.baseUrl === baseUrl);
-    if (matched) {
-      matched.baseUrl = baseUrl;
-      matched.model = model || matched.model;
-      matched.apiKey = apiKey;
-      return { profiles, activeProfileId: matched.id };
-    }
-    profiles.unshift({
-      id: "legacy-custom",
-      name: "我的配置",
-      provider: parsed.provider || "custom",
-      baseUrl,
-      model,
-      apiKey,
-      note: "从旧版单配置迁移而来。"
-    });
-    return { profiles, activeProfileId: "legacy-custom" };
+    if (!baseUrl && !model && !apiKey) return { profiles: [], activeProfileId: "" };
+    return {
+      profiles: [{
+        id: "legacy-custom",
+        name: "我的配置",
+        provider: parsed.provider || "custom",
+        protocol: String(baseUrl).includes("generativelanguage") ? "google" : "openai",
+        baseUrl,
+        model,
+        apiKey,
+        note: "从旧版单配置迁移而来。"
+      }],
+      activeProfileId: "legacy-custom"
+    };
   }
 
   function normalizeModelProfiles(raw, parsed = {}) {
@@ -437,7 +424,14 @@
         thinkingBudget: Math.max(0, Math.min(262144, Number(profile.thinkingBudget) || 0))
       };
     });
-    return { profiles, activeProfileId: String(parsed.activeProfileId || profiles[0].id) };
+    const active = String(parsed.activeProfileId || profiles[0]?.id || "");
+    const kept = profiles.filter((profile) => {
+      const preset = MODEL_PRESETS.some((item) => item.id === profile.id);
+      if (!preset) return true;
+      if (profile.id === active) return true;
+      return Boolean(String(profile.apiKey || "").trim());
+    });
+    return { profiles: kept, activeProfileId: kept.some((item) => item.id === active) ? active : (kept[0]?.id || "") };
   }
 
   function activeProfile(settings) {
@@ -864,10 +858,10 @@
       cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
       qwenTtsModel: preferences.qwenTtsModel || parsed.qwenTtsModel || "qwen-audio-3.1-tts-plus",
       qwenTtsVoice: preferences.qwenTtsVoice || parsed.qwenTtsVoice || "longanhuan_v3.1",
-      enableThinking: Boolean(selected.enableThinking),
-      thinkingBudget: Number(selected.thinkingBudget) || 0,
+      enableThinking: Boolean(selected?.enableThinking),
+      thinkingBudget: Number(selected?.thinkingBudget) || 0,
       profiles: normalized.profiles,
-      activeProfileId: selected.id
+      activeProfileId: selected?.id || ""
     }, selected);
   }
 
@@ -5375,24 +5369,6 @@
     openKeyLayer(index);
   }
 
-  function openTemplatePicker() {
-    openSheetShell({ kicker: "MODEL TEMPLATES", title: "从模板新建配置" });
-    const body = $("#sheet-scroll", overlayRoot);
-    if (!body) return;
-    body.innerHTML = `
-      <div class="template-list">
-        ${PROVIDER_TEMPLATES.map((template) => `
-          <button class="template-row" type="button" data-action="new-from-template" data-template="${attr(template.id)}">
-            <span class="template-head">
-              <strong>${esc(template.name)}</strong>
-              <span class="template-badge">${template.protocol === "google" ? "Gemini" : "OpenAI 兼容"}</span>
-            </span>
-            <span class="template-url mono">${esc(template.baseUrl || "自行填写地址")}</span>
-            <span class="template-note">${esc(template.note || "")}</span>
-          </button>`).join("")}
-      </div>`;
-  }
-
   function openSheetShell({ kicker, title }) {
     state.sheetOpenedAt = performance.now();
     if (state.sheetCloseTimer) {
@@ -5800,13 +5776,42 @@
     return picks.filter((id) => models.includes(id));
   }
 
-  function openProviderSheet(profileId) {
+  function openProviderPicker() {
+    openSheetShell({ kicker: "MODEL SETUP", title: "选择供应商" });
+    const body = $("#sheet-scroll", overlayRoot);
+    if (!body) return;
+    body.innerHTML = `
+      <div class="template-list">
+        ${PROVIDER_TEMPLATES.map((template) => `
+          <button class="template-row" type="button" data-action="provider-template" data-template="${attr(template.id)}">
+            <span class="template-head">
+              <strong>${esc(template.name)}</strong>
+              <span class="template-badge">${(template.protocol || "openai") === "google" ? "Gemini" : "OpenAI 兼容"}</span>
+            </span>
+            <span class="template-url mono">${esc(template.baseUrl || "自行填写地址")}</span>
+            <span class="template-note">${esc(template.note || "")}</span>
+          </button>`).join("")}
+      </div>`;
+  }
+
+  function openProviderSheet(profileId, template = null) {
     const draft = state.draft;
     if (!draft) return;
     const existing = profileId ? draft.profiles.find((item) => item.id === profileId) : null;
     state.providerDraft = existing
       ? { ...existing, isNew: false }
-      : { id: `channel-${Date.now()}`, name: "", protocol: "openai", provider: "custom", baseUrl: "", model: "", apiKey: "", models: [], note: "", isNew: true };
+      : {
+        id: `channel-${Date.now()}`,
+        name: template?.name || "",
+        protocol: template?.protocol || "openai",
+        provider: template?.provider || "custom",
+        baseUrl: template?.baseUrl || "",
+        model: template?.model || "",
+        apiKey: "",
+        models: [],
+        note: template?.note || "",
+        isNew: true
+      };
     state.providerStatus = null;
     openSheetShell({ kicker: "MODEL CHANNEL", title: existing ? "编辑渠道" : "添加渠道" });
     renderProviderSheet();
@@ -5863,6 +5868,7 @@
         <span class="settings-subhead">渠道</span>
         <span class="mono">${draft.profiles.length} 个</span>
       </div>
+      ${draft.profiles.length ? "" : '<p class="provider-empty">还没有渠道。点下面添加一个，填好密钥就能查词。</p>'}
       <div class="provider-list" role="list" aria-label="模型渠道">
         ${draft.profiles.map((profile) => `
           <button class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" type="button" role="listitem" data-action="provider-edit" data-profile="${attr(profile.id)}">
@@ -5900,7 +5906,7 @@
         ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(current?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
       </div>
       <div class="settings-inline-actions">
-        <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试当前渠道</button>
+        <button class="btn btn-secondary" type="button" data-action="test-connection" ${draft.profiles.length ? "" : "disabled"}>${icon("sparkle")} 测试当前渠道</button>
       </div>
       <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>`;
   }
@@ -7840,8 +7846,15 @@
         event.preventDefault();
         if (!state.draft) break;
         syncDraftProfile(state.draft);
-        openProviderSheet(null);
+        openProviderPicker();
         break;
+
+      case "provider-template": {
+        event.preventDefault();
+        const template = PROVIDER_TEMPLATES.find((item) => item.id === target.dataset.template) || CUSTOM_TEMPLATE;
+        openProviderSheet(null, template);
+        break;
+      }
 
       case "provider-edit":
         event.preventDefault();
@@ -7928,44 +7941,14 @@
       case "provider-delete": {
         event.preventDefault();
         const profile = state.providerDraft;
-        if (!profile || !state.draft || state.draft.profiles.length <= 1) { toast("至少保留一个渠道"); break; }
+        if (!profile || !state.draft) break;
         if (!window.confirm(`删除「${profile.name || "这个渠道"}」？`)) break;
         state.draft.profiles = state.draft.profiles.filter((item) => item.id !== profile.id);
-        state.draft = applyProfileToSettings(state.draft, state.draft.profiles[0]);
+        state.draft = state.draft.profiles.length
+          ? applyProfileToSettings(state.draft, state.draft.profiles[0])
+          : { ...state.draft, activeProfileId: "", baseUrl: "", model: "", apiKey: "" };
         commitSettingsDraft();
         closeSheet();
-        openSettingsSheet();
-        renderSettingsContent();
-        break;
-      }
-
-      case "add-profile": {
-        event.preventDefault();
-        if (!state.draft) break;
-        syncDraftProfile(state.draft);
-        openTemplatePicker();
-        break;
-      }
-
-      case "new-from-template": {
-        event.preventDefault();
-        if (!state.draft) break;
-        const template = PROVIDER_TEMPLATES.find((item) => item.id === target.dataset.template) || CUSTOM_TEMPLATE;
-        closeSheet();
-        const profile = {
-          id: `${template.id}-${Date.now()}`,
-          name: template.name,
-          provider: template.provider || "custom",
-          protocol: template.protocol || "openai",
-          templateId: template.id,
-          baseUrl: template.baseUrl || "",
-          model: template.model || "",
-          apiKey: "",
-          note: template.note || ""
-        };
-        state.draft.profiles = [...state.draft.profiles, profile];
-        state.draft = applyProfileToSettings(state.draft, profile);
-        commitSettingsDraft();
         openSettingsSheet();
         renderSettingsContent();
         break;

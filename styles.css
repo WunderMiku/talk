@@ -9728,3 +9728,10 @@ html.motion-ready .reveal.reveal-soft.is-in {
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--accent);
 }
+
+.provider-empty {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
