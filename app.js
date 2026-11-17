@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "227"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "228"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2962,7 +2962,7 @@
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 60_000);
+    const timer = window.setTimeout(() => controller.abort(), 180_000);
     const startedAt = Date.now();
     diagLog("info", "model.start", `translation · ${state.settings?.detailLevel || "standard"}`, { chars: text.length });
     try {
@@ -6635,7 +6635,7 @@
       window.clearTimeout(timer);
       controller = new AbortController();
       timedOut = false;
-      timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 60_000);
+      timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 180_000);
     };
     armDeadline();
     const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
@@ -6675,7 +6675,7 @@
       // when both are present. The static prompt already requires JSON.
       content = await streamOnce();
     } catch (error) {
-      diagLog("error", "model.fail", timedOut ? "请求超时（60 秒）" : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
+      diagLog("error", "model.fail", timedOut ? "请求超时（180 秒）" : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
       // Mobile networks drop long streams and gateways sometimes cut our 60s
       // deadline. Both are worth one silent retry with a fresh signal.
       const retriable = timedOut || error?.name !== "AbortError" || /不是 JSON|空响应|Failed to fetch|network error/i.test(String(error?.message || ""));
@@ -6710,7 +6710,7 @@
           content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
         }
       }
-      if (!content) throw timedOut ? new Error("请求超时（60 秒），网关没有返回内容，可以重试或换一个模型。") : error;
+      if (!content) throw timedOut ? new Error("请求超时（180 秒），网关没有返回内容，可以重试或换一个模型。") : error;
     } finally {
       window.clearTimeout(timer);
     }
