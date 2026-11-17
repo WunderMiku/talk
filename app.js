@@ -5701,31 +5701,164 @@
         <p class="tts-error" id="tts-error" hidden></p>`}`;
   }
 
+
+  const PROTOCOL_OPTIONS = [
+    { id: "openai", label: "OpenAI 兼容" },
+    { id: "google", label: "Google Gemini" }
+  ];
+
+  function profileHost(profile) {
+    try {
+      return new URL(String(profile.baseUrl || "")).host;
+    } catch (_) {
+      return String(profile.baseUrl || "").replace(/^https?:\/\//, "").split("/")[0] || "未填地址";
+    }
+  }
+
+  function channelModelsUrl(profile) {
+    const base = String(profile.baseUrl || "").trim().replace(/\/+$/, "");
+    if ((profile.protocol || "openai") === "google") {
+      const root = /\/v1beta$/.test(base) ? base : `${base}/v1beta`;
+      return `${root}/models?key=${encodeURIComponent(String(profile.apiKey || "").trim())}`;
+    }
+    return `${base}/models`;
+  }
+
+  async function fetchChannelModels(profile) {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 15000);
+    try {
+      const headers = (profile.protocol || "openai") === "google"
+        ? { Accept: "application/json" }
+        : { Accept: "application/json", Authorization: `Bearer ${String(profile.apiKey || "").trim()}` };
+      const response = await fetch(channelModelsUrl(profile), { headers, signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const json = await response.json();
+      if ((profile.protocol || "openai") === "google") {
+        return (json.models || [])
+          .filter((item) => !item.supportedGenerationMethods || item.supportedGenerationMethods.includes("generateContent"))
+          .map((item) => String(item.name || "").replace(/^models\//, ""))
+          .filter(Boolean);
+      }
+      return (json.data || []).map((item) => String(item.id || "")).filter(Boolean);
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function testChannel(profile) {
+    const started = performance.now();
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 20000);
+    try {
+      const response = await postChat(
+        endpointFor(profile.baseUrl, profile),
+        profile,
+        [{ role: "user", content: "Reply with the single word: pong" }],
+        controller.signal,
+        false,
+        16
+      );
+      const json = typeof response.text === "string" ? null : await readJsonResponse(response, "测试请求");
+      const text = json
+        ? (isGoogleProvider(profile) ? googleText(json) : (json.choices?.[0]?.message?.content || ""))
+        : response.text;
+      const reply = String(text || "").trim().slice(0, 40);
+      return { ok: true, ms: Math.round(performance.now() - started), text: reply || "(空回复)" };
+    } catch (error) {
+      return { ok: false, ms: Math.round(performance.now() - started), text: error.message };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  function readProviderForm(previous = {}) {
+    const read = (name) => $(`[data-provider-field="${name}"]`)?.value;
+    const baseUrl = String(read("baseUrl") ?? previous.baseUrl ?? "").trim();
+    const name = String(read("name") ?? previous.name ?? "").trim();
+    return {
+      id: previous.id || `channel-${Date.now()}`,
+      name: name || profileHost({ baseUrl }),
+      protocol: previous.protocol || "openai",
+      provider: previous.provider || ((previous.protocol === "google") ? "google" : "custom"),
+      baseUrl,
+      model: String(read("model") ?? previous.model ?? "").trim(),
+      apiKey: String(read("apiKey") || previous.apiKey || ""),
+      models: previous.models || [],
+      note: previous.note || "",
+      isNew: Boolean(previous.isNew)
+    };
+  }
+
+  function openProviderSheet(profileId) {
+    const draft = state.draft;
+    if (!draft) return;
+    const existing = profileId ? draft.profiles.find((item) => item.id === profileId) : null;
+    state.providerDraft = existing
+      ? { ...existing, isNew: false }
+      : { id: `channel-${Date.now()}`, name: "", protocol: "openai", provider: "custom", baseUrl: "", model: "", apiKey: "", models: [], note: "", isNew: true };
+    state.providerStatus = null;
+    openSheetShell({ kicker: "MODEL CHANNEL", title: existing ? "编辑渠道" : "添加渠道" });
+    renderProviderSheet();
+  }
+
+  function renderProviderSheet() {
+    const sheet = $("#sheet-scroll");
+    const d = state.providerDraft;
+    if (!sheet || !d) return;
+    const status = state.providerStatus || {};
+    sheet.innerHTML = `
+      <div class="provider-form">
+        <label class="provider-field"><span>名称</span>
+          <input data-provider-field="name" value="${attr(d.name || "")}" placeholder="例如 DeepSeek 主力" autocomplete="off" spellcheck="false" />
+        </label>
+        <div class="provider-field"><span>协议</span>
+          <div class="provider-protocols" role="group" aria-label="协议">
+            ${PROTOCOL_OPTIONS.map((item) => `<button class="provider-protocol ${(d.protocol || "openai") === item.id ? "active" : ""}" type="button" data-action="provider-protocol" data-protocol="${item.id}" aria-pressed="${(d.protocol || "openai") === item.id}">${esc(item.label)}</button>`).join("")}
+          </div>
+        </div>
+        <label class="provider-field"><span>Base URL</span>
+          <input data-provider-field="baseUrl" value="${attr(d.baseUrl || "")}" inputmode="url" placeholder="${d.protocol === "google" ? "https://generativelanguage.googleapis.com/v1beta" : "https://api.deepseek.com"}" autocomplete="off" spellcheck="false" />
+        </label>
+        <label class="provider-field"><span>API Key</span>
+          <input data-provider-field="apiKey" type="password" value="${attr(d.apiKey || "")}" placeholder="sk-…" autocomplete="off" />
+        </label>
+        <div class="provider-field"><span>模型</span>
+          <div class="provider-model-row">
+            <input data-provider-field="model" value="${attr(d.model || "")}" list="provider-model-options" placeholder="先获取，或手动填写" autocomplete="off" spellcheck="false" />
+            <button class="btn btn-secondary" type="button" data-action="provider-fetch">获取模型</button>
+          </div>
+          <datalist id="provider-model-options">
+            ${(d.models || []).map((id) => `<option value="${attr(id)}"></option>`).join("")}
+          </datalist>
+          <p class="provider-hint">${(d.models || []).length ? `${d.models.length} 个可用模型` : "填好地址与密钥后点「获取模型」"}</p>
+        </div>
+        <p class="provider-status ${status.tone || ""}">${esc(status.text || "先获取模型，再点测试确认能连通。")}</p>
+        <div class="provider-actions">
+          <button class="btn btn-secondary" type="button" data-action="provider-test">测试</button>
+          <button class="btn btn-primary" type="button" data-action="provider-save">保存</button>
+        </div>
+        ${d.isNew ? "" : '<button class="link-btn provider-delete" type="button" data-action="provider-delete">删除这个渠道</button>'}
+      </div>`;
+  }
+
   function modelSettingsHtml(draft) {
+    const current = activeProfile(draft);
     return `
       <div class="model-profile-head">
-        <span class="settings-subhead">模型配置</span>
+        <span class="settings-subhead">渠道</span>
         <span class="mono">${draft.profiles.length} 个</span>
       </div>
-      <div class="model-profile-strip" role="list" aria-label="模型配置">
+      <div class="provider-list" role="list" aria-label="模型渠道">
         ${draft.profiles.map((profile) => `
-          <button class="model-profile-chip ${profile.id === draft.activeProfileId ? "active" : ""}" type="button" role="listitem" data-action="select-profile" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
-            <strong>${esc(profile.name)}</strong>
-            <small>${esc(profile.model || profile.baseUrl || "未配置")}</small>
+          <button class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" type="button" role="listitem" data-action="provider-edit" data-profile="${attr(profile.id)}">
+            <span class="provider-row-copy">
+              <strong>${esc(profile.name || "未命名渠道")}</strong>
+              <small class="mono">${esc(profile.model || "未选模型")} · ${esc(profileHost(profile))}</small>
+            </span>
+            <span class="provider-row-side" aria-hidden="true">${profile.id === draft.activeProfileId ? '<i class="provider-dot"></i>' : ""}<span class="provider-chevron">›</span></span>
           </button>`).join("")}
-        <button class="model-profile-add" type="button" data-action="add-profile" aria-label="新增模型配置">+</button>
-      </div>
-            <div class="field">
-        <label for="profile-name">配置名称</label>
-        <input id="profile-name" type="text" data-profile-name value="${attr(activeProfile(draft)?.name || "")}" placeholder="例如：DeepSeek 主力" spellcheck="false" autocomplete="off" />
-      </div>
-      <div class="field">
-        <label for="base-url">API 地址</label>
-        <input id="base-url" type="url" inputmode="url" data-setting="baseUrl" value="${attr(draft.baseUrl)}" placeholder="https://api.deepseek.com" spellcheck="false" autocomplete="off" />
-      </div>
-      <div class="field">
-        <label for="model-name">模型</label>
-        <input id="model-name" type="text" data-setting="model" value="${attr(draft.model)}" placeholder="deepseek-chat" spellcheck="false" autocomplete="off" />
+        <button class="provider-add" type="button" data-action="provider-new">+ 添加渠道</button>
       </div>
       <div class="field">
         <label>生成深度</label>
@@ -5734,7 +5867,7 @@
             <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
         </div>
       </div>
-      ${profileSupportsThinking(activeProfile(draft)) ? `
+      ${profileSupportsThinking(current) ? `
       <div class="thinking-panel">
         <label class="check-row">
           <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
@@ -5744,24 +5877,16 @@
           <label for="thinking-budget">思考预算（tokens）</label>
           <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
         </div>
-        <p class="field-hint">0 = 模型默认；一般 256–1024。</p>
       </div>` : ""}
-      ${activeProfile(draft)?.note ? `<p class="field-hint model-profile-note">${esc(activeProfile(draft).note)}</p>` : ""}
-      <div class="field">
-        <label for="api-key">API 密钥</label>
-        <input id="api-key" type="password" data-setting="apiKey" value="${attr(draft.apiKey)}" placeholder="sk-…" spellcheck="false" autocomplete="off" />
-        <p class="field-hint">加密后保存在本机；关闭“记住”时只留在当前会话。</p>
-      </div>
       <label class="check-row">
         <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
         在这台设备上记住密钥
       </label>
-      ${draft.profiles.length > 1 ? `<button class="link-btn model-profile-delete" type="button" data-action="delete-profile">删除当前配置</button>` : ""}
       <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
-        ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(activeProfile(draft)?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
+        ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(current?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
       </div>
       <div class="settings-inline-actions">
-        <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试连接</button>
+        <button class="btn btn-secondary" type="button" data-action="test-connection">${icon("sparkle")} 测试当前渠道</button>
       </div>
       <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>`;
   }
@@ -7693,6 +7818,99 @@
         if (!profile) break;
         state.draft = applyProfileToSettings(state.draft, profile);
         scheduleSettingsCommit();
+        renderSettingsContent();
+        break;
+      }
+
+      case "provider-new":
+        event.preventDefault();
+        if (!state.draft) break;
+        syncDraftProfile(state.draft);
+        openProviderSheet(null);
+        break;
+
+      case "provider-edit":
+        event.preventDefault();
+        if (!state.draft) break;
+        syncDraftProfile(state.draft);
+        openProviderSheet(target.dataset.profile || null);
+        break;
+
+      case "provider-protocol": {
+        event.preventDefault();
+        const next = readProviderForm(state.providerDraft);
+        next.protocol = target.dataset.protocol || "openai";
+        next.provider = next.protocol === "google" ? "google" : (next.provider === "google" ? "custom" : next.provider);
+        next.models = [];
+        state.providerDraft = next;
+        renderProviderSheet();
+        break;
+      }
+
+      case "provider-fetch": {
+        event.preventDefault();
+        const profile = readProviderForm(state.providerDraft);
+        if (!profile.baseUrl) { toast("先填 Base URL"); break; }
+        state.providerDraft = profile;
+        state.providerStatus = { tone: "", text: "正在获取模型…" };
+        renderProviderSheet();
+        try {
+          const models = await fetchChannelModels(profile);
+          state.providerDraft = { ...profile, models, model: profile.model || models[0] || "" };
+          state.providerStatus = models.length
+            ? { tone: "ok", text: `找到 ${models.length} 个模型，选一个再测试。` }
+            : { tone: "bad", text: "没有取到模型；可以手动填写模型名。" };
+        } catch (error) {
+          state.providerStatus = { tone: "bad", text: `获取失败：${error.message}` };
+        }
+        renderProviderSheet();
+        break;
+      }
+
+      case "provider-test": {
+        event.preventDefault();
+        const profile = readProviderForm(state.providerDraft);
+        if (!profile.baseUrl || !profile.model) { toast("地址与模型都要填"); break; }
+        state.providerDraft = profile;
+        state.providerStatus = { tone: "", text: "正在测试…" };
+        renderProviderSheet();
+        const result = await testChannel(profile);
+        state.providerStatus = result.ok
+          ? { tone: "ok", text: `连通 · ${result.ms} ms · 回复「${result.text}」` }
+          : { tone: "bad", text: `失败 · ${result.ms} ms · ${result.text}` };
+        renderProviderSheet();
+        break;
+      }
+
+      case "provider-save": {
+        event.preventDefault();
+        const profile = readProviderForm(state.providerDraft);
+        if (!profile.baseUrl || !profile.model) { toast("地址与模型都要填"); break; }
+        const clean = { ...profile };
+        delete clean.isNew;
+        const draft = state.draft;
+        const index = draft.profiles.findIndex((item) => item.id === clean.id);
+        if (index >= 0) draft.profiles[index] = clean;
+        else draft.profiles.push(clean);
+        state.draft = applyProfileToSettings(draft, clean);
+        commitSettingsDraft();
+        closeSheet();
+        openSettingsSheet();
+        renderSettingsContent();
+        toast("渠道已保存");
+        break;
+      }
+
+      case "provider-delete": {
+        event.preventDefault();
+        const profile = state.providerDraft;
+        if (!profile || !state.draft || state.draft.profiles.length <= 1) { toast("至少保留一个渠道"); break; }
+        if (!window.confirm(`删除「${profile.name || "这个渠道"}」？`)) break;
+        state.draft.profiles = state.draft.profiles.filter((item) => item.id !== profile.id);
+        state.draft = applyProfileToSettings(state.draft, state.draft.profiles[0]);
+        commitSettingsDraft();
+        closeSheet();
+        openSettingsSheet();
         renderSettingsContent();
         break;
       }
