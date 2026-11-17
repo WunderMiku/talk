@@ -5813,7 +5813,7 @@
         isNew: true
       };
     state.providerStatus = null;
-    openSheetShell({ kicker: "MODEL CHANNEL", title: existing ? "编辑渠道" : "添加渠道" });
+    openSheetShell({ kicker: "MODEL", title: existing ? "编辑模型" : "添加模型" });
     renderProviderSheet();
   }
 
@@ -5857,7 +5857,7 @@
           <button class="btn btn-secondary" type="button" data-action="provider-test">测试</button>
           <button class="btn btn-primary" type="button" data-action="provider-save">保存</button>
         </div>
-        ${d.isNew ? "" : '<button class="link-btn provider-delete" type="button" data-action="provider-delete">删除这个渠道</button>'}
+        ${d.isNew ? "" : '<button class="link-btn provider-delete" type="button" data-action="provider-delete">删除这个模型</button>'}
       </div>`;
   }
 
@@ -5865,20 +5865,20 @@
     const current = activeProfile(draft);
     return `
       <div class="model-profile-head">
-        <span class="settings-subhead">渠道</span>
+        <span class="settings-subhead">可用模型</span>
         <span class="mono">${draft.profiles.length} 个</span>
       </div>
-      ${draft.profiles.length ? "" : '<p class="provider-empty">还没有渠道。点下面添加一个，填好密钥就能查词。</p>'}
+      ${draft.profiles.length ? "" : '<p class="provider-empty">还没有可用的模型。点下面添加一个，填好密钥就能查词。</p>'}
       <div class="provider-list" role="list" aria-label="模型渠道">
         ${draft.profiles.map((profile) => `
           <button class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" type="button" role="listitem" data-action="provider-edit" data-profile="${attr(profile.id)}">
             <span class="provider-row-copy">
-              <strong>${esc(profile.name || "未命名渠道")}</strong>
-              <small class="mono">${esc(profile.model || "未选模型")} · ${esc(profileHost(profile))}</small>
+              <strong>${esc(profile.model || "未选模型")}</strong>
+              <small class="mono">${esc(profile.name || "未命名")} · ${esc(profileHost(profile))}</small>
             </span>
             <span class="provider-row-side" aria-hidden="true">${profile.id === draft.activeProfileId ? '<i class="provider-dot"></i>' : ""}<span class="provider-chevron">›</span></span>
           </button>`).join("")}
-        <button class="provider-add" type="button" data-action="provider-new">+ 添加渠道</button>
+        <button class="provider-add" type="button" data-action="provider-new">+ 添加模型</button>
       </div>
       <div class="field">
         <label>生成深度</label>
@@ -5906,7 +5906,7 @@
         ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(current?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
       </div>
       <div class="settings-inline-actions">
-        <button class="btn btn-secondary" type="button" data-action="test-connection" ${draft.profiles.length ? "" : "disabled"}>${icon("sparkle")} 测试当前渠道</button>
+        <button class="btn btn-secondary" type="button" data-action="test-connection" ${draft.profiles.length ? "" : "disabled"}>${icon("sparkle")} 测试当前模型</button>
       </div>
       <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>`;
   }
@@ -7934,7 +7934,7 @@
         closeSheet();
         openSettingsSheet();
         renderSettingsContent();
-        toast("渠道已保存");
+        toast("模型已保存");
         break;
       }
 
@@ -7942,7 +7942,7 @@
         event.preventDefault();
         const profile = state.providerDraft;
         if (!profile || !state.draft) break;
-        if (!window.confirm(`删除「${profile.name || "这个渠道"}」？`)) break;
+        if (!window.confirm(`删除「${profile.model || profile.name || "这个模型"}」？`)) break;
         state.draft.profiles = state.draft.profiles.filter((item) => item.id !== profile.id);
         state.draft = state.draft.profiles.length
           ? applyProfileToSettings(state.draft, state.draft.profiles[0])
