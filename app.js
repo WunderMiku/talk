@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "235"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "236"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4280,31 +4280,80 @@
      Reverse search (context → candidates)
      ============================================================ */
 
-  function reverseAnnotatedPage(result) {
+  function reverseThreadHtml() {
     const copy = copyFor("reverse");
+    const thread = state.reverseThread || [];
+    const last = thread[thread.length - 1];
     return `
       ${backTopbar({ label: copy.label || "语境寻词", title: "语境寻词", actions: `
         <button class="icon-btn" type="button" title="新对话" aria-label="新对话" data-action="reverse-new">${icon("refresh")}</button>
       ` })}
       <main class="result-page reverse-page reverse-annotated">
         <div class="reverse-thread">
-          <div class="reverse-turn reverse-turn-mine reveal" style="--d:0">
-            <div class="reverse-bubble">${esc(result.text)}</div>
-          </div>
-          <article class="reverse-narrative reveal" style="--d:0.12">${result.pending
-            ? `<p class="desk-lead" id="reverse-stream">正在组织语言…</p>`
-            : renderAnchoredText(result.narrative, result.cards || {})}</article>
-          <div class="reverse-actions reveal" style="--d:0.2">
-            ${(result.followups || []).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
-            <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
-          </div>
-          <p class="reverse-hint">点画线的片段，看语气判断；↗ 进完整档案。</p>
+          ${thread.map((turn, index) => {
+            if (turn.role === "user") {
+              return `<div class="reverse-turn reverse-turn-mine"><div class="reverse-bubble">${esc(turn.text)}</div></div>`;
+            }
+            if (turn.pending) {
+              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-lead" id="reverse-stream">正在组织语言…</p></article>`;
+            }
+            if (turn.error) {
+              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-note">${esc(turn.error)}</p></article>`;
+            }
+            return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}">${renderAnchoredText(turn.result.narrative, turn.result.cards || {})}</article>`;
+          }).join("")}
+          ${last?.role === "assistant" && !last.pending && !last.error ? `
+            <div class="reverse-actions">
+              ${(last.result.followups || []).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
+              <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
+            </div>
+            <p class="reverse-hint">点画线的片段，看语气判断；↗ 进完整档案。</p>` : ""}
         </div>
       </main>
       <form class="reverse-composer" id="reverse-composer">
         <input class="reverse-composer-input" id="reverse-input" type="text" autocomplete="off" placeholder="输入英文句子，或继续追问语气、搭配…" aria-label="继续追问" />
         <button class="reverse-composer-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
       </form>`;
+  }
+
+  function reverseAnnotatedPage(result) {
+    if (!state.reverseThread?.length) {
+      state.reverseThread = [{ role: "user", text: result.text || "" }, { role: "assistant", result }];
+    }
+    return reverseThreadHtml();
+  }
+
+  function redrawReverse() {
+    const html = reverseThreadHtml();
+    const stickToBottom = true;
+    screen.innerHTML = html;
+    applyCacheDisplay();
+    refreshCacheBorders();
+    updateModuleBar();
+    applyContentCopy();
+    if (stickToBottom) screen.scrollTop = screen.scrollHeight;
+  }
+
+  async function askReverseFollowUp(text) {
+    const query = String(text || "").trim();
+    if (!query) return;
+    state.reverseThread = state.reverseThread || [];
+    state.reverseThread.push({ role: "user", text: query });
+    const placeholder = { role: "assistant", pending: true };
+    state.reverseThread.push(placeholder);
+    redrawReverse();
+    const onPreview = (preview) => updateStreamPreview(preview, "reverse");
+    try {
+      const result = await modelLookup(query, "reverse", state.settings, { onPreview });
+      placeholder.pending = false;
+      placeholder.result = result.data;
+      placeholder.result.text = placeholder.result.text || query;
+      redrawReverse();
+    } catch (error) {
+      placeholder.pending = false;
+      placeholder.error = error?.message || "这次没有写完，再试一次。";
+      redrawReverse();
+    }
   }
 
   function closeDecisionPopover() {
@@ -4320,7 +4369,8 @@
 
   function openDecisionPopover(button) {
     const pop = $("#decision-popover");
-    const result = state.reverse;
+    const index = Number(button.closest("[data-turn]")?.dataset.turn);
+    const result = state.reverseThread?.[index]?.result || state.reverse;
     if (!pop || !result) return;
     const id = button.dataset.anchor || "";
     const card = result.cards?.[id];
@@ -6581,8 +6631,21 @@
           : result.type === "reverse"
             ? { name: "reverse", id: result.data.id, result: result.data }
             : { name: "sentence", id: result.data.id, result: result.data };
+      if (result.type === "reverse") {
+        state.reverseThread = [{ role: "user", text: query }, { role: "assistant", result: result.data }];
+      }
       setRevealMode("soft");
-      navigate(route, { replace: true, direction: "forward" });
+      /* The pending reverse shell was pushed a few milliseconds ago; a second
+         replace in the same frame can be swallowed by the running transition.
+         Render the settled route directly when we are already on the desk. */
+      if (result.type === "reverse" && state.route?.name === "reverse") {
+        try {
+          history.replaceState({ route, depth: Number(history.state?.depth) || 1 }, "", routeHash(route));
+        } catch (_) {}
+        renderRoute(route, "forward", { instant: true });
+      } else {
+        navigate(route, { replace: true, direction: "forward" });
+      }
     } catch (error) {
       if (token !== state.searchSeq) return;
       clearLoadingTimer();
@@ -7231,6 +7294,14 @@
 
   function updateStreamPreview(preview, type) {
     if (!preview) return;
+    if (preview.kind === "reverse") {
+      const stream = $("#reverse-stream");
+      if (stream) {
+        const next = preview.narrative || "";
+        if (stream.textContent !== next) stream.textContent = next;
+        return;
+      }
+    }
     const host = $("#live-preview");
     if (!host) return;
     const signature = JSON.stringify(preview);
@@ -7241,11 +7312,6 @@
     const skeleton = $(".skeleton-stack");
     if (skeleton) skeleton.classList.add("is-streaming");
     if (preview.kind === "reverse") {
-      const stream = $("#reverse-stream");
-      if (stream) {
-        stream.textContent = preview.narrative;
-        return;
-      }
       host.innerHTML = `
         <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
         <p class="live-preview-narrative">${esc(preview.narrative)}</p>`;
@@ -7281,7 +7347,8 @@
     const field = $("#reverse-input");
     const text = String(field?.value || "").trim();
     if (!text) return;
-    runSearch(text, "reverse");
+    field.value = "";
+    void askReverseFollowUp(text);
   });
 
   document.addEventListener("keydown", (event) => {
@@ -7777,11 +7844,7 @@
 
       case "reverse-follow": {
         event.preventDefault();
-        const field = $("#reverse-input");
-        if (!field) break;
-        field.value = target.dataset.prompt || "";
-        field.focus();
-        field.setSelectionRange(field.value.length, field.value.length);
+        void askReverseFollowUp(target.dataset.prompt || "");
         break;
       }
 
