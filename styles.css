@@ -9787,3 +9787,34 @@ html.motion-ready .reveal.reveal-soft.is-in {
   content: "· ";
   color: var(--accent);
 }
+
+.share-choices {
+  display: grid;
+  gap: 2px;
+  margin: 14px 0 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.share-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--card);
+  font-size: 13px;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.share-choice:last-child { border-bottom: 0; }
+
+.share-choice input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-ink, var(--ink));
+}
+
+.share-choice span { flex: 1; }

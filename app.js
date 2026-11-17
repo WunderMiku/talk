@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "225"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "226"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2280,28 +2280,36 @@
 
   let shareCard = null;
 
-  function shareComposeParts() {
+  function shareHeroNode() {
     const route = state.route;
     const pick = (selector) => document.querySelector(selector);
-    if (route.name === "word") {
-      return [pick(".result-hero"), pick(".meaning-card"), pick(".example-card")].filter(Boolean);
-    }
-    if (route.name === "chunk") {
-      return [pick(".chunk-hero"), pick(".sense-card"), pick(".chunk-example")].filter(Boolean);
-    }
-    if (route.name === "sentence") {
-      const card = pick(".translation-card");
-      const block = card?.closest(".block") || card;
-      const parts = [pick(".sentence-stage"), block].filter(Boolean);
-      if (!parts.length) parts.push(pick(".sentence-line"));
-      return parts;
-    }
-    return [];
+    if (route.name === "word") return pick(".result-hero");
+    if (route.name === "chunk") return pick(".chunk-hero");
+    if (route.name === "sentence") return pick(".sentence-stage") || pick(".sentence-line");
+    return null;
   }
 
-  async function buildShareImage(data) {
+  // Every block on the page can go into the image; the reader decides which.
+  function shareSections() {
+    return Array.from(document.querySelectorAll(".result-page .block"))
+      .filter((block) => block.querySelector(".block-head, .sentence-part-head"))
+      .map((block, index) => {
+        const head = block.querySelector(".block-head, .sentence-part-head");
+        let label = `第 ${index + 1} 段`;
+        if (head) {
+          label = (head.querySelector("h2")?.textContent || head.textContent).replace(/\s+/g, " ").trim() || label;
+        }
+        return { index, label, node: block };
+      });
+  }
+
+  function shareParts(sections) {
+    return [shareHeroNode(), ...sections].filter(Boolean);
+  }
+
+  async function buildShareImage(data, sections = []) {
     const route = state.route;
-    const parts = shareComposeParts();
+    const parts = shareParts(sections);
     if (!parts.length) return null;
     const paper = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#f6f1e7";
     const theme = window.TALK_THEME?.current?.() || {};
@@ -2357,13 +2365,75 @@
     }
   }
 
+  const SHARE_PICK_KEY = "talk.share.v1";
+
+  function savedSharePick() {
+    try {
+      const raw = JSON.parse(localStorage.getItem(SHARE_PICK_KEY) || "null");
+      return Array.isArray(raw) ? raw.map(Number) : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function defaultSharePick(sections) {
+    const picked = [];
+    for (const pattern of [/词义|释义/, /例句/]) {
+      const hit = sections.find((section) => pattern.test(section.label) && !picked.includes(section.index));
+      if (hit) picked.push(hit.index);
+    }
+    for (const section of sections) {
+      if (picked.length >= 2) break;
+      if (!picked.includes(section.index)) picked.push(section.index);
+    }
+    return picked;
+  }
+
+  function sharePickFor(sections) {
+    const saved = savedSharePick();
+    const valid = (saved || []).filter((index) => sections.some((section) => section.index === index));
+    return valid.length ? valid : defaultSharePick(sections);
+  }
+
+  function shareChoicesHtml(sections, picked) {
+    return sections.map((section) => `
+      <label class="share-choice">
+        <input type="checkbox" data-share-section="${section.index}" ${picked.includes(section.index) ? "checked" : ""} />
+        <span>${esc(section.label)}</span>
+      </label>`).join("");
+  }
+
   async function openShareSheet() {
     const data = sharePageData();
     if (!data) {
       toast("这一页还没有可分享的内容");
       return;
     }
+    const sections = shareSections();
+    state.shareSections = sections;
+    state.sharePicked = sharePickFor(sections);
     openSheetShell({ kicker: "分享这一页", title: data.title });
+    const body = document.getElementById("sheet-scroll");
+    if (!body) return;
+    const nodes = sections.filter((section) => state.sharePicked.includes(section.index)).map((section) => section.node);
+    renderSharePreview(data, nodes);
+  }
+
+  function renderShareChooser() {
+    const body = document.getElementById("sheet-scroll");
+    const data = sharePageData();
+    const sections = state.shareSections || [];
+    if (!body || !data) return;
+    body.innerHTML = `
+      <div class="share-sheet">
+        <p class="sheet-lead">挑几段放进图片；标题和释义始终保留。</p>
+        <div class="share-choices">${shareChoicesHtml(sections, state.sharePicked || [])}</div>
+        <button class="btn btn-primary" type="button" data-action="share-generate">生成分享图</button>
+        <p class="share-hint">${esc(data.theme)} 主题 · ${esc(data.kind)}</p>
+      </div>`;
+  }
+
+  async function renderSharePreview(data, sections) {
     const body = document.getElementById("sheet-scroll");
     if (!body) return;
     body.innerHTML = `
@@ -2372,19 +2442,18 @@
         <div class="share-actions" hidden>
           <a class="btn btn-primary" data-share-save download="talk-${encodeURIComponent(data.title).slice(0, 24)}.png">保存图片</a>
           <button class="btn btn-secondary" type="button" data-action="share-native">系统分享</button>
+          <button class="btn btn-ghost" type="button" data-action="share-adjust">调整内容</button>
         </div>
         <p class="share-hint">${esc(data.theme)} 主题 · ${esc(data.kind)}</p>
       </div>`;
-
-    const canvas = window.htmlToImage ? await buildShareImage(data) : shareCardCanvas(data);
+    const canvas = window.htmlToImage ? await buildShareImage(data, sections) : shareCardCanvas(data);
+    const sheet = body.querySelector(".share-sheet");
     if (!canvas) {
-      const sheet = body.querySelector(".share-sheet");
       if (sheet) sheet.innerHTML = `<p class="share-hint">这一页暂时生成不了分享图</p>`;
       return;
     }
     const url = canvas.toDataURL("image/png");
     state.shareUrl = url;
-    const sheet = body.querySelector(".share-sheet");
     if (!sheet) return;
     sheet.querySelector(".share-loading")?.remove();
     const actions = sheet.querySelector(".share-actions");
@@ -7721,6 +7790,20 @@
         break;
       }
 
+      case "share-generate": {
+        const picked = $$("[data-share-section]:checked").map((input) => Number(input.dataset.shareSection));
+        const data = sharePageData();
+        if (!data) return;
+        state.sharePicked = picked;
+        try { localStorage.setItem(SHARE_PICK_KEY, JSON.stringify(picked)); } catch (_) { /* private mode */ }
+        const sections = (state.shareSections || []).filter((section) => picked.includes(section.index)).map((section) => section.node);
+        renderSharePreview(data, sections);
+        break;
+      }
+      case "share-adjust": {
+        renderShareChooser();
+        break;
+      }
       case "share-native": {
         event.preventDefault();
         if (!state.shareUrl) break;
