@@ -9767,24 +9767,3 @@ html.motion-ready .reveal.reveal-soft.is-in {
   background: var(--card-soft, rgba(0,0,0,.03));
 }
 
-/* Loading meter: how much text has arrived while the model writes. */
-.loading-meter {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 6px;
-  margin-top: 10px;
-  font-family: var(--mono);
-  font-size: 10px;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
-
-.loading-meter [data-meter-tokens] {
-  font-size: 13px;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.loading-meter-sep { opacity: 0.5; }
-
-.loading-meter[hidden] { display: none; }

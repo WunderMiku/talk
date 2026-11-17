@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "222"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "223"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4834,12 +4834,7 @@
             <span class="loading-dots"><i></i><i></i><i></i></span>
             <span${withPreview ? ' id="loading-status-text"' : ""}>${status}</span>
           </div>
-          <div class="loading-meter" id="loading-meter" hidden>
-            <span data-meter-tokens>0</span>
-            <span class="loading-meter-unit">tokens 已到手</span>
-            <span class="loading-meter-sep">·</span>
-            <span data-meter-time>0.0s</span>
-          </div>
+
           ${withPreview ? '<div class="live-preview" id="live-preview" hidden></div>' : ""}
           <div class="skeleton-stack">
             <div class="skeleton hero"></div>
@@ -6369,20 +6364,6 @@
       if (target) target.textContent = messages[index];
     }, 1200);
     state.loadingTimer = timer;
-    state.meterTimer = window.setInterval(paintLoadingMeter, 220);
-  }
-
-  function paintLoadingMeter() {
-    const meter = $("#loading-meter");
-    if (!meter) return;
-    const stats = state.streamStats;
-    if (!stats) { meter.hidden = true; return; }
-    const tokens = Math.round(stats.chars / 3.2);
-    meter.hidden = false;
-    const tokenEl = $("[data-meter-tokens]", meter);
-    const timeEl = $("[data-meter-time]", meter);
-    if (tokenEl) tokenEl.textContent = tokens.toLocaleString("en-US");
-    if (timeEl) timeEl.textContent = `${((Date.now() - stats.startedAt) / 1000).toFixed(1)}s · ${stats.chunks} 段`;
   }
 
   function clearLoadingTimer() {
@@ -6390,10 +6371,7 @@
       window.clearInterval(state.loadingTimer);
       state.loadingTimer = null;
     }
-    if (state.meterTimer) {
-      window.clearInterval(state.meterTimer);
-      state.meterTimer = null;
-    }
+
   }
 
   /* ============================================================
@@ -6602,13 +6580,8 @@
         : next;
     };
     const startedAt = Date.now();
-    state.streamStats = { startedAt, chars: 0, chunks: 0 };
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     const streamOnce = () => postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
-      if (state.streamStats) {
-        state.streamStats.chars += String(partial || "").length;
-        state.streamStats.chunks += 1;
-      }
       if (typeof options.onPreview === "function") {
         try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
       }
@@ -6882,6 +6855,10 @@
 
     const type = response.headers.get("content-type") || "";
     if (type.includes("application/json")) {
+      diagLog("info", "stream.buffered", "网关把流式响应缓冲成了整段 JSON", {
+        host: (() => { try { return new URL(endpoint).host; } catch (_) { return endpoint; } })(),
+        contentType: type
+      });
       if (!window.__talkStreamWarned) {
         window.__talkStreamWarned = true;
         console.info("Provider returned a buffered JSON response despite stream=true.");
