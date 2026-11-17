@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "233"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "234"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3669,7 +3669,7 @@
 
   function renderAnchoredText(narrative, cards) {
     let no = 0;
-    return esc(narrative)
+    const html = esc(narrative)
       .replace(/&lt;([scw])\s+id=&quot;([^&]*?)&quot;\s*&gt;([\s\S]*?)&lt;\/\1&gt;/g, (match, tag, id, inner) => {
         const type = ANCHOR_TYPES[tag];
         const card = cards[id];
@@ -3679,8 +3679,26 @@
         return `<span role="button" tabindex="0" class="anchor anchor-${tag} has-card"` +
           ` data-action="anchor-open" data-anchor="${attr(id)}" data-type="${type}" data-text="${attr(text)}"` +
           ` aria-expanded="false">${inner}${index ? `<sup class="anchor-index">${index}</sup>` : ""}</span>`;
+      });
+
+    // The prompt puts each target on its own line with a Chinese gloss below;
+    // render those as a magazine-style list instead of one dense paragraph.
+    let seenItem = false;
+    return html
+      .split(/\n+/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => {
+        const hasAnchor = /class="anchor/.test(line);
+        const bare = line.replace(/<[^>]+>/g, "").trim();
+        if (hasAnchor && bare.length <= 96) {
+          seenItem = true;
+          return `<p class="desk-item">${line}</p>`;
+        }
+        if (hasAnchor) return `<p class="desk-line">${line}</p>`;
+        return `<p class="${seenItem ? "desk-note" : "desk-lead"}">${line}</p>`;
       })
-      .replace(/\n/g, "<br>");
+      .join("");
   }
 
   function ensureReverse(raw, text) {

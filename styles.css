@@ -10187,3 +10187,36 @@ html.motion-ready .reveal.reveal-soft.is-in {
 @media (prefers-reduced-motion: reduce) {
   .reverse-thread { animation: none; }
 }
+
+/* Each recommended target gets its own line, the gloss a small line below. */
+.desk-lead {
+  margin: 0 0 22px;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.8;
+}
+
+.desk-item {
+  margin: 22px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.desk-item .anchor {
+  font-size: inherit;
+  font-weight: 600;
+}
+
+.desk-note {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+
+.desk-line {
+  margin: 16px 0 0;
+  font-size: 16px;
+  line-height: 1.7;
+}
