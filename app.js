@@ -5738,7 +5738,7 @@
         return (json.models || [])
           .filter((item) => !item.supportedGenerationMethods || item.supportedGenerationMethods.includes("generateContent"))
           .map((item) => String(item.name || "").replace(/^models\//, ""))
-          .filter(Boolean);
+          .filter((id) => id && !/embedding|aqa/i.test(id));
       }
       return (json.data || []).map((item) => String(item.id || "")).filter(Boolean);
     } finally {
