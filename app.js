@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "223"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "224"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -6935,15 +6935,19 @@
       const tone = partialJsonString(text, "tone");
       const structure = partialJsonString(text, "structure");
       if (!translation && !tone && !structure) return null;
-      return { kind: "sentence", text: query, translation, tone, structure };
+      return { kind: "sentence", text: query, translation, tone, structure, received: String(text).length };
     }
     const word = partialJsonString(text, "word") || query;
     const phonetic = partialJsonString(text, "phonetic");
     const translation = partialJsonString(text, "translation");
     const short = partialJsonString(text, "short");
     const pos = partialJsonString(text, "pos");
-    if (!word && !translation && !short) return null;
-    return { kind: "word", word, phonetic, translation, short, pos };
+    const senses = Array.from(String(text).matchAll(/"zh"\s*:\s*"((?:\\.|[^"\\])*)"/g))
+      .map((match) => { try { return JSON.parse(`"${match[1]}"`); } catch (_) { return ""; } })
+      .filter(Boolean)
+      .slice(0, 3);
+    if (!word && !translation && !short && !senses.length) return null;
+    return { kind: "word", word, phonetic, translation, short, pos, senses, received: String(text).length };
   }
 
   function updateStreamPreview(preview, type) {
@@ -6959,7 +6963,7 @@
     if (skeleton) skeleton.classList.add("is-streaming");
     if (type === "sentence") {
       host.innerHTML = `
-        <span class="live-preview-kicker"><i></i>正在分段返回</span>
+        <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 已收 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
         <h2 class="live-preview-word">${esc(shorten(preview.text || "", 80))}</h2>
         ${preview.tone ? `<span class="live-preview-meta">${esc(preview.tone)}</span>` : ""}
         ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理译文…</p>`}
@@ -6967,11 +6971,12 @@
       return;
     }
     host.innerHTML = `
-      <span class="live-preview-kicker"><i></i>正在分段返回</span>
+      <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 已收 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
       <h2 class="live-preview-word">${esc(preview.word || "")}</h2>
       <div class="live-preview-meta">${esc(preview.phonetic || "")}${preview.pos ? ` · ${esc(posLabel(preview.pos))}` : ""}</div>
       ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理第一段…</p>`}
-      ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}`;
+      ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}
+      ${(preview.senses || []).length ? `<ul class="live-preview-senses">${preview.senses.map((sense) => `<li>${esc(shorten(sense, 42))}</li>`).join("")}</ul>` : ""}`;
   }
 
   function thinkingParams(cfg) {

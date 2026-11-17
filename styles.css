@@ -9767,3 +9767,23 @@ html.motion-ready .reveal.reveal-soft.is-in {
   background: var(--card-soft, rgba(0,0,0,.03));
 }
 
+
+.live-preview-senses {
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px dashed var(--line);
+  list-style: none;
+  display: grid;
+  gap: 5px;
+}
+
+.live-preview-senses li {
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.live-preview-senses li::before {
+  content: "· ";
+  color: var(--accent);
+}
