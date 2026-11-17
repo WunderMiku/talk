@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "230"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "231"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1903,6 +1903,11 @@
       screen.classList.add("is-entering");
       window.setTimeout(() => screen.classList.remove("is-entering"), 1300);
       document.title = pageTitle(route);
+      if (route.name === "reverse" && Number.isFinite(state.restoreScroll) && state.restoreScroll >= 0) {
+        const target = state.restoreScroll;
+        state.restoreScroll = -1;
+        window.requestAnimationFrame(() => { screen.scrollTop = target; });
+      }
       if (route.name === "translator") {
         updateTranslatorLanguage();
         updateTranslatorStyleControls();
@@ -1980,6 +1985,7 @@
       }
       case "reverse": {
         const reverse = getReverse(route);
+        state.reverse = reverse || null;
         return reverse ? reversePage(reverse) : missPage("reverse", route.query || "", []);
       }
       case "translator":
@@ -2490,7 +2496,7 @@
     }
   }
 
-  function backTopbar({ label, title, bookmark = null, share = false }) {
+  function backTopbar({ label, title, bookmark = null, share = false, actions = "" }) {
     const saved = bookmark ? state.saved.includes(bookmark) : false;
     return `
       <header class="topbar">
@@ -2502,6 +2508,7 @@
         <div class="top-actions">
           ${bookmark ? `<button class="icon-btn ${saved ? "is-saved" : ""}" type="button" data-action="save" aria-label="${saved ? "取消收藏" : "收藏"}" aria-pressed="${saved}" title="${saved ? "已收藏" : "收藏"}">${icon("bookmark")}</button>` : ""}
           ${share ? `<button class="icon-btn" type="button" data-action="share-page" aria-label="分享这一页" title="分享这一页">${icon("share")}</button>` : ""}
+          ${actions}
           <button class="icon-btn" type="button" data-action="settings" aria-label="连接模型" title="连接模型">${icon("settings")}</button>
         </div>
       </header>`;
@@ -3623,9 +3630,68 @@
     };
   }
 
+  const ANCHOR_TYPES = { s: "sentence", c: "chunk", w: "word" };
+
+  /* The reverse reply arrives as prose with <s>/<c>/<w> anchors followed by a
+     json:cards block. This splitter is pure so the stream can call it on every
+     delta without touching the DOM. */
+  function parseAnnotatedStream(raw) {
+    const text = String(raw || "");
+    const marker = "```json:cards";
+    const at = text.indexOf(marker);
+    let narrative = at === -1 ? text : text.slice(0, at);
+    const tail = at === -1 ? "" : text.slice(at + marker.length);
+    // A half-streamed tag must never reach the screen as raw angle brackets.
+    narrative = narrative.replace(/<([scw])\b[^>]*>([^<]*)$/, "$2");
+    narrative = narrative.replace(/<[^>]*$/, "");
+    const closed = tail.includes("```");
+    let cards = {};
+    let ok = false;
+    if (closed) {
+      const body = tail.slice(0, tail.indexOf("```")).trim();
+      try {
+        const parsed = JSON.parse(body);
+        if (parsed && typeof parsed === "object") { cards = parsed; ok = true; }
+      } catch (_) {
+        ok = false;
+      }
+    }
+    const order = Array.from(narrative.matchAll(/<([scw])\s+id="([^"]+)"/g)).map((match) => match[2]);
+    return { narrative: narrative.trim(), cards, order, phase: at === -1 ? "narrative" : ok ? "ready" : "cards" };
+  }
+
+  function renderAnchoredText(narrative, cards) {
+    let no = 0;
+    return esc(narrative)
+      .replace(/&lt;([scw])\s+id=&quot;([^&]*?)&quot;\s*&gt;([\s\S]*?)&lt;\/\1&gt;/g, (match, tag, id, inner) => {
+        const type = ANCHOR_TYPES[tag];
+        const card = cards[id];
+        const index = tag === "w" ? String(++no).padStart(2, "0") : "";
+        const text = String(card?.text || inner).trim();
+        if (!card) return `<span class="anchor anchor-${tag} is-plain">${inner}${index ? `<sup class="anchor-index">${index}</sup>` : ""}</span>`;
+        return `<span role="button" tabindex="0" class="anchor anchor-${tag} has-card"` +
+          ` data-action="anchor-open" data-anchor="${attr(id)}" data-type="${type}" data-text="${attr(text)}"` +
+          ` aria-expanded="false">${inner}${index ? `<sup class="anchor-index">${index}</sup>` : ""}</span>`;
+      })
+      .replace(/\n/g, "<br>");
+  }
+
   function ensureReverse(raw, text) {
     const source = String(text || raw?.text || "").trim();
-    const candidates = (Array.isArray(raw?.candidates) ? raw.candidates : [])
+    const narrative = String(raw?.narrative || "").trim();
+    const cards = raw?.cards && typeof raw.cards === "object" ? raw.cards : {};
+    const order = Array.isArray(raw?.order) ? raw.order.filter((id) => cards[id]) : [];
+    const fromCards = order.map((id) => {
+      const card = cards[id] || {};
+      return {
+        expression: String(card.text || id).trim(),
+        paradigm: ["word", "chunk", "sentence"].includes(card.type) ? card.type : "chunk",
+        phonetic: "",
+        whenToUse: String(card.verdict || "").trim(),
+        gloss: String(card.vibe || "").trim()
+      };
+    });
+    const candidates = (narrative && fromCards.length ? fromCards : Array.isArray(raw?.candidates) ? raw.candidates : [])
       .map((item) => {
         let expression = String(item?.expression || "").trim().replace(/\s+/g, " ");
         if (!expression) return null;
@@ -3649,6 +3715,9 @@
       kind: "reverse",
       id: reverseIdFor(source),
       text: source,
+      narrative,
+      cards,
+      order,
       overview: String(raw?.overview || "").trim(),
       candidates,
       source: raw?.source || ""
@@ -4185,8 +4254,73 @@
      Reverse search (context → candidates)
      ============================================================ */
 
+  function reverseAnnotatedPage(result) {
+    const copy = copyFor("reverse");
+    return `
+      ${backTopbar({ label: copy.label || "语境寻词", title: "语境寻词", actions: `
+        <button class="icon-btn" type="button" title="新对话" aria-label="新对话" data-action="reverse-new">${icon("refresh")}</button>
+      ` })}
+      <main class="result-page reverse-page reverse-annotated">
+        <div class="reverse-thread">
+          <div class="reverse-turn reverse-turn-mine reveal" style="--d:0">
+            <div class="reverse-bubble">${esc(result.text)}</div>
+          </div>
+          <article class="reverse-narrative reveal" style="--d:0.12">${renderAnchoredText(result.narrative, result.cards || {})}</article>
+          <div class="reverse-actions reveal" style="--d:0.2">
+            <button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="换一个更委婉的说法">换个更委婉的词</button>
+            <button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="放在雅思作文里怎么改？">放在雅思作文里怎么改？</button>
+            <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
+          </div>
+          <p class="reverse-hint">点画线的片段，看语气判断；↗ 进完整档案。</p>
+        </div>
+      </main>
+      <form class="reverse-composer" id="reverse-composer">
+        <input class="reverse-composer-input" id="reverse-input" type="text" autocomplete="off" placeholder="输入英文句子，或继续追问语气、搭配…" aria-label="继续追问" />
+        <button class="reverse-composer-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
+      </form>`;
+  }
+
+  function closeDecisionPopover() {
+    const pop = $("#decision-popover");
+    if (!pop || pop.hidden) return;
+    pop.hidden = true;
+    pop.innerHTML = "";
+    $$(".anchor[aria-expanded='true']").forEach((el) => el.setAttribute("aria-expanded", "false"));
+  }
+
+  function openDecisionPopover(button) {
+    const pop = $("#decision-popover");
+    const result = state.reverse;
+    if (!pop || !result) return;
+    const id = button.dataset.anchor || "";
+    const card = result.cards?.[id];
+    if (!card) return;
+    const same = pop.dataset.anchor === id && !pop.hidden;
+    closeDecisionPopover();
+    if (same) return;
+    pop.dataset.anchor = id;
+    pop.innerHTML = `
+      <div class="popover-head">
+        <span class="popover-vibe">${esc(card.vibe || "")}</span>
+        <button class="popover-drill" type="button" data-action="anchor-drill" data-type="${attr(card.type || button.dataset.type || "chunk")}" data-text="${attr(card.text || button.dataset.text || "")}" aria-label="查看完整档案">↗</button>
+      </div>
+      <p class="popover-verdict">${esc(card.verdict || "")}</p>`;
+    pop.hidden = false;
+    button.setAttribute("aria-expanded", "true");
+    const rect = button.getBoundingClientRect();
+    const width = Math.min(240, window.innerWidth - 24);
+    const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12));
+    const popHeight = pop.offsetHeight || 96;
+    let top = rect.bottom + 8;
+    if (top + popHeight > window.innerHeight - 12) top = Math.max(12, rect.top - popHeight - 8);
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    pop.style.width = `${width}px`;
+  }
+
   function reversePage(result) {
     const copy = copyFor("reverse");
+    if (result.narrative) return reverseAnnotatedPage(result);
     const paradigms = copy.paradigms || { word: "词", chunk: "意群", sentence: "句" };
     return `
       ${backTopbar({ label: copy.label || "语境寻词", title: "选词手记" })}
@@ -6736,6 +6870,15 @@
       cut: content.length > 2400,
       text: String(content).slice(0, 2400)
     };
+
+    if (type === "reverse") {
+      const annotated = parseAnnotatedStream(content);
+      const data = ensureReverse(annotated, query);
+      data.source = "model";
+      data.model = cfg.model;
+      cachePutReverse(data.id, query, data);
+      return { type: "reverse", data };
+    }
     let parsed;
     let retryLength = null;
     const emptyish = content.trim().length < 12;
@@ -7024,7 +7167,12 @@
   }
 
   function streamPreviewFromJson(text, type, query) {
-    if (type === "chunk" || type === "reverse") return null;
+    if (type === "reverse") {
+      const partial = parseAnnotatedStream(text);
+      if (!partial.narrative) return null;
+      return { kind: "reverse", narrative: partial.narrative, received: String(text).length };
+    }
+    if (type === "chunk") return null;
     if (type === "sentence") {
       const translation = partialJsonString(text, "translation");
       const tone = partialJsonString(text, "tone");
@@ -7056,6 +7204,12 @@
     host.classList.add("has-content");
     const skeleton = $(".skeleton-stack");
     if (skeleton) skeleton.classList.add("is-streaming");
+    if (preview.kind === "reverse") {
+      host.innerHTML = `
+        <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
+        <p class="live-preview-narrative">${esc(preview.narrative)}</p>`;
+      return;
+    }
     if (type === "sentence") {
       host.innerHTML = `
         <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
@@ -7073,6 +7227,34 @@
       ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}
       ${(preview.senses || []).length ? `<ul class="live-preview-senses">${preview.senses.map((sense) => `<li>${esc(shorten(sense, 42))}</li>`).join("")}</ul>` : ""}`;
   }
+
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("#decision-popover") || event.target.closest("[data-action='anchor-open']")) return;
+    closeDecisionPopover();
+  });
+
+  document.addEventListener("submit", (event) => {
+    const form = event.target;
+    if (!(form instanceof HTMLFormElement) || form.id !== "reverse-composer") return;
+    event.preventDefault();
+    const field = $("#reverse-input");
+    const text = String(field?.value || "").trim();
+    if (!text) return;
+    runSearch(text, "reverse");
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const anchorEl = event.target instanceof Element ? event.target.closest(".anchor.has-card") : null;
+    if (anchorEl && (event.key === "Enter" || event.key === " ")) {
+      event.preventDefault();
+      if (event.key === " ") closeDecisionPopover();
+      openDecisionPopover(anchorEl);
+      return;
+    }
+
+
+    if (event.key === "Escape") closeDecisionPopover();
+  });
 
   function thinkingParams(cfg) {
     const profile = activeProfile(cfg);
@@ -7508,6 +7690,26 @@
         break;
       }
 
+      case "anchor-open": {
+        event.preventDefault();
+        const anchor = target.closest("[data-action='anchor-open']");
+        if (anchor) openDecisionPopover(anchor);
+        break;
+      }
+
+      case "anchor-drill": {
+        event.preventDefault();
+        const card = target.closest("[data-action='anchor-drill']");
+        if (!card) break;
+        const text = card.dataset.text || "";
+        const type = card.dataset.type || "chunk";
+        if (!text) break;
+        state.restoreScroll = document.querySelector(".screen")?.scrollTop || 0;
+        closeDecisionPopover();
+        runSearch(text, type === "word" ? "word" : type);
+        break;
+      }
+
       case "reverse-pick": {
         event.preventDefault();
         const expression = target.dataset.expression || "";
@@ -7517,11 +7719,30 @@
         break;
       }
 
-      case "reverse-again": {
+      case "reverse-again":
+      case "reverse-new": {
         event.preventDefault();
         navigate({ name: "home" });
         const field = $("#search-input");
         if (field) requestAnimationFrame(() => field.focus());
+        break;
+      }
+
+      case "reverse-follow": {
+        event.preventDefault();
+        const field = $("#reverse-input");
+        if (!field) break;
+        field.value = target.dataset.prompt || "";
+        field.focus();
+        field.setSelectionRange(field.value.length, field.value.length);
+        break;
+      }
+
+      case "reverse-copy": {
+        event.preventDefault();
+        const text = state.reverse?.narrative || "";
+        if (!text) break;
+        void copyText(text.replace(/\s+/g, " ").trim(), "正文已复制");
         break;
       }
 
@@ -9034,7 +9255,7 @@
     }, { passive: true });
     app.addEventListener("pointercancel", () => { wordSwipe = null; }, { passive: true });
 
-    app.addEventListener("click", handleClick);
+    document.addEventListener("click", handleClick);
     app.addEventListener("input", handleInput);
     app.addEventListener("change", handleInput);
     app.addEventListener("submit", handleSubmit);

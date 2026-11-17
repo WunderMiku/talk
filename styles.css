@@ -9818,3 +9818,259 @@ html.motion-ready .reveal.reveal-soft.is-in {
 }
 
 .share-choice span { flex: 1; }
+
+/* ------------------------------------------------------------
+   Annotated reverse desk — prose anchors + decision popover
+   ------------------------------------------------------------ */
+
+.reverse-annotated .reverse-query { margin-bottom: 18px; }
+
+.reverse-narrative {
+  max-width: 60ch;
+  margin: 0 0 18px;
+  font-size: 16.5px;
+  line-height: 1.85;
+  color: var(--text-primary);
+  text-wrap: pretty;
+}
+
+.reverse-hint {
+  margin: 0 0 26px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.anchor {
+  display: inline;
+  margin: 0;
+  padding: 0 1px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.anchor-w {
+  font-weight: 650;
+  border-bottom: 1.5px solid var(--accent);
+}
+
+.anchor-c {
+  border-bottom: 1px dashed var(--border-strong);
+}
+
+.anchor-s {
+  padding: 0 4px 0 8px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent-wash) 32%, transparent);
+}
+
+.anchor-index {
+  margin-left: 2px;
+  font-family: var(--mono);
+  font-size: 9px;
+  font-weight: 500;
+  vertical-align: super;
+  color: var(--text-secondary);
+}
+
+.anchor:hover,
+.anchor[aria-expanded="true"] {
+  color: var(--text-primary);
+  background: var(--accent-wash);
+}
+
+.decision-popover {
+  position: fixed;
+  z-index: 90;
+  padding: 10px 12px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-float);
+  color: var(--text-primary);
+}
+
+.decision-popover[hidden] { display: none; }
+
+.popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.popover-vibe {
+  padding: 3px 6px;
+  border: 1px solid var(--border-soft);
+  font-family: var(--mono);
+  font-size: 10px;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--text-secondary);
+}
+
+.popover-drill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid transparent;
+  background: none;
+  font-size: 13px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.popover-drill:hover,
+.popover-drill:focus-visible {
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  background: var(--accent-wash);
+}
+
+.popover-verdict {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.live-preview-narrative {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text-primary);
+  text-wrap: pretty;
+}
+
+.anchor-s {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+.anchor:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.anchor.is-plain { cursor: text; }
+
+/* Themes style bare buttons as blocks; anchors must stay inline with the prose. */
+.reverse-narrative .anchor {
+  display: inline;
+  width: auto;
+  height: auto;
+  min-width: 0;
+}
+
+/* Reverse desk reads like a conversation: a narrow column, your line on the
+   right, the answer as prose, and a composer that stays at the bottom. */
+.reverse-thread {
+  width: 100%;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 10px 0 132px;
+}
+
+.reverse-turn-mine {
+  display: flex;
+  justify-content: flex-end;
+  margin: 6px 0 24px;
+}
+
+.reverse-bubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: 16px 16px 4px 16px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.reverse-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 26px;
+}
+
+.reverse-action {
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.reverse-action:hover { color: var(--ink); border-color: var(--border-strong); }
+
+.reverse-action-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+}
+
+.reverse-composer {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  gap: 8px;
+  width: min(720px, calc(100% - 28px));
+  padding: 8px;
+  transform: translateX(-50%);
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+}
+
+.reverse-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 15px;
+}
+
+.reverse-composer-input:focus { outline: none; }
+
+.reverse-composer-send {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-ink, #111);
+  cursor: pointer;
+}
+
+.reverse-narrative .anchor,
+.reverse-narrative .anchor:hover {
+  display: inline !important;
+  width: auto !important;
+  height: auto !important;
+}
