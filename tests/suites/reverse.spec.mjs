@@ -24,6 +24,7 @@ suite("dictionary · context word search", { timeout: 45_000 }, (s) => {
     await page.fill("#search-input", "想在聊天里顺便提一句");
     await page.keyboard.press("Enter");
     await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-card, .desk-item");
 
     t.expect(await page.locator(".reverse-card").count()).toBe(3);
     t.expect(await page.locator(".reverse-card .paradigm-tag").allInnerTexts()).toEqual(["意群", "词", "句"]);
@@ -37,6 +38,7 @@ suite("dictionary · context word search", { timeout: 45_000 }, (s) => {
     await page.fill("#search-input", "想在聊天里顺便提一句");
     await page.keyboard.press("Enter");
     await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-card");
 
     await page.locator(".reverse-card").first().click();
     await page.waitForPage("chunk");
@@ -55,9 +57,11 @@ suite("dictionary · context word search", { timeout: 45_000 }, (s) => {
     await page.fill("#search-input", "想在聊天里顺便提一句");
     await page.keyboard.press("Enter");
     await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-card, .desk-item");
 
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-card");
     t.expect(await page.locator(".reverse-card").count()).toBe(3);
     t.expect(state.env.server.mock.requestsOf("reverse").length).toBe(1);
   });
