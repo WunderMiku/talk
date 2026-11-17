@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "237"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "238"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3667,6 +3667,14 @@
     return { narrative: narrative.trim(), cards, order, followups, phase: at === -1 ? "narrative" : ok ? "ready" : "cards" };
   }
 
+  function cleanStreamNarrative(value) {
+    let text = String(value || "");
+    text = text.split(/```json:cards/i)[0];
+    const lastOpen = text.lastIndexOf("<");
+    if (lastOpen >= 0 && !/>/.test(text.slice(lastOpen))) text = text.slice(0, lastOpen);
+    return text.trim();
+  }
+
   function renderAnchoredText(narrative, cards) {
     let no = 0;
     const html = esc(narrative)
@@ -3684,21 +3692,39 @@
     // The prompt puts each target on its own line with a Chinese gloss below;
     // render those as a magazine-style list instead of one dense paragraph.
     let seenItem = false;
-    return html
-      .split(/\n+/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
-        const hasAnchor = /class="anchor/.test(line);
-        const bare = line.replace(/<[^>]+>/g, "").trim();
-        if (hasAnchor && bare.length <= 96) {
-          seenItem = true;
-          return `<p class="desk-item">${line}</p>`;
-        }
-        if (hasAnchor) return `<p class="desk-line">${line}</p>`;
-        return `<p class="${seenItem ? "desk-note" : "desk-lead"}">${line}</p>`;
-      })
-      .join("");
+    const out = [];
+    let pair = null;
+    const flushPair = () => {
+      if (!pair) return;
+      const attrs = pair.id
+        ? ` data-action="anchor-open" data-anchor="${attr(pair.id)}"`
+        : "";
+      out.push(`<div class="desk-pair${pair.id ? " is-live" : ""}"${attrs}>${pair.parts.join("")}</div>`);
+      pair = null;
+    };
+    for (const rawLine of html.split(/\n+/)) {
+      const line = rawLine.trim();
+      if (!line) continue;
+      const hasAnchor = /class="anchor/.test(line);
+      const bare = line.replace(/<[^>]+>/g, "").trim();
+      if (hasAnchor && bare.length <= 96) {
+        flushPair();
+        seenItem = true;
+        const id = (line.match(/data-anchor="([^"]+)"/) || [])[1] || "";
+        pair = { id, parts: [`<p class="desk-item">${line}</p>`] };
+        continue;
+      }
+      if (hasAnchor) {
+        flushPair();
+        out.push(`<p class="desk-line">${line}</p>`);
+        continue;
+      }
+      const paragraph = `<p class="${seenItem ? "desk-note" : "desk-lead"}">${line}</p>`;
+      if (pair) pair.parts.push(paragraph);
+      else out.push(paragraph);
+    }
+    flushPair();
+    return out.join("");
   }
 
   function ensureReverse(raw, text) {
@@ -4298,7 +4324,7 @@
               return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}">
                 <div class="reverse-typing" id="reverse-typing">
                   <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <p class="desk-lead" id="reverse-stream">正在组织语言</p>
+                  <div class="desk-lead" id="reverse-stream">正在组织语言</div>
                 </div>
                 <div class="typing-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
               </article>`;
@@ -4311,9 +4337,9 @@
             }
             return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}">${renderAnchoredText(turn.result.narrative, turn.result.cards || {})}</article>`;
           }).join("")}
-          ${last?.role === "assistant" && !last.pending && !last.error ? `
+          ${last?.role === "assistant" && !last.pending && !last.typing && !last.error ? `
             <div class="reverse-actions">
-              ${(last.result.followups || []).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
+              ${(last.result.followups?.length ? last.result.followups : ["看更地道的口语说法", "放进具体例句里"]).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
               <button class="reverse-action" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
               <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
             </div>
@@ -4327,10 +4353,21 @@
   }
 
   function reverseAnnotatedPage(result) {
+    setTimeout(scheduleAutoDecision, 80);
     if (!state.reverseThread?.length) {
       state.reverseThread = [{ role: "user", text: result.text || "" }, { role: "assistant", result }];
     }
     return reverseThreadHtml();
+  }
+
+  function scheduleAutoDecision() {
+    requestAnimationFrame(() => {
+      if (state.route?.name !== "reverse") return;
+      const pop = $("#decision-popover");
+      if (!pop || !pop.hidden) return;
+      const pair = $(".reverse-turn-assistant .desk-pair[data-anchor]");
+      if (pair) openDecisionPopover(pair);
+    });
   }
 
   function redrawReverse() {
@@ -4342,6 +4379,7 @@
     updateModuleBar();
     applyContentCopy();
     if (stickToBottom) screen.scrollTop = screen.scrollHeight;
+    if (!state.reverseThread?.at(-1)?.typing) scheduleAutoDecision();
   }
 
   function plainNarrative(value) {
@@ -4451,8 +4489,13 @@
       </div>
       <p class="dock-verdict">${esc(card.verdict || "")}</p>`;
     pop.hidden = false;
+    $$(".desk-pair.is-active, .anchor.is-active").forEach((el) => {
+      el.classList.remove("is-active");
+      el.setAttribute("aria-expanded", "false");
+    });
     button.setAttribute("aria-expanded", "true");
     button.classList.add("is-active");
+    button.closest(".desk-pair")?.classList.add("is-active");
   }
 
   function reversePage(result) {
@@ -7360,10 +7403,13 @@
     if (preview.kind === "reverse") {
       const stream = $("#reverse-stream");
       if (stream) {
-        const next = preview.narrative || "";
-        if (stream.textContent !== next) stream.textContent = next;
+        const now = Date.now();
+        if (now - (state.reversePaintAt || 0) > 60) {
+          state.reversePaintAt = now;
+          stream.innerHTML = renderAnchoredText(cleanStreamNarrative(preview.raw || preview.narrative || ""), {});
+        }
         const wrap = stream.closest(".reverse-typing");
-        if (wrap) wrap.classList.toggle("has-text", Boolean(next.trim()));
+        if (wrap) wrap.classList.toggle("has-text", Boolean((preview.narrative || "").trim()));
         return;
       }
     }
