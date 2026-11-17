@@ -8,7 +8,8 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
-  const APP_VERSION = "1.0"; // display version; build numbers live in index.html/sw.js
+  const APP_VERSION = "1.0"; // display version
+  const APP_BUILD = "221"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -6048,7 +6049,7 @@
           ${tab === "tts" ? ttsSettingsHtml(draft) : tab === "data" ? dataSettingsHtml(draft) : modelSettingsHtml(draft)}
         </div>
         <div class="settings-footer">
-          <span id="settings-save-status"><span data-app-version>v${APP_VERSION}</span> · ${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
+          <span id="settings-save-status"><span data-app-version>v${APP_VERSION}</span> · build <span data-app-build>${APP_BUILD}</span> · ${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
           <button class="btn btn-primary" type="button" data-action="save-settings">完成</button>
         </div>
       </div>`;
