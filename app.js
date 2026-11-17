@@ -4645,6 +4645,8 @@
       orderNote: String(part.orderNote || ""),
       contrast: part.contrast || null
     }));
+    const wholeTranslation = sentence.translation
+      || renderParts.map((part) => part.translation).filter(Boolean).join(" ");
     const primary = renderParts[0];
     const primaryKeyWords = primary.keyWords.length ? primary.keyWords : topKeyWords;
     const bookmark = `sentence:${sentence.id}`;
@@ -4671,7 +4673,7 @@
           ${blockHead(nextNo(), multi ? "整段意译" : "整句意译", "中文翻译")}
           <div class="translation-card">
             <span class="translation-label">${icon("quote")} ${multi ? "整段理解" : "整句理解"}</span>
-            <p class="translation-text">${esc(sentence.translation || "连接模型后生成翻译。")}</p>
+            <p class="translation-text">${esc(wholeTranslation || "连接模型后生成翻译。")}</p>
             ${sentence.tone ? `<span class="translation-tone">${esc(sentence.tone)}</span>` : ""}
           </div>
           ${(sentence.tone || sentence.syntax || sentence.structure) ? `
@@ -6958,12 +6960,13 @@
         .slice(0, 12);
     }
     if (!text) throw new Error("模型返回的内容里没有原句。");
+    const joinedTranslation = sentences.map((part) => part.translation).filter(Boolean).join(" ");
     // A sentence with no key words is still a valid page (short or plain
     // sentences happen); only a missing sentence is fatal.
     return {
       id: `model-${Date.now()}`,
       text,
-      translation: String(base.translation || ""),
+      translation: String(base.translation || joinedTranslation || ""),
       tone: String(base.tone || ""),
       structure: typeof base.structure === "string" ? base.structure : String(base.structure?.note || ""),
       summary: String(base.summary || base.gist || "").trim(),
