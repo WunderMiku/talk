@@ -5871,13 +5871,16 @@
       ${draft.profiles.length ? "" : '<p class="provider-empty">还没有可用的模型。点下面添加一个，填好密钥就能查词。</p>'}
       <div class="provider-list" role="list" aria-label="模型渠道">
         ${draft.profiles.map((profile) => `
-          <button class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" type="button" role="listitem" data-action="provider-edit" data-profile="${attr(profile.id)}">
-            <span class="provider-row-copy">
-              <strong>${esc(profile.model || "未选模型")}</strong>
-              <small class="mono">${esc(profile.name || "未命名")} · ${esc(profileHost(profile))}</small>
-            </span>
-            <span class="provider-row-side" aria-hidden="true">${profile.id === draft.activeProfileId ? '<i class="provider-dot"></i>' : ""}<span class="provider-chevron">›</span></span>
-          </button>`).join("")}
+          <div class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" role="listitem">
+            <button class="provider-select" type="button" data-action="provider-select" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
+              <span class="provider-row-copy">
+                <strong>${esc(profile.model || "未选模型")}</strong>
+                <small class="mono">${esc(profile.name || "未命名")} · ${esc(profileHost(profile))}</small>
+              </span>
+              ${profile.id === draft.activeProfileId ? '<i class="provider-dot" aria-hidden="true"></i>' : ""}
+            </button>
+            <button class="provider-edit" type="button" data-action="provider-edit" data-profile="${attr(profile.id)}">编辑</button>
+          </div>`).join("")}
         <button class="provider-add" type="button" data-action="provider-new">+ 添加模型</button>
       </div>
       <div class="field">
@@ -7853,6 +7856,18 @@
         event.preventDefault();
         const template = PROVIDER_TEMPLATES.find((item) => item.id === target.dataset.template) || CUSTOM_TEMPLATE;
         openProviderSheet(null, template);
+        break;
+      }
+
+      case "provider-select": {
+        event.preventDefault();
+        const profile = state.draft?.profiles.find((item) => item.id === target.dataset.profile);
+        if (!profile || profile.id === state.draft.activeProfileId) break;
+        syncDraftProfile(state.draft);
+        state.draft = applyProfileToSettings(state.draft, profile);
+        commitSettingsDraft();
+        renderSettingsContent();
+        toast(`已切换到 ${profile.model || profile.name}`);
         break;
       }
 

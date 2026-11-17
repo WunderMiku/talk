@@ -9497,11 +9497,10 @@ html.motion-ready .reveal.reveal-soft.is-in {
 
 .provider-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: stretch;
+  gap: 0;
   width: 100%;
-  padding: 12px 14px;
+  padding: 0;
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--card);
@@ -9734,4 +9733,36 @@ html.motion-ready .reveal.reveal-soft.is-in {
   font-size: 12px;
   line-height: 1.6;
   color: var(--muted);
+}
+
+.provider-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.provider-edit {
+  flex: 0 0 auto;
+  padding: 0 14px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: none;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.provider-edit:hover {
+  color: var(--ink);
+  background: var(--card-soft, rgba(0,0,0,.03));
 }
