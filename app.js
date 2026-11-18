@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "240"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "241"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3692,6 +3692,7 @@
     // The prompt puts each target on its own line with a Chinese gloss below;
     // render those as a magazine-style list instead of one dense paragraph.
     let seenItem = false;
+    let pairCount = 0;
     const out = [];
     let pair = null;
     const flushPair = () => {
@@ -3699,7 +3700,8 @@
       const attrs = pair.id
         ? ` data-action="anchor-open" data-anchor="${attr(pair.id)}"`
         : "";
-      out.push(`<div class="desk-pair${pair.id ? " is-live" : ""}"${attrs}>${pair.parts.join("")}</div>`);
+      const delay = Number(pair.delay) || 0;
+      out.push(`<div class="desk-pair${pair.id ? " is-live" : ""}"${attrs} style="--d:${delay}ms">${pair.parts.join("")}</div>`);
       pair = null;
     };
     for (const rawLine of html.split(/\n+/)) {
@@ -3711,7 +3713,7 @@
         flushPair();
         seenItem = true;
         const id = (line.match(/data-anchor="([^"]+)"/) || [])[1] || "";
-        pair = { id, parts: [`<p class="desk-item">${line}</p>`] };
+        pair = { id, delay: pairCount++ * 50, parts: [`<p class="desk-item">${line}</p>`] };
         continue;
       }
       if (hasAnchor) {
@@ -4353,10 +4355,23 @@
   }
 
   function reverseAnnotatedPage(result) {
+    setTimeout(autoOpenFirstDecision, 90);
     if (!state.reverseThread?.length) {
       state.reverseThread = [{ role: "user", text: result.text || "" }, { role: "assistant", result }];
     }
     return reverseThreadHtml();
+  }
+
+  function autoOpenFirstDecision() {
+    const thread = state.reverseThread || [];
+    const index = thread.length - 1;
+    const turn = thread[index];
+    if (!turn?.result || turn.pending || turn.typing) return;
+    if (state.autoOpenedTurn === index) return;
+    const pair = $(`.reverse-turn-assistant[data-turn="${index}"] .desk-pair[data-anchor]`);
+    if (!pair) return;
+    state.autoOpenedTurn = index;
+    setTimeout(() => openDecisionPopover(pair), 60);
   }
 
   function redrawReverse() {
@@ -4368,6 +4383,7 @@
     updateModuleBar();
     applyContentCopy();
     if (stickToBottom) screen.scrollTop = screen.scrollHeight;
+    autoOpenFirstDecision();
   }
 
   function plainNarrative(value) {
@@ -4415,9 +4431,16 @@
     redrawReverse();
     const onPreview = (preview) => updateStreamPreview(preview, "reverse");
     try {
+      state.reversePainted = false;
       const result = await modelLookup(user.text, "reverse", state.settings, { onPreview, skipCache: true });
       result.data.text = result.data.text || user.text;
-      await typeReverse(placeholder, result.data);
+      if (state.reversePainted) {
+        placeholder.pending = false;
+        placeholder.result = result.data;
+        redrawReverse();
+      } else {
+        await typeReverse(placeholder, result.data);
+      }
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
@@ -4437,7 +4460,13 @@
     try {
       const result = await modelLookup(query, "reverse", state.settings, { onPreview });
       result.data.text = result.data.text || query;
-      await typeReverse(placeholder, result.data);
+      if (state.reversePainted) {
+        placeholder.pending = false;
+        placeholder.result = result.data;
+        redrawReverse();
+      } else {
+        await typeReverse(placeholder, result.data);
+      }
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
@@ -4445,12 +4474,20 @@
     }
   }
 
-  function closeDecisionPopover() {
+  function closeDecisionPopover(immediate = false) {
     const pop = $("#decision-popover");
-    if (!pop || pop.hidden) return;
-    pop.hidden = true;
-    pop.innerHTML = "";
-    $$(".anchor[aria-expanded='true']").forEach((el) => {
+    if (!pop) return;
+    $(".reverse-annotated")?.classList.remove("has-docket");
+    if (pop.hidden) return;
+    const finish = () => {
+      pop.hidden = true;
+      pop.classList.remove("is-open");
+      pop.innerHTML = "";
+    };
+    if (immediate) finish();
+    else setTimeout(finish, 220);
+    pop.classList.remove("is-open");
+    $$(".anchor[aria-expanded='true'], .desk-pair.is-active").forEach((el) => {
       el.setAttribute("aria-expanded", "false");
       el.classList.remove("is-active");
     });
@@ -4465,10 +4502,10 @@
     const card = result.cards?.[id];
     if (!card) return;
     const same = pop.dataset.anchor === id && !pop.hidden;
-    closeDecisionPopover();
     if (same) return;
+    const swap = !pop.hidden && pop.dataset.anchor;
     pop.dataset.anchor = id;
-    pop.innerHTML = `
+    const markup = `
       <div class="dock-line">
         <span class="dock-text">${esc(card.text || button.dataset.text || "")}</span>
         ${card.vibe ? `<span class="dock-vibe">${esc(card.vibe)}</span>` : ""}
@@ -4476,7 +4513,18 @@
         <button class="dock-close" type="button" data-action="anchor-close" aria-label="收起">×</button>
       </div>
       <p class="dock-verdict">${esc(card.verdict || "")}</p>`;
+    if (swap) {
+      pop.classList.add("is-swapping");
+      setTimeout(() => {
+        pop.innerHTML = markup;
+        pop.classList.remove("is-swapping");
+      }, 150);
+    } else {
+      pop.innerHTML = markup;
+    }
     pop.hidden = false;
+    requestAnimationFrame(() => pop.classList.add("is-open"));
+    $(".reverse-annotated")?.classList.add("has-docket");
     $$(".desk-pair.is-active, .anchor.is-active").forEach((el) => {
       el.classList.remove("is-active");
       el.setAttribute("aria-expanded", "false");
@@ -6692,6 +6740,10 @@
     state.lastAttempt = { query, type };
     const token = ++state.searchSeq;
     if (type === "reverse" && hasModelConfig()) {
+      state.reverseThread = [{ role: "user", text: query }, { role: "assistant", pending: true }];
+      state.reversePainted = false;
+      state.autoOpenedTurn = -1;
+      closeDecisionPopover(true);
       navigate({ name: "reverse", query, pending: true, result: { text: query, narrative: "", cards: {}, pending: true } });
     } else {
       navigate({ name: "loading", query, type });
@@ -7391,6 +7443,7 @@
     if (preview.kind === "reverse") {
       const stream = $("#reverse-stream");
       if (stream) {
+        if (String(preview.raw || "").trim()) state.reversePainted = true;
         const now = Date.now();
         if (now - (state.reversePaintAt || 0) > 60) {
           state.reversePaintAt = now;

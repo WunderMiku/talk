@@ -10326,3 +10326,71 @@ html.motion-ready .reveal.reveal-soft.is-in {
 @media (prefers-reduced-motion: reduce) {
   .reverse-actions { animation: none; }
 }
+
+/* Paper-damping motion for the reverse desk. GPU-only: transform + opacity. */
+:root {
+  --ease-paper: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.reverse-annotated {
+  background: var(--paper);
+  animation: reverse-page-in 0.25s var(--ease-paper) both;
+}
+
+@keyframes reverse-page-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.desk-pair {
+  animation: desk-pair-in 0.24s var(--ease-paper) both;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes desk-pair-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* The dock rides in above the input and reserves room in the thread. */
+.reverse-thread { transition: padding-bottom 0.26s var(--ease-paper); }
+.reverse-annotated.has-docket .reverse-thread { padding-bottom: 148px; }
+
+#decision-popover {
+  opacity: 0;
+  transform: translate(-50%, 14px);
+  transition: opacity 0.26s var(--ease-paper), transform 0.26s var(--ease-paper);
+}
+
+#decision-popover.is-open { opacity: 1; transform: translate(-50%, 0); }
+#decision-popover.is-swapping .dock-line,
+#decision-popover.is-swapping .dock-verdict {
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.15s var(--ease-paper), transform 0.15s var(--ease-paper);
+}
+
+.dock-drill svg { transition: transform 0.15s var(--ease-paper); }
+.dock-drill:hover svg,
+.dock-drill:active svg { transform: translate(2px, -2px); }
+
+.anchor { transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease; }
+
+.desk-pair.is-live:active,
+.reverse-action:active,
+.icon-btn:active,
+.reverse-composer-send:active,
+.dock-drill:active { transform: scale(0.975); }
+
+.desk-pair.is-live,
+.reverse-action,
+.icon-btn,
+.reverse-composer-send,
+.dock-drill { transition: transform 0.1s linear, background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .reverse-annotated,
+  .desk-pair { animation: none; }
+  .anchor, #decision-popover, .desk-pair, .reverse-action, .icon-btn,
+  .reverse-composer-send, .dock-drill, .reverse-thread { transition: none; }
+}
