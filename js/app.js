@@ -107,6 +107,9 @@
     standard: "按内容需要完整展开：tree 一般 6–9 个节点，重点词按等级上限，解释具体但不铺陈。",
     deep: "尽量讲透：tree 可到 12–14 个节点，重点词到上限，补语域、易错点与阅读提示，但不要重复。"
   };
+  // Single source for the model-request deadline; error copy derives from it.
+  const MODEL_TIMEOUT_MS = 180_000;
+  const MODEL_TIMEOUT_TEXT = `请求超过 ${MODEL_TIMEOUT_MS / 1000} 秒`;
   const HISTORY_KEY = "talk.history.v1";
   const SAVED_KEY = "talk.saved.v1";
   // Bumped when the shape of a cached entry changes (POS spelled out, English
@@ -231,6 +234,16 @@
     }
     const active = activeProfile(settings);
     if (active) settings.apiKey = active.apiKey || "";
+  }
+
+  // A still-sealed key means unsealing failed (e.g. no WebCrypto here).
+  // Never send the ciphertext as a credential; ask the user to re-enter it.
+  function usableApiKey(value) {
+    const key = String(value || "").trim();
+    if (key.startsWith(SEAL_PREFIX)) {
+      throw new Error("当前环境无法解密已保存的密钥，请在模型设置里重新输入密钥。");
+    }
+    return key;
   }
 
   const DEFAULT_SETTINGS = {
@@ -906,11 +919,25 @@
     return storageChain;
   }
 
+  let plainKeyDropWarned = false;
+
   async function sealSettingsSnapshot(snapshot) {
-    if (!canSeal()) return snapshot;
-    snapshot.apiKey = await sealText(snapshot.apiKey);
+    const sealKey = async (value) => {
+      const text = String(value || "");
+      if (!text || text.startsWith(SEAL_PREFIX)) return text;
+      const sealed = canSeal() ? await sealText(text) : text;
+      if (sealed.startsWith(SEAL_PREFIX)) return sealed;
+      // Cannot encrypt here: keep the key in memory for this session only,
+      // never write it to localStorage/sessionStorage in plain text.
+      if (!plainKeyDropWarned) {
+        plainKeyDropWarned = true;
+        toast("当前环境无法加密存储，密钥仅保留在本次会话");
+      }
+      return "";
+    };
+    snapshot.apiKey = await sealKey(snapshot.apiKey);
     for (const profile of snapshot.profiles || []) {
-      profile.apiKey = await sealText(profile.apiKey);
+      profile.apiKey = await sealKey(profile.apiKey);
     }
     return snapshot;
   }
@@ -1118,6 +1145,10 @@
   function cacheGetSentence(key) {
     const record = sentenceCache.get(key);
     if (!record || !(record.schema >= 1)) return null;
+    if (Date.now() - Number(record.savedAt || 0) > cacheTtlMs()) {
+      removeSentenceRecord(key);
+      return null;
+    }
     return record.data || null;
   }
 
@@ -1302,6 +1333,7 @@
         key,
         at: Number(entry.at) || Date.now(),
         detail: entry.detail || "standard",
+        schema: Number(entry.schema) >= WORD_CACHE_MIN_SCHEMA ? Number(entry.schema) : WORD_CACHE_MIN_SCHEMA,
         data
       };
       wordCache.set(key, record);
@@ -1879,6 +1911,8 @@
       closeTranslationWorkspace({ immediate: true });
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
+      // Drop observed nodes from the outgoing page before it is discarded.
+      revealObserver?.disconnect();
       screen.innerHTML = pageHtml(route);
       screen.classList.toggle("reveal-soft-mode", revealMode === "soft");
       applyInputMode($("#search-input"), "en");
@@ -2973,7 +3007,7 @@
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 180_000);
+    const timer = window.setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
     const startedAt = Date.now();
     diagLog("info", "model.start", `translation · ${state.settings?.detailLevel || "standard"}`, { chars: text.length });
     try {
@@ -3036,7 +3070,7 @@
       addHistory("translation", text);
     } catch (error) {
       if (token !== state.translatorSeq) return;
-      renderTranslatorError(error?.name === "AbortError" ? "请求超过 60 秒" : String(error?.message || error));
+      renderTranslatorError(error?.name === "AbortError" ? MODEL_TIMEOUT_TEXT : String(error?.message || error));
     }
   }
 
@@ -3945,6 +3979,8 @@
 
   function updateExamplesBlock(word) {
     if (!screen || state.route?.name !== "word") return false;
+    // A slow theme-example refill must not overwrite another word's page.
+    if (normalizeWord(state.route.word) !== normalizeWord(word.word)) return false;
     const section = $(".word-example-block", screen);
     const no = section?.dataset?.blockNo;
     if (!section || !no) return false;
@@ -4393,23 +4429,32 @@
       .trim();
   }
 
-  async function typeReverse(placeholder, data) {
+  async function typeReverse(placeholder, data, alive = () => true) {
     placeholder.pending = false;
     placeholder.result = data;
     placeholder.typing = true;
     placeholder.typingText = "";
+    if (!alive()) {
+      placeholder.typing = false;
+      return;
+    }
     redrawReverse();
     const text = plainNarrative(data.narrative);
     const stream = $("#reverse-stream");
     if (!stream || !text) {
       placeholder.typing = false;
-      redrawReverse();
+      if (alive()) redrawReverse();
       return;
     }
     const step = Math.max(1, Math.ceil(text.length / 55));
     await new Promise((done) => {
       let index = 0;
       const tick = () => {
+        if (!alive()) {
+          placeholder.typing = false;
+          done();
+          return;
+        }
         index = Math.min(text.length, index + step);
         stream.textContent = text.slice(0, index);
         if (index < text.length) setTimeout(tick, 16);
@@ -4418,33 +4463,43 @@
       tick();
     });
     placeholder.typing = false;
-    redrawReverse();
+    if (alive()) redrawReverse();
   }
 
   async function regenerateReverse() {
     const thread = state.reverseThread || [];
     const user = [...thread].reverse().find((turn) => turn.role === "user");
     if (!user) return;
+    const originRoute = state.route;
+    const alive = () => state.route === originRoute && state.route?.name === "reverse" && state.reverseThread === thread;
     if (thread[thread.length - 1]?.role === "assistant") thread.pop();
     const placeholder = { role: "assistant", pending: true };
     thread.push(placeholder);
     redrawReverse();
-    const onPreview = (preview) => updateStreamPreview(preview, "reverse");
+    const onPreview = (preview) => {
+      if (alive()) updateStreamPreview(preview, "reverse");
+    };
     try {
       state.reversePainted = false;
       const result = await modelLookup(user.text, "reverse", state.settings, { onPreview, skipCache: true });
       result.data.text = result.data.text || user.text;
+      if (!alive()) {
+        // The user moved on; modelLookup already cached the result.
+        placeholder.pending = false;
+        placeholder.result = result.data;
+        return;
+      }
       if (state.reversePainted) {
         placeholder.pending = false;
         placeholder.result = result.data;
         redrawReverse();
       } else {
-        await typeReverse(placeholder, result.data);
+        await typeReverse(placeholder, result.data, alive);
       }
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
-      redrawReverse();
+      if (alive()) redrawReverse();
     }
   }
 
@@ -4455,22 +4510,33 @@
     state.reverseThread.push({ role: "user", text: query });
     const placeholder = { role: "assistant", pending: true };
     state.reverseThread.push(placeholder);
+    const thread = state.reverseThread;
+    const originRoute = state.route;
+    const alive = () => state.route === originRoute && state.route?.name === "reverse" && state.reverseThread === thread;
     redrawReverse();
-    const onPreview = (preview) => updateStreamPreview(preview, "reverse");
+    const onPreview = (preview) => {
+      if (alive()) updateStreamPreview(preview, "reverse");
+    };
     try {
       const result = await modelLookup(query, "reverse", state.settings, { onPreview });
       result.data.text = result.data.text || query;
+      if (!alive()) {
+        // The user moved on; modelLookup already cached the result.
+        placeholder.pending = false;
+        placeholder.result = result.data;
+        return;
+      }
       if (state.reversePainted) {
         placeholder.pending = false;
         placeholder.result = result.data;
         redrawReverse();
       } else {
-        await typeReverse(placeholder, result.data);
+        await typeReverse(placeholder, result.data, alive);
       }
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
-      redrawReverse();
+      if (alive()) redrawReverse();
     }
   }
 
@@ -5598,7 +5664,7 @@
     } catch (error) {
       if (!record.el.isConnected) return;
       const message = error?.name === "AbortError"
-        ? "请求超过 60 秒，已中断。"
+        ? `${MODEL_TIMEOUT_TEXT}，已中断。`
         : String(error?.message || "模型请求失败。");
       record.loading = false;
       record.error = message;
@@ -6134,7 +6200,7 @@
     const base = String(profile.baseUrl || "").trim().replace(/\/+$/, "");
     if ((profile.protocol || "openai") === "google") {
       const root = /\/v1beta$/.test(base) ? base : `${base}/v1beta`;
-      return `${root}/models?key=${encodeURIComponent(String(profile.apiKey || "").trim())}`;
+      return `${root}/models?key=${encodeURIComponent(usableApiKey(profile.apiKey))}`;
     }
     return `${base}/models`;
   }
@@ -6145,7 +6211,7 @@
     try {
       const headers = (profile.protocol || "openai") === "google"
         ? { Accept: "application/json" }
-        : { Accept: "application/json", Authorization: `Bearer ${String(profile.apiKey || "").trim()}` };
+        : { Accept: "application/json", Authorization: `Bearer ${usableApiKey(profile.apiKey)}` };
       const response = await fetch(channelModelsUrl(profile), { headers, signal: controller.signal });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const json = await response.json();
@@ -6652,7 +6718,7 @@
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${String(state.draft.apiKey || "").trim()}`
+            "Authorization": `Bearer ${usableApiKey(state.draft.apiKey)}`
           },
           body: JSON.stringify({
             model: state.draft.model,
@@ -6739,7 +6805,9 @@
     const type = requestedMode === "auto" ? detectParadigm(query) : requestedMode;
     state.lastAttempt = { query, type };
     const token = ++state.searchSeq;
+    let loadingTimerId = null;
     if (type === "reverse" && hasModelConfig()) {
+      clearLoadingTimer();
       state.reverseThread = [{ role: "user", text: query }, { role: "assistant", pending: true }];
       state.reversePainted = false;
       state.autoOpenedTurn = -1;
@@ -6748,12 +6816,16 @@
     } else {
       navigate({ name: "loading", query, type });
       startLoadingStatus(type);
+      loadingTimerId = state.loadingTimer;
     }
 
     try {
       let result;
       if (hasModelConfig()) {
-        const onPreview = (preview) => updateStreamPreview(preview, type);
+        const onPreview = (preview) => {
+          if (token !== state.searchSeq) return;
+          updateStreamPreview(preview, type);
+        };
         result = type === "word"
           ? await lookupWordDeduped(query, { onPreview })
           : await modelLookup(query, type, state.settings, { ...options, onPreview });
@@ -6767,7 +6839,10 @@
         await wait(820);
         result = lookupDemo(query, type);
       }
-      if (token !== state.searchSeq) return;
+      if (token !== state.searchSeq) {
+        if (loadingTimerId && state.loadingTimer === loadingTimerId) clearLoadingTimer();
+        return;
+      }
       clearLoadingTimer();
       if (result.type !== "reverse") addHistory(result.type, query);
       const route = result.type === "word"
@@ -6793,14 +6868,17 @@
         navigate(route, { replace: true, direction: "forward" });
       }
     } catch (error) {
-      if (token !== state.searchSeq) return;
+      if (token !== state.searchSeq) {
+        if (loadingTimerId && state.loadingTimer === loadingTimerId) clearLoadingTimer();
+        return;
+      }
       clearLoadingTimer();
       if (error instanceof DemoMiss) {
         navigate({ name: "miss", type: error.type, query: error.query, suggestions: error.suggestions }, { replace: true });
         return;
       }
       const message = error?.name === "AbortError"
-        ? "请求超过 60 秒，已中断。"
+        ? `${MODEL_TIMEOUT_TEXT}，已中断。`
         : String(error?.message || "模型返回了未知错误。");
       navigate({ name: "error", query, type, message }, { replace: true });
     }
@@ -6860,7 +6938,7 @@
     const model = String(cfg?.model || "gemini-3.6-flash").trim().replace(/^models\//, "") || "gemini-3.6-flash";
     const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
     const sep = action.includes("?") ? "&" : "?";
-    return `${googleRoot(cfg?.baseUrl)}/models/${encodeURIComponent(model)}:${action}${sep}key=${encodeURIComponent(String(cfg?.apiKey || "").trim())}`;
+    return `${googleRoot(cfg?.baseUrl)}/models/${encodeURIComponent(model)}:${action}${sep}key=${encodeURIComponent(usableApiKey(cfg?.apiKey))}`;
   }
 
   function googlePayload(messages, maxTokens, jsonMode, cfg = {}) {
@@ -7010,7 +7088,7 @@
       window.clearTimeout(timer);
       controller = new AbortController();
       timedOut = false;
-      timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, 180_000);
+      timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, MODEL_TIMEOUT_MS);
     };
     armDeadline();
     const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
@@ -7050,8 +7128,8 @@
       // when both are present. The static prompt already requires JSON.
       content = await streamOnce();
     } catch (error) {
-      diagLog("error", "model.fail", timedOut ? "请求超时（180 秒）" : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
-      // Mobile networks drop long streams and gateways sometimes cut our 60s
+      diagLog("error", "model.fail", timedOut ? `请求超时（${MODEL_TIMEOUT_MS / 1000} 秒）` : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
+      // Mobile networks drop long streams and gateways sometimes cut our
       // deadline. Both are worth one silent retry with a fresh signal.
       const retriable = timedOut || error?.name !== "AbortError" || /不是 JSON|空响应|Failed to fetch|network error/i.test(String(error?.message || ""));
       if (!content && retriable) {
@@ -7085,7 +7163,7 @@
           content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
         }
       }
-      if (!content) throw timedOut ? new Error("请求超时（180 秒），网关没有返回内容，可以重试或换一个模型。") : error;
+      if (!content) throw timedOut ? new Error(`请求超时（${MODEL_TIMEOUT_MS / 1000} 秒），网关没有返回内容，可以重试或换一个模型。`) : error;
     } finally {
       window.clearTimeout(timer);
     }
@@ -7309,7 +7387,7 @@
         headers: {
           "Content-Type": "application/json",
           "Accept": "text/event-stream",
-          "Authorization": `Bearer ${String(cfg.apiKey || "").trim()}`
+          "Authorization": `Bearer ${usableApiKey(cfg.apiKey)}`
         },
         body: JSON.stringify(payload),
         signal
@@ -7547,7 +7625,7 @@
         headers: {
           "Content-Type": "application/json",
           "Accept": "application/json",
-          "Authorization": `Bearer ${String(cfg.apiKey || "").trim()}`
+          "Authorization": `Bearer ${usableApiKey(cfg.apiKey)}`
         },
         body: JSON.stringify(payload),
         signal
@@ -9176,29 +9254,42 @@
         return "qwen-cache";
       }
     }
-    const response = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${String(profile.apiKey || "").trim()}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model,
-        input: isQwen3
-          ? {
-              text,
-              voice,
-              language_type: detectSourceLanguage(text) === "zh" ? "Chinese" : "English"
-            }
-          : {
-              text,
-              voice,
-              format: "mp3",
-              sample_rate: 24000
-            }
-      })
-    });
-    const raw = await response.text();
+    const ttsTimeoutMs = 30_000;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), ttsTimeoutMs);
+    let response;
+    let raw;
+    try {
+      response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${usableApiKey(profile.apiKey)}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          input: isQwen3
+            ? {
+                text,
+                voice,
+                language_type: detectSourceLanguage(text) === "zh" ? "Chinese" : "English"
+              }
+            : {
+                text,
+                voice,
+                format: "mp3",
+                sample_rate: 24000
+              }
+        }),
+        signal: controller.signal
+      });
+      raw = await response.text();
+    } catch (error) {
+      if (error?.name === "AbortError") throw new Error(`Qwen 语音请求超过 ${ttsTimeoutMs / 1000} 秒，已中断。`);
+      throw error;
+    } finally {
+      window.clearTimeout(timer);
+    }
     let payload = null;
     try { payload = raw ? JSON.parse(raw) : null; } catch (_) { /* handled below */ }
     if (!response.ok || !payload) {

@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
-import { startServer } from "./tests/lib/server.mjs";
-import { modelSettings } from "./tests/lib/browser.mjs";
+import { startServer } from "../../tests/lib/server.mjs";
+import { modelSettings } from "../../tests/lib/browser.mjs";
 
 const server = await startServer();
 server.mock.setFallback("word", { fixture: "word-min" });

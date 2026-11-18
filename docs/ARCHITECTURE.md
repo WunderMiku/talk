@@ -145,12 +145,12 @@ memory                                记法
 主题是「基础 token + 覆盖文件」的结构：
 
 ```text
-theme.css            基础 token 契约（Paper 就是它本身）
-themes/ussr.css      constructivist 覆盖
-themes/rhine.css     Rhine Lab 覆盖
-theme.js             注册表：id / label / themeColor / accent / css / copyKey / description
-content.js           基础文案 + themeCopy[<id>] 的主题语气改写
-prompts.js           与主题无关，主题不影响提示词
+css/theme.css        基础 token 契约（Paper 就是它本身）
+css/themes/ussr.css  constructivist 覆盖
+css/themes/rhine.css Rhine Lab 覆盖
+js/theme.js          注册表：id / label / themeColor / accent / css / copyKey / description
+js/content.js        基础文案 + themeCopy[<id>] 的主题语气改写
+js/prompts.js        与主题无关，主题不影响提示词
 ```
 
 `theme.js` 的 `apply()` 负责写 `<html data-theme>`、切换 `theme-color`、懒加载对应样式表；`list()` 直接喂给设置面板，所以加一个主题只需要：一个 CSS 文件、一条注册表项、可选的文案块。完整步骤见 [THEME.md](../THEME.md)。
@@ -186,9 +186,10 @@ v122 之前打包过一个本地 Kokoro 模型，每个访客要多下约 115 MB
 ```text
 cp index.html styles.css theme.css theme.js content.js prompts.js data.js app.js \
    favicon.svg manifest.webmanifest sw.js .nojekyll LICENSE dist/
-cp -r icons themes dist/
-bash scripts/fetch-assets.sh dist      # 只下载 vendor/idb.js
+cp -r icons themes vendor dist/
 ```
+
+`vendor/`（idb、Lenis、html-to-image）已随仓库提交，部署不再联网下载；升级版本时跑 `bash scripts/fetch-assets.sh .` 重新下载并按写死的 SHA-256 校验。
 
 改前端资源后有三处版本号要一起动，否则老用户会拿到新旧混杂的缓存：
 
@@ -204,13 +205,13 @@ bash scripts/fetch-assets.sh dist      # 只下载 vendor/idb.js
 python3 -m http.server 8080     # 或任意静态服务器
 ```
 
-请用 `http://127.0.0.1:8080` 打开，**不要用局域网 IP**：页面带 `upgrade-insecure-requests`，非 localhost 的 HTTP 源会被浏览器改写成 HTTPS，子资源全部失败，表现为白屏。要在手机上调试就起一个 HTTPS 服务，或者接受 localhost 的信任例外。
+用 `http://127.0.0.1:8080` 或局域网 IP 打开都可以（页面不再带 `upgrade-insecure-requests`，HTTP 不会被改写成 HTTPS）。但注意：非 localhost 的 HTTP 是非安全上下文，没有 `crypto.subtle`，密钥加密封存与 service worker 不可用；要在手机上完整调试就起一个 HTTPS 服务。
 
 截图脚本 `scripts/screenshots.mjs` 用 Playwright 生成 README 图片，需要先 `npm i -D playwright && npx playwright install chromium`。脚本以 `SHOT_OUT` 指定输出目录。
 
 ## 自动化测试
 
-`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、离线降级与主题覆盖，共 16 例。细节见 [TESTING.md](TESTING.md)。
+`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、离线降级与主题覆盖，共 21 例。细节见 [TESTING.md](TESTING.md)。
 
 ## 手工验收清单
 

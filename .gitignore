@@ -1,5 +1,6 @@
 dist/
-vendor/
+node_modules/
+preview/
 .DS_Store
 
 # Local AI/tool configuration — may contain API keys or tokens.

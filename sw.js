@@ -3,19 +3,19 @@ const SHELL_CACHE = "talk-shell-v241";
 const SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=241",
-  "./theme.css?v=241",
-  "./themes/ussr.css?v=241",
-  "./themes/rhine.css?v=241",
-  "./themes/rhineaccess.css?v=241",
-  "./themes/endfield.css?v=241",
-  "./themes/bitterworld.css?v=241",
-  "./themes/ussr-statue.svg?v=241",
-  "./theme.js?v=241",
-  "./content.js?v=241",
-  "./prompts.js?v=241",
-  "./data.js?v=241",
-  "./app.js?v=241",
+  "./css/styles.css?v=241",
+  "./css/theme.css?v=241",
+  "./css/themes/ussr.css?v=241",
+  "./css/themes/rhine.css?v=241",
+  "./css/themes/rhineaccess.css?v=241",
+  "./css/themes/endfield.css?v=241",
+  "./css/themes/bitterworld.css?v=241",
+  "./css/themes/ussr-statue.svg?v=241",
+  "./js/theme.js?v=241",
+  "./js/content.js?v=241",
+  "./js/prompts.js?v=241",
+  "./js/data.js?v=241",
+  "./js/app.js?v=241",
   "./vendor/idb.js",
   "./vendor/html-to-image.js?v=241",
   "./vendor/lenis.min.js?v=241",
@@ -41,7 +41,9 @@ self.addEventListener("install", (event) => {
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key !== SHELL_CACHE).map((key) => caches.delete(key))))
+      // Only clean up this project's own old shell caches; the origin may be
+      // shared with other PWAs (e.g. *.github.io), whose caches must survive.
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("talk-shell-") && key !== SHELL_CACHE).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -56,8 +58,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const copy = response.clone();
-          caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+          if (response.ok) {
+            const copy = response.clone();
+            caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy)).catch(() => {});
+          }
           return response;
         })
         .catch(async () => (await caches.match(request)) || caches.match("./index.html"))

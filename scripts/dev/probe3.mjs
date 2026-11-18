@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { startServer } from "./tests/lib/server.mjs";
+import { startServer } from "../../tests/lib/server.mjs";
 const server = await startServer();
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 const ctx = await browser.newContext({ viewport: { width: 430, height: 932 }, serviceWorkers: "block" });

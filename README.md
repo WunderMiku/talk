@@ -37,7 +37,7 @@
 | **句子** | 重点词高亮、整句翻译、语气与句式分析、值得注意的词逐个展开 |
 | **翻译** | 极简口语 / 地道习语 / 书面正式 / 网络流行 / 优雅文句，五选多，一次调用 |
 | **主题沙龙** | AI 策展：一个场景、五个词，像一期小展览 |
-| **四套主题** | Paper、USSR、Rhine Lab、Endfield，各有自己的语气和版式细节 |
+| **六套主题** | Paper、USSR、Rhine Lab、Endfield、Rhine Lab · Access、Bitterworld，各有自己的语气和版式细节 |
 | **离线可用** | PWA 外壳 + 词条缓存，断网也能翻查过的词 |
 | **两套发音** | 设备原生语音（默认、离线）或 Qwen 语音（可缓存音频） |
 | **八个模型预设** | DeepSeek、OpenAI、Qwen、Kimi、GLM、OpenRouter、Claude、自定义 |
@@ -68,7 +68,7 @@
 
 ## 主题
 
-四套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
+六套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
 
 <img src="docs/screenshots/home-paper.jpg" width="330" alt="首页 Paper 主题"> <img src="docs/screenshots/home-endfield.jpg" width="330" alt="首页 Endfield 主题">
 
@@ -76,6 +76,8 @@
 - **USSR**：构成主义的红黑斜切，标题像海报。
 - **Rhine Lab**：冷调的实验档案，细线、刻度与编号。
 - **Endfield**：工业终端的现场记录。纸白底、切角面板、编号区块，全站只有一种信号黄，只用来点「当前」。
+- **Rhine Lab · Access**：实验记录终端，纸白、细线窗口与唯一一种酸性绿。
+- **Bitterworld**：票根拼贴，米纸、墨线、检票章与一条虚线路线。
 
 <img src="docs/screenshots/word-endfield.jpg" width="330" alt="词条页 Endfield 主题">
 
@@ -99,16 +101,17 @@
 
 ## 快速开始
 
-不需要 Node、不需要打包。任意静态服务器即可：
+不需要 Node、不需要打包，`vendor/` 依赖已随仓库提交。任意静态服务器即可：
 
 ```bash
-bash scripts/fetch-assets.sh .   # 下载一次 vendor/idb.js
 python3 -m http.server 8080
 ```
 
 打开 <http://127.0.0.1:8080/>，进 **设置 → 模型** 填上你自己的 API key 就能用。
 
-> 请用 `127.0.0.1`，不要用局域网 IP：页面带 `upgrade-insecure-requests`，从非 localhost 的 HTTP 地址打开会被浏览器改写成 HTTPS，表现是白屏。
+> 局域网 IP 的 HTTP 地址也能直接打开。但非安全上下文（非 localhost 的 HTTP）没有 `crypto.subtle`，密钥加密封存与 service worker 不可用；要在手机上完整体验请用 HTTPS。
+>
+> 可选：`bash scripts/fetch-assets.sh .` 重新下载 vendor 依赖（仅升级版本时需要，下载带 SHA-256 校验）。
 
 ## 配置模型
 
@@ -132,20 +135,22 @@ Qwen 失败时提示原因并自动回退到设备语音，不会让一个词没
 
 ```text
 index.html              单页外壳与三处版本号
-styles.css              布局与组件，横屏间距收敛为 --word-* 变量
-theme.css               基础 token（Paper）
-themes/ussr.css         构成主义主题覆盖
-themes/rhine.css        Rhine Lab 主题覆盖
-themes/endfield.css     Endfield 主题覆盖
-themes/bitterworld.css  未许之地主题覆盖
-theme.js                主题注册表
-content.js              基础文案 + 各主题的语气改写
-prompts.js              静态模型提示词（与主题无关）
-data.js                 内置示例词条
-app.js                  应用主体：路由、请求、渲染、缓存、设置
+css/styles.css          布局与组件，横屏间距收敛为 --word-* 变量
+css/theme.css           基础 token（Paper）
+css/themes/ussr.css     构成主义主题覆盖
+css/themes/rhine.css    Rhine Lab 主题覆盖
+css/themes/endfield.css Endfield 主题覆盖
+css/themes/rhineaccess.css  Rhine Lab · Access 主题覆盖
+css/themes/bitterworld.css  未许之地主题覆盖
+js/theme.js             主题注册表
+js/content.js           基础文案 + 各主题的语气改写
+js/prompts.js           静态模型提示词（与主题无关）
+js/data.js              内置示例词条
+js/app.js               应用主体：路由、请求、渲染、缓存、设置
 sw.js                   app-shell service worker
-vendor/idb.js           构建时下载的 IndexedDB 助手
+vendor/                 随仓库提交的运行依赖（idb、Lenis、html-to-image）
 scripts/screenshots.mjs Playwright 截图脚本
+scripts/dev/            一次性调试与审查脚本（从仓库根运行）
 tests/                  离线端到端测试（假模型 + Playwright）
 docs/ARCHITECTURE.md    实现说明与设计取舍
 docs/TESTING.md         测试怎么跑、怎么加
@@ -180,18 +185,16 @@ npm test
 2. 推送到 `main` / `master`，或在 Actions 里手动运行
 3. 等部署完成，打开 `https://<user>.github.io/<repo>/`
 
-发布的是纯静态文件，`themes/`、`icons/`、`vendor/idb.js` 都包含在产物里；没有模型要下载，也没有 100 MB 的限制。
+发布的是纯静态文件，`css/`、`js/`、`icons/`、`vendor/` 都包含在产物里；没有模型要下载，也没有 100 MB 的限制。
 
 ## 已知限制
 
-- **没有自动化测试**。改动依赖 [验收清单](docs/ARCHITECTURE.md#手工验收清单) 手测。
 - **key 是加密存储、而非真正保密**。密文挡得住翻看，挡不住同源脚本；请用限额 key，要真正隔离只能加代理。
-- **局域网 HTTP 预览会白屏**，原因见上文。
+- **局域网 HTTP 下密钥无法加密**。非安全上下文没有 `crypto.subtle`，密钥加密封存与 service worker 不可用，完整功能请走 HTTPS 或 localhost。
 - 宽屏下同根词卡片宽度固定，右侧会留白；吸顶栏半透明，滚动时偶尔显得脏。
 
 ## 路线图
 
-- 把截图脚本扩成 Playwright 冒烟测试，接进 CI
 - 宽屏同根词卡片均分整行
 - 吸顶栏滚动时的可读性
 - 深度数量在提示词与代码里收敛成单一来源
@@ -209,6 +212,6 @@ npm test
 
 **talk.** is a static, backend-free English–Chinese dictionary and translator that runs entirely in the browser. It renders a word as a living entry — IPA, multiple parts of speech, etymology timeline, word family, synonyms, collocations, examples, mnemonics — and parses whole sentences into key words, tone, and structure. A multi-style translator turns one sentence into five English registers in a single model call.
 
-There is no build step and no bundled model: the site is plain HTML/CSS/JS (< 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and four visual themes (Paper, USSR, Rhine Lab, Endfield) share one token contract. Model profiles for DeepSeek, OpenAI, Qwen, Kimi, GLM, OpenRouter, and Claude are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
+There is no build step and no bundled model: the site is plain HTML/CSS/JS (< 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and six visual themes (Paper, USSR, Rhine Lab, Endfield, Rhine Lab · Access, Bitterworld) share one token contract. Model profiles for DeepSeek, OpenAI, Qwen, Kimi, GLM, OpenRouter, and Claude are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request pipeline, prompt structure, cache layout, and deployment details.

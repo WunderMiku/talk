@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { startServer } from "./tests/lib/server.mjs";
+import { startServer } from "../../tests/lib/server.mjs";
 import { readFileSync } from "node:fs";
 const server = await startServer();
 const word = JSON.parse(readFileSync("tests/fixtures/word-obfuscate.json", "utf8"));

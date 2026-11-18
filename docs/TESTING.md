@@ -23,7 +23,7 @@ npm test -- --headed         # 开窗口看过程
 - 静态文件服务（就是仓库根目录，带 `cache-control: no-store`）；
 - `POST /__mock/*` 的模型端点，按请求体里的 `task` 分派。
 
-页面把 `baseUrl` 指到 `${origin}/__mock`，于是请求天然同源：没有 CORS 预检，也不会被 `index.html` 里的 `upgrade-insecure-requests` 改写成 https。响应可以按 task 排队、按 query 精确匹配，也可以模拟截断、500、挂起和 SSE 分块。
+页面把 `baseUrl` 指到 `${origin}/__mock`，于是请求天然同源：没有 CORS 预检，也没有跨协议改写。响应可以按 task 排队、按 query 精确匹配，也可以模拟截断、500、挂起和 SSE 分块。
 
 ```js
 server.mock.setFallback("word", { fixture: "word-min" });   // 该 task 的默认响应
