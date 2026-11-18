@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "239"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "240"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4353,21 +4353,10 @@
   }
 
   function reverseAnnotatedPage(result) {
-    setTimeout(scheduleAutoDecision, 80);
     if (!state.reverseThread?.length) {
       state.reverseThread = [{ role: "user", text: result.text || "" }, { role: "assistant", result }];
     }
     return reverseThreadHtml();
-  }
-
-  function scheduleAutoDecision() {
-    requestAnimationFrame(() => {
-      if (state.route?.name !== "reverse") return;
-      const pop = $("#decision-popover");
-      if (!pop || !pop.hidden) return;
-      const pair = $(".reverse-turn-assistant .desk-pair[data-anchor]");
-      if (pair) openDecisionPopover(pair);
-    });
   }
 
   function redrawReverse() {
@@ -4379,7 +4368,6 @@
     updateModuleBar();
     applyContentCopy();
     if (stickToBottom) screen.scrollTop = screen.scrollHeight;
-    if (!state.reverseThread?.at(-1)?.typing) scheduleAutoDecision();
   }
 
   function plainNarrative(value) {
