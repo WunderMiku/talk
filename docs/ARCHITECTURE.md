@@ -184,9 +184,8 @@ v122 之前打包过一个本地 Kokoro 模型，每个访客要多下约 115 MB
 `.github/workflows/pages.yml` 把静态文件拷进 `dist/` 再发布到 GitHub Pages，没有任何构建步骤：
 
 ```text
-cp index.html styles.css theme.css theme.js content.js prompts.js data.js app.js \
-   favicon.svg manifest.webmanifest sw.js .nojekyll LICENSE dist/
-cp -r icons themes vendor dist/
+cp index.html favicon.svg manifest.webmanifest sw.js .nojekyll LICENSE dist/
+cp -r icons css js vendor dist/
 ```
 
 `vendor/`（idb、Lenis、html-to-image）已随仓库提交，部署不再联网下载；升级版本时跑 `bash scripts/fetch-assets.sh .` 重新下载并按写死的 SHA-256 校验。
@@ -194,7 +193,7 @@ cp -r icons themes vendor dist/
 改前端资源后有三处版本号要一起动，否则老用户会拿到新旧混杂的缓存：
 
 1. `app.js` 里的 `APP_VERSION`
-2. `index.html` 里所有 `?v=` 查询参数（含 `themes/*.css`）
+2. `index.html` 里所有 `?v=` 查询参数（含 `css/themes/*.css`）
 3. `sw.js` 的缓存名（`talk-shell-vNNN`）和 `?v=`
 
 新增静态目录时记得同步 `pages.yml` 的拷贝清单——`themes/` 最初就是因为漏了这一步而 404。

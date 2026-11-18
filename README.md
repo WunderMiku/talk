@@ -172,7 +172,7 @@ npm test
 
 - **静态提示词 + 动态尾巴**：系统提示词整段不变，变的东西（查询词、排除列表）永远放在用户消息末尾，让供应商的前缀缓存一直命中。
 - **缓存跨深度复用**：换 fast/standard/deep 不会重新请求，想换版本就点「重新生成词条」——省钱，也避免同样的词反复生成。
-- **主题不碰布局**：主题文件只覆盖 token，横屏间距走 `styles.css` 的变量，避免主题之间的 `!important` 打架。
+- **主题不碰布局**：主题文件只覆盖 token，横屏间距走 `css/styles.css` 的变量，避免主题之间的 `!important` 打架。
 - **流式但不带 `response_format`**：很多网关在「流式 + 结构化输出」同时开启时会缓冲整个响应，所以流式请求靠提示词约束 JSON，普通请求才用 `response_format`。
 
 完整链路、数据结构和缓存表在 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
