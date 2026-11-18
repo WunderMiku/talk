@@ -29,9 +29,11 @@
 | 单个词 | 词 | `word` | 词条页（报刊卡片） |
 | 2–5 个词、无句末标点 | 意群 | `chunk` | 意群页：整体意思 / 词眼 / 槽位 / 变形 / 来历 / 例句 |
 | 有句末标点或 ≥6 词 | 句子 | `sentence` | 句子页（意群切分） |
-| 中文或「how do you say…」 | 语境寻词 | `reverse` | 选词手记：一句概述 + 3–5 个候选，按 `paradigm` 精确跳转 |
+| 中文或「how do you say…」 | 语境寻词 | `reverse` | 对话式选词台：一段拆解 + 3–5 个行内标注 + 语气判断卡，可继续追问 |
 
 意群缓存与词条共用 `talk.words.v1`，键前缀 `chunk:`，单独限 **60 条**，不挤占 300 条词条额度；`talk.reverse.v1` 只存最近 20 次手记、7 天过期。
+
+语境寻词返回的是**两段式文本**：正文里用 `<s>/<c>/<w>` 标出句子、意群、单词，末尾跟一段 ```` ```json:cards ```` 存放语气判断与推荐追问。流式阶段会剥掉半截标签、隐藏 JSON；卡片解析成功后正文渲染成可点的锚点。追问时，客户端把本页最近 6 轮问答作为 `assistant` / `user` 消息一起发给模型（Gemini 映射为 `model`），所以一次请求仍然无状态，但上下文是完整的。
 
 ## 提示词：静态前缀，动态尾巴
 
@@ -89,7 +91,10 @@ memory                                记法
 | localStorage | `talk.theme.v1` | 当前主题 id | — |
 | IndexedDB | `talk.vault.v1` | 用于解封密钥的 AES-GCM `CryptoKey` | 不可导出（`extractable: false`） |
 | localStorage | `talk.history.v1` / `talk.saved.v1` | 最近查词（含意群）/ 收藏 | — |
-| localStorage | `talk.reverse.v1` | 语境寻词手记（按下文短哈希） | 20 条 / 7 天 |
+| localStorage | `talk.reverse.v1` | 语境寻词结果（按下文短哈希；正文、卡片、追问建议） | 20 条 / 7 天 |
+| IndexedDB | `talk.sentences.v1` | 句子分析结果（`sha1(text\|level\|detail)` 为键） | 120 条，按写入时间淘汰 |
+| localStorage | `talk.share.v1` | 分享图勾选的段落 | — |
+| localStorage | `talk.exampleStyles.v1` | 每套主题的例句风格描述 | — |
 
 几条规则：
 
@@ -177,7 +182,7 @@ v122 之前打包过一个本地 Kokoro 模型，每个访客要多下约 115 MB
 
 ## 分享图
 
-顶栏的分享按钮只出现在词条、意群与句子页。客户端把当前页面的真实元素（标题区、释义卡、例句/译文卡）克隆进一个离屏舞台，套上当前主题的样式，再用 `vendor/html-to-image.js` 渲染成 1080 宽的 PNG：可保存，也可通过 `navigator.share` 交给系统。它不请求模型，也不上传内容。
+顶栏的分享按钮只出现在词条、意群与句子页。客户端先按默认选择（词义 + 例句）生成一张图：把标题区与选中的段落克隆进离屏舞台，套上当前主题的样式，再用 `vendor/html-to-image.js` 渲染成 1080 宽的 PNG。底部可以「保存图片 / 系统分享 / 调整内容」；调整面板会列出页面上所有段落，勾选结果写入 `talk.share.v1`，下次沿用。它不请求模型，也不上传内容。
 
 ## 部署
 
@@ -210,7 +215,7 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 ## 自动化测试
 
-`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、离线降级与主题覆盖，共 21 例。细节见 [TESTING.md](TESTING.md)。
+`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、缓存导入导出、离线降级与主题覆盖，共 22 例。细节见 [TESTING.md](TESTING.md)。
 
 ## 手工验收清单
 
