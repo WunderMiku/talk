@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "242"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "243"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -505,6 +505,7 @@
   const SILENT_AUDIO = "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
   let activeViewTransition = null;
+  let queuedRender = null;
 
   const state = {
     mode: "auto",
@@ -1597,6 +1598,7 @@
       if (decoded.startsWith("word/")) {
         const word = normalizeWord(decoded.slice(5));
         if (DATA.words[word]) return { name: "word", word, result: DATA.words[word] };
+        if (word && cacheGetWord(word)) return { name: "word", word };
       }
       if (decoded.startsWith("sentence/")) {
         const id = decoded.slice(9);
@@ -1950,7 +1952,15 @@
 
     if (!instant && !reduceMotion && document.startViewTransition) {
       if (activeViewTransition) {
-        apply();
+        /* The running transition has not painted its own update callback yet.
+           Rendering now would let that callback overwrite this page later. */
+        queuedRender = { route, direction };
+        activeViewTransition.finished.catch(() => {}).finally(() => {
+          activeViewTransition = null;
+          const next = queuedRender;
+          queuedRender = null;
+          if (next) renderRoute(next.route, next.direction, { instant: true });
+        });
         return;
       }
       try {
@@ -2020,6 +2030,12 @@
       case "reverse": {
         const reverse = getReverse(route);
         state.reverse = reverse || null;
+        if (reverse?.narrative && !state.reverseThread?.length) {
+          state.reverseThread = [
+            { role: "user", text: reverse.text || "" },
+            { role: "assistant", result: reverse }
+          ];
+        }
         return reverse ? reversePage(reverse) : missPage("reverse", route.query || "", []);
       }
       case "translator":
@@ -2037,6 +2053,8 @@
 
   function getWord(route) {
     if (route?.result) return ensureWord(route.result);
+    const cached = cacheGetWord(route?.word || "");
+    if (cached) return ensureWord(cached);
     return ensureWord(DATA.words[normalizeWord(route?.word || "")]);
   }
 
@@ -4507,6 +4525,14 @@
     const query = String(text || "").trim();
     if (!query) return;
     state.reverseThread = state.reverseThread || [];
+    const history = state.reverseThread
+      .slice(-6)
+      .map((turn) => turn.role === "user" && turn.text
+        ? { role: "user", content: String(turn.text).slice(0, 1200) }
+        : turn.result?.narrative
+          ? { role: "assistant", content: plainNarrative(turn.result.narrative).slice(0, 3000) }
+          : null)
+      .filter(Boolean);
     state.reverseThread.push({ role: "user", text: query });
     const placeholder = { role: "assistant", pending: true };
     state.reverseThread.push(placeholder);
@@ -4518,7 +4544,7 @@
       if (alive()) updateStreamPreview(preview, "reverse");
     };
     try {
-      const result = await modelLookup(query, "reverse", state.settings, { onPreview });
+      const result = await modelLookup(query, "reverse", state.settings, { onPreview, history, skipCache: true });
       result.data.text = result.data.text || query;
       if (!alive()) {
         // The user moved on; modelLookup already cached the result.
@@ -6814,7 +6840,7 @@
       closeDecisionPopover(true);
       navigate({ name: "reverse", query, pending: true, result: { text: query, narrative: "", cards: {}, pending: true } });
     } else {
-      navigate({ name: "loading", query, type });
+      navigate({ name: "loading", query, type }, { instant: true });
       startLoadingStatus(type);
       loadingTimerId = state.loadingTimer;
     }
@@ -6943,9 +6969,11 @@
 
   function googlePayload(messages, maxTokens, jsonMode, cfg = {}) {
     const system = messages.filter((m) => m.role === "system").map((m) => String(m.content || "")).join("\n\n");
-    const user = messages.filter((m) => m.role !== "system").map((m) => String(m.content || "")).join("\n\n");
+    const turns = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content || "") }] }));
     const payload = {
-      contents: [{ role: "user", parts: [{ text: user }] }],
+      contents: turns.length ? turns : [{ role: "user", parts: [{ text: "" }] }],
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: maxTokens
@@ -7077,8 +7105,14 @@
         : type === "reverse"
           ? reversePrompt(query, detail)
           : wordPrompt(query, detail);
+    const history = Array.isArray(options?.history)
+      ? options.history
+        .filter((turn) => turn && turn.content)
+        .map((turn) => ({ role: turn.role === "assistant" ? "assistant" : "user", content: String(turn.content) }))
+      : [];
     const messages = [
       { role: "system", content: systemPrompt(type) },
+      ...history,
       { role: "user", content: prompt }
     ];
     let controller = new AbortController();
@@ -9638,13 +9672,19 @@
       }
       state.searchSeq += 1;
       clearLoadingTimer();
-      const route = event.state?.route;
-      renderRoute(route && route.name ? route : { name: "home" }, "back");
+      const stored = event.state?.route;
+      const route = stored && stored.name && routeHash(stored) === location.hash
+        ? stored
+        : routeFromHash();
+      renderRoute(route, "back");
     });
 
     if ("scrollRestoration" in history) history.scrollRestoration = "manual";
 
-    const initial = routeFromHash();
+    const storedRoute = history.state?.route;
+    const initial = storedRoute && storedRoute.name && routeHash(storedRoute) === location.hash
+      ? storedRoute
+      : routeFromHash();
     history.replaceState({ route: initial, depth: 0 }, "", routeHash(initial));
     setupReveal();
     renderRoute(initial, "forward", { instant: true });
