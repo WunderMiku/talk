@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "244"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "245"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -7090,7 +7090,7 @@
       : type === "chunk"
         ? Math.max(detailTokens, 2400)
         : type === "reverse"
-          ? Math.max(4096, Number(state.settings?.reverseMaxTokens) || 4096)
+          ? 1500
           : detailTokens;
     const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";
