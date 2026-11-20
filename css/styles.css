@@ -10693,3 +10693,8 @@ html.motion-ready .reveal.reveal-soft.is-in {
   box-decoration-break: clone;
   -webkit-box-decoration-break: clone;
 }
+
+/* Keep the last line of a thread clear of the fixed composer. */
+.screen[data-page="reverse"] .reverse-thread {
+  padding-bottom: 132px;
+}
