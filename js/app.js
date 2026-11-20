@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "246"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "247"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3760,6 +3760,11 @@
       }
       if (code !== null) { code.push(raw); continue; }
       if (!line.trim()) { flushParagraph(); flushQuote(); flushList(); continue; }
+      if (/^ {0,3}([-*_])(?: *\1){2,} *$/.test(line)) {
+        flushParagraph(); flushQuote(); flushList();
+        out.push('<hr class="rev-rule">');
+        continue;
+      }
       const heading = line.match(/^(#{1,4})\s+(.*)$/);
       if (heading) {
         flushParagraph(); flushQuote(); flushList();

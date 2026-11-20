@@ -10698,3 +10698,9 @@ html.motion-ready .reveal.reveal-soft.is-in {
 .screen[data-page="reverse"] .reverse-thread {
   padding-bottom: 132px;
 }
+
+.reverse-markdown .rev-rule {
+  margin: 22px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
