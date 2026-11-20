@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "243"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "244"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2028,15 +2028,18 @@
         return chunk ? chunkPage(chunk) : missPage("chunk", route.query || "", ["by and large", "take off", "in the end"]);
       }
       case "reverse": {
-        const reverse = getReverse(route);
-        state.reverse = reverse || null;
-        if (reverse?.narrative && !state.reverseThread?.length) {
-          state.reverseThread = [
-            { role: "user", text: reverse.text || "" },
-            { role: "assistant", result: reverse }
-          ];
+        state.reverse = null;
+        if (!state.reverseThread?.length || state.reverseThreadId !== route.id) {
+          const stored = loadReverseThread(route.id);
+          if (stored) {
+            state.reverseThreadId = stored.id;
+            state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
+          }
         }
-        return reverse ? reversePage(reverse) : missPage("reverse", route.query || "", []);
+        if (!state.reverseThread?.length) {
+          return missPage("reverse", route.query || "", []);
+        }
+        return reversePage({ id: route.id });
       }
       case "translator":
         return translatorPage();
@@ -3687,147 +3690,109 @@
   /* The reverse reply arrives as prose with <s>/<c>/<w> anchors followed by a
      json:cards block. This splitter is pure so the stream can call it on every
      delta without touching the DOM. */
-  function parseAnnotatedStream(raw) {
-    const text = String(raw || "");
-    const marker = "```json:cards";
-    const at = text.indexOf(marker);
-    let narrative = at === -1 ? text : text.slice(0, at);
-    const tail = at === -1 ? "" : text.slice(at + marker.length);
-    // A half-streamed tag must never reach the screen as raw angle brackets.
-    narrative = narrative.replace(/<([scw])\b[^>]*>([^<]*)$/, "$2");
-    narrative = narrative.replace(/<[^>]*$/, "");
-    const closed = tail.includes("```");
-    let cards = {};
-    let ok = false;
-    if (closed) {
-      const body = tail.slice(0, tail.indexOf("```")).trim();
-      try {
-        const parsed = JSON.parse(body);
-        if (parsed && typeof parsed === "object") { cards = parsed; ok = true; }
-      } catch (_) {
-        ok = false;
-      }
-    }
-    const order = Array.from(narrative.matchAll(/<([scw])\s+id="([^"]+)"/g)).map((match) => match[2]);
-    let followups = [];
-    if (ok) {
-      const rawFollowups = Array.isArray(cards.followups) ? cards.followups : Array.isArray(cards._followups) ? cards._followups : [];
-      followups = rawFollowups.map((item) => String(item || "").trim()).filter(Boolean).slice(0, 3);
-      delete cards.followups;
-      delete cards._followups;
-    }
-    return { narrative: narrative.trim(), cards, order, followups, phase: at === -1 ? "narrative" : ok ? "ready" : "cards" };
+  /* Reverse replies are plain Markdown with [[expression]] anchors. The
+     renderer runs on every streamed frame, so it has to be cheap and it has to
+     tolerate a half-written [[ at the tail. */
+  const REVERSE_ANCHOR_RE = /\[\[([^\[\]\n]{1,80})\]\]/g;
+
+  function reverseAnchorWords(text) {
+    return String(text || "").trim().split(/\s+/).filter(Boolean).length;
   }
 
-  function cleanStreamNarrative(value) {
-    let text = String(value || "");
-    text = text.split(/```json:cards/i)[0];
-    const lastOpen = text.lastIndexOf("<");
-    if (lastOpen >= 0 && !/>/.test(text.slice(lastOpen))) text = text.slice(0, lastOpen);
-    return text.trim();
+  function stripReverseAnchors(text) {
+    return String(text || "").replace(REVERSE_ANCHOR_RE, "$1");
   }
 
-  function renderAnchoredText(narrative, cards) {
-    let no = 0;
-    const html = esc(narrative)
-      .replace(/&lt;([scw])\s+id=&quot;([^&]*?)&quot;\s*&gt;([\s\S]*?)&lt;\/\1&gt;/g, (match, tag, id, inner) => {
-        const type = ANCHOR_TYPES[tag];
-        const card = cards[id];
-        const index = tag === "w" ? String(++no).padStart(2, "0") : "";
-        const text = String(card?.text || inner).trim();
-        if (!card) return `<span class="anchor anchor-${tag} is-plain">${inner}${index ? `<sup class="anchor-index">${index}</sup>` : ""}</span>`;
-        return `<span role="button" tabindex="0" class="anchor anchor-${tag} has-card"` +
-          ` data-action="anchor-open" data-anchor="${attr(id)}" data-type="${type}" data-text="${attr(text)}"` +
-          ` aria-expanded="false">${inner}${index ? `<sup class="anchor-index">${index}</sup>` : ""}</span>`;
-      });
-
-    // The prompt puts each target on its own line with a Chinese gloss below;
-    // render those as a magazine-style list instead of one dense paragraph.
-    let seenItem = false;
-    let pairCount = 0;
-    const out = [];
-    let pair = null;
-    const flushPair = () => {
-      if (!pair) return;
-      const attrs = pair.id
-        ? ` data-action="anchor-open" data-anchor="${attr(pair.id)}"`
-        : "";
-      const delay = Number(pair.delay) || 0;
-      out.push(`<div class="desk-pair${pair.id ? " is-live" : ""}"${attrs} style="--d:${delay}ms">${pair.parts.join("")}</div>`);
-      pair = null;
-    };
-    for (const rawLine of html.split(/\n+/)) {
-      const line = rawLine.trim();
-      if (!line) continue;
-      const hasAnchor = /class="anchor/.test(line);
-      const bare = line.replace(/<[^>]+>/g, "").trim();
-      if (hasAnchor && bare.length <= 96) {
-        flushPair();
-        seenItem = true;
-        const id = (line.match(/data-anchor="([^"]+)"/) || [])[1] || "";
-        pair = { id, delay: pairCount++ * 50, parts: [`<p class="desk-item">${line}</p>`] };
-        continue;
-      }
-      if (hasAnchor) {
-        flushPair();
-        out.push(`<p class="desk-line">${line}</p>`);
-        continue;
-      }
-      const paragraph = `<p class="${seenItem ? "desk-note" : "desk-lead"}">${line}</p>`;
-      if (pair) pair.parts.push(paragraph);
-      else out.push(paragraph);
-    }
-    flushPair();
-    return out.join("");
-  }
-
-  function ensureReverse(raw, text) {
-    const source = String(text || raw?.text || "").trim();
-    const narrative = String(raw?.narrative || "").trim();
-    const cards = raw?.cards && typeof raw.cards === "object" ? raw.cards : {};
-    const order = Array.isArray(raw?.order) ? raw.order.filter((id) => cards[id]) : [];
-    const fromCards = order.map((id) => {
-      const card = cards[id] || {};
-      return {
-        expression: String(card.text || id).trim(),
-        paradigm: ["word", "chunk", "sentence"].includes(card.type) ? card.type : "chunk",
-        phonetic: "",
-        whenToUse: String(card.verdict || "").trim(),
-        gloss: String(card.vibe || "").trim()
-      };
+  function inlineMarkup(text) {
+    const slots = [];
+    const working = String(text || "").replace(REVERSE_ANCHOR_RE, (_match, expression) => {
+      const index = slots.push(String(expression).trim()) - 1;
+      return `\u0000${index}\u0000`;
     });
-    const candidates = (narrative && fromCards.length ? fromCards : Array.isArray(raw?.candidates) ? raw.candidates : [])
-      .map((item) => {
-        let expression = String(item?.expression || "").trim().replace(/\s+/g, " ");
-        if (!expression) return null;
-        let paradigm = ["word", "chunk", "sentence"].includes(item?.paradigm) ? item.paradigm : "chunk";
-        const words = countWords(expression);
-        if (paradigm === "word" && words > 1) paradigm = "chunk";
-        if (paradigm === "sentence" && words > REVERSE_MAX_SENTENCE_WORDS) {
-          paradigm = words === 1 ? "word" : "chunk";
-        }
-        return {
-          expression,
-          paradigm,
-          phonetic: String(item?.phonetic || "").trim(),
-          whenToUse: String(item?.whenToUse || item?.when || "").trim(),
-          gloss: String(item?.gloss || "").trim()
-        };
-      })
-      .filter(Boolean)
-      .slice(0, 5);
-    return {
-      kind: "reverse",
-      id: reverseIdFor(source),
-      text: source,
-      narrative,
-      cards,
-      followups: Array.isArray(raw?.followups) ? raw.followups : [],
-      order,
-      overview: String(raw?.overview || "").trim(),
-      candidates,
-      source: raw?.source || ""
+    let html = esc(working);
+    html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
+    html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>");
+    html = html.replace(/\u0000(\d+)\u0000/g, (_match, index) => {
+      const expression = slots[Number(index)] || "";
+      const cls = reverseAnchorWords(expression) <= 2 ? "is-word" : "is-phrase";
+      return `<span class="rev-anchor ${cls}" role="button" tabindex="0" data-action="reverse-anchor" data-text="${attr(expression)}">${esc(expression)}</span>`;
+    });
+    return html;
+  }
+
+  function markdownLite(source, final = true) {
+    let text = String(source || "").replace(/\r\n/g, "\n");
+    if (!final) {
+      const open = text.lastIndexOf("[[");
+      if (open !== -1 && text.indexOf("]]", open) === -1) text = text.slice(0, open);
+    }
+    const out = [];
+    let paragraph = [];
+    let quote = [];
+    let list = "";
+    let listItems = [];
+    let code = null;
+
+    const flushParagraph = () => {
+      if (!paragraph.length) return;
+      out.push(`<p>${paragraph.join("<br>")}</p>`);
+      paragraph = [];
     };
+    const flushQuote = () => {
+      if (!quote.length) return;
+      out.push(`<blockquote>${quote.map((line) => `<p>${line}</p>`).join("")}</blockquote>`);
+      quote = [];
+    };
+    const flushList = () => {
+      if (!list) return;
+      out.push(`<${list}>${listItems.join("")}</${list}>`);
+      list = "";
+      listItems = [];
+    };
+
+    for (const raw of text.split("\n")) {
+      const line = raw.replace(/\s+$/, "");
+      if (/^```/.test(line)) {
+        flushParagraph(); flushQuote(); flushList();
+        if (code === null) code = [];
+        else { out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`); code = null; }
+        continue;
+      }
+      if (code !== null) { code.push(raw); continue; }
+      if (!line.trim()) { flushParagraph(); flushQuote(); flushList(); continue; }
+      const heading = line.match(/^(#{1,4})\s+(.*)$/);
+      if (heading) {
+        flushParagraph(); flushQuote(); flushList();
+        const level = Math.min(6, heading[1].length + 2);
+        out.push(`<h${level}>${inlineMarkup(heading[2])}</h${level}>`);
+        continue;
+      }
+      const quoted = line.match(/^>\s?(.*)$/);
+      if (quoted) {
+        flushParagraph(); flushList();
+        quote.push(inlineMarkup(quoted[1]));
+        continue;
+      }
+      const bullets = line.match(/^[-*]\s+(.*)$/);
+      if (bullets) {
+        flushParagraph(); flushQuote();
+        if (list !== "ul") { flushList(); list = "ul"; }
+        listItems.push(`<li>${inlineMarkup(bullets[1])}</li>`);
+        continue;
+      }
+      const numbered = line.match(/^\d+[.)]\s+(.*)$/);
+      if (numbered) {
+        flushParagraph(); flushQuote();
+        if (list !== "ol") { flushList(); list = "ol"; }
+        listItems.push(`<li>${inlineMarkup(numbered[1])}</li>`);
+        continue;
+      }
+      flushList(); flushQuote();
+      paragraph.push(inlineMarkup(line));
+    }
+    if (code !== null) out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
+    flushParagraph(); flushQuote(); flushList();
+    return out.join("");
   }
 
   function ensureWord(raw) {
@@ -4362,203 +4327,247 @@
      Reverse search (context → candidates)
      ============================================================ */
 
+  const REVERSE_THREADS_KEY = "talk.reverse.threads.v1";
+  const REVERSE_THREAD_LIMIT = 30;
+  const REVERSE_FIRST_KEY = "talk.reverse.v2";
+
+  function readLocalJson(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      const parsed = raw ? JSON.parse(raw) : null;
+      return parsed && typeof parsed === "object" ? parsed : fallback;
+    } catch (_) {
+      return fallback;
+    }
+  }
+
+  function writeLocalJson(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* storage can be full */ }
+  }
+
+  function loadReverseThreads() {
+    return readLocalJson(REVERSE_THREADS_KEY, {});
+  }
+
+  function saveReverseThreads(map) {
+    const entries = Object.values(map).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+    const kept = {};
+    entries.slice(0, REVERSE_THREAD_LIMIT).forEach((entry) => { kept[entry.id] = entry; });
+    writeLocalJson(REVERSE_THREADS_KEY, kept);
+  }
+
+  function reverseThreadTitle(thread) {
+    const first = (thread || []).find((turn) => turn.role === "user" && turn.content);
+    return String(first?.content || "语境寻词").replace(/\s+/g, " ").trim().slice(0, 60);
+  }
+
+  function persistReverseThread() {
+    const id = state.reverseThreadId;
+    const thread = Array.isArray(state.reverseThread) ? state.reverseThread : [];
+    if (!id || !thread.length) return;
+    const messages = thread
+      .filter((turn) => turn && !turn.pending)
+      .map((turn) => ({
+        role: turn.role === "assistant" ? "assistant" : "user",
+        content: String(turn.content || ""),
+        ...(turn.reasoning ? { reasoning: String(turn.reasoning) } : {})
+      }))
+      .filter((turn) => turn.content);
+    if (!messages.length) return;
+    const map = loadReverseThreads();
+    map[id] = { id, title: reverseThreadTitle(thread), updatedAt: Date.now(), messages };
+    saveReverseThreads(map);
+  }
+
+  function loadReverseThread(id) {
+    if (!id) return null;
+    return loadReverseThreads()[id] || null;
+  }
+
+  function currentReverseThread() {
+    return Array.isArray(state.reverseThread) ? state.reverseThread : [];
+  }
+
+  function cacheGetReverseFirst(text) {
+    return readLocalJson(REVERSE_FIRST_KEY, {})[reverseIdFor(text)] || null;
+  }
+
+  function cachePutReverseFirst(text, data) {
+    const map = readLocalJson(REVERSE_FIRST_KEY, {});
+    map[reverseIdFor(text)] = { ...data, at: Date.now() };
+    const entries = Object.entries(map).sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0));
+    writeLocalJson(REVERSE_FIRST_KEY, Object.fromEntries(entries.slice(0, 40)));
+  }
+
+  function reverseSuggestions() {
+    const sent = new Set(
+      currentReverseThread()
+        .filter((turn) => turn.role === "user")
+        .map((turn) => String(turn.content || "").trim())
+    );
+    return ["再口语一点怎么说", "放进正式写作里怎么改", "举两个真实例句"]
+      .filter((text) => !sent.has(text))
+      .slice(0, 2);
+  }
+
+  function reverseTurnHtml(turn) {
+    if (turn.role === "user") {
+      return `<div class="reverse-turn-mine"><div class="reverse-bubble">${esc(turn.content)}</div></div>`;
+    }
+    if (turn.pending) {
+      return `<article class="reverse-turn is-pending">
+        <div class="reverse-typing" aria-label="正在组织语言"><i></i><i></i><i></i></div>
+        <div class="typing-skeleton"><span></span><span></span><span></span></div>
+        <div class="reverse-stream-body" id="reverse-stream"></div>
+      </article>`;
+    }
+    if (turn.error) {
+      return `<article class="reverse-turn"><p class="reverse-error">${esc(turn.error)}</p></article>`;
+    }
+    return `<article class="reverse-turn">
+      <div class="reverse-markdown">${markdownLite(turn.content, true)}</div>
+      ${turn.reasoning ? `<details class="rev-reasoning"><summary>模型思考</summary><p>${esc(String(turn.reasoning).slice(0, 4000))}</p></details>` : ""}
+    </article>`;
+  }
+
   function reverseThreadHtml() {
     const copy = copyFor("reverse");
-    const thread = state.reverseThread || [];
+    const thread = currentReverseThread();
+    const chips = reverseSuggestions();
     const last = thread[thread.length - 1];
+    const showActions = last && last.role === "assistant" && !last.pending && !last.error && last.content;
     return `
-      ${backTopbar({ label: copy.label || "语境寻词", title: "语境寻词", actions: `
-        <button class="icon-btn" type="button" title="新对话" aria-label="新对话" data-action="reverse-new">${icon("refresh")}</button>
-      ` })}
-      <main class="result-page reverse-page reverse-annotated">
-        <div class="reverse-thread">
-          ${thread.map((turn, index) => {
-            if (turn.role === "user") {
-              return `<div class="reverse-turn reverse-turn-mine"><div class="reverse-bubble">${esc(turn.text)}</div></div>`;
-            }
-            if (turn.pending) {
-              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}">
-                <div class="reverse-typing" id="reverse-typing">
-                  <span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                  <div class="desk-lead" id="reverse-stream">正在组织语言</div>
-                </div>
-                <div class="typing-skeleton" aria-hidden="true"><i></i><i></i><i></i></div>
-              </article>`;
-            }
-            if (turn.typing) {
-              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-lead" id="reverse-stream">${esc(turn.typingText || "")}</p></article>`;
-            }
-            if (turn.error) {
-              return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}"><p class="desk-note">${esc(turn.error)}</p></article>`;
-            }
-            return `<article class="reverse-turn reverse-turn-assistant" data-turn="${index}">${renderAnchoredText(turn.result.narrative, turn.result.cards || {})}</article>`;
-          }).join("")}
-          ${last?.role === "assistant" && !last.pending && !last.typing && !last.error ? `
-            <div class="reverse-actions">
-              ${(last.result.followups?.length ? last.result.followups : ["看更地道的口语说法", "放进具体例句里"]).map((prompt) => `<button class="reverse-action" type="button" data-action="reverse-follow" data-prompt="${attr(prompt)}">${esc(prompt)}</button>`).join("")}
-              <button class="reverse-action" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
-              <button class="reverse-action reverse-action-icon" type="button" title="复制" aria-label="复制" data-action="reverse-copy">${icon("copy")}</button>
-            </div>
-            <p class="reverse-hint">点画线的片段，看语气判断；↗ 进完整档案。</p>` : ""}
+      <header class="reverse-topbar">
+        <button class="icon-btn" type="button" data-action="back" aria-label="返回">${icon("arrowLeft")}</button>
+        <div class="reverse-topbar-copy">
+          <span class="reverse-kicker">${esc(copy.label || "语境寻词")}</span>
+          <strong>${esc(copy.title || "语境寻词")}</strong>
         </div>
-      </main>
-      <form class="reverse-composer" id="reverse-composer">
-        <input class="reverse-composer-input" id="reverse-input" type="text" autocomplete="off" placeholder="输入英文句子，或继续追问语气、搭配…" aria-label="继续追问" />
-        <button class="reverse-composer-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
-      </form>`;
+        <button class="icon-btn reverse-new" type="button" data-action="reverse-new" aria-label="新对话"><span aria-hidden="true">+</span></button>
+      </header>
+      <main class="reverse-page reverse-thread">
+        <div class="reverse-scroll">
+          ${thread.map(reverseTurnHtml).join("")}
+          ${showActions ? `<div class="reverse-actions">
+            ${chips.map((chip) => `<button class="reverse-chip" type="button" data-action="reverse-follow" data-prompt="${attr(chip)}">${esc(chip)}</button>`).join("")}
+            <button class="reverse-chip" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
+            <button class="reverse-chip is-icon" type="button" data-action="reverse-copy" aria-label="复制">${icon("copy")}</button>
+          </div>
+          <p class="reverse-hint">带下划线或底色的表达可以直接点开看完整档案。</p>` : ""}
+        </div>
+        <form class="reverse-composer" autocomplete="off">
+          <input id="reverse-input" type="text" name="q" placeholder="输入英文句子，或继续追问语气、搭配…" />
+          <button class="reverse-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
+        </form>
+      </main>`;
   }
 
-  function reverseAnnotatedPage(result) {
-    setTimeout(autoOpenFirstDecision, 90);
-    if (!state.reverseThread?.length) {
-      state.reverseThread = [{ role: "user", text: result.text || "" }, { role: "assistant", result }];
-    }
-    return reverseThreadHtml();
-  }
-
-  function autoOpenFirstDecision() {
-    const thread = state.reverseThread || [];
-    const index = thread.length - 1;
-    const turn = thread[index];
-    if (!turn?.result || turn.pending || turn.typing) return;
-    if (state.autoOpenedTurn === index) return;
-    const pair = $(`.reverse-turn-assistant[data-turn="${index}"] .desk-pair[data-anchor]`);
-    if (!pair) return;
-    state.autoOpenedTurn = index;
-    setTimeout(() => openDecisionPopover(pair), 60);
+  function reverseScrollToEnd() {
+    const scroller = document.querySelector(".reverse-page");
+    if (scroller) scroller.scrollTop = scroller.scrollHeight;
   }
 
   function redrawReverse() {
-    const html = reverseThreadHtml();
-    const stickToBottom = true;
-    screen.innerHTML = html;
-    applyCacheDisplay();
-    refreshCacheBorders();
-    updateModuleBar();
-    applyContentCopy();
-    if (stickToBottom) screen.scrollTop = screen.scrollHeight;
-    autoOpenFirstDecision();
+    const screen = document.querySelector('.screen[data-page="reverse"]');
+    if (!screen) return;
+    screen.innerHTML = reverseThreadHtml();
+    reverseScrollToEnd();
   }
 
-  function plainNarrative(value) {
-    return String(value || "")
-      .replace(/```json:cards[\s\S]*$/i, "")
-      .replace(/<\s*\/?\s*[scw]\b[^>]*>/gi, "")
-      .trim();
+  function reversePage(result = {}) {
+    if (!currentReverseThread().length) {
+      const stored = loadReverseThread(result.id || state.reverseThreadId);
+      if (stored) {
+        state.reverseThreadId = stored.id;
+        state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
+      }
+    }
+    state.reverse = null;
+    return reverseThreadHtml();
   }
 
-  async function typeReverse(placeholder, data, alive = () => true) {
-    placeholder.pending = false;
-    placeholder.result = data;
-    placeholder.typing = true;
-    placeholder.typingText = "";
-    if (!alive()) {
-      placeholder.typing = false;
+  function updateReverseStream(text) {
+    const body = document.querySelector(".reverse-turn.is-pending .reverse-stream-body");
+    if (!body) return;
+    body.innerHTML = markdownLite(String(text || ""), false);
+    body.classList.add("has-text");
+    const pending = body.closest(".is-pending");
+    if (pending) pending.classList.add("has-text");
+    reverseScrollToEnd();
+  }
+
+  async function startReverse(query) {
+    const text = String(query || "").trim();
+    if (!text) return;
+    const cached = cacheGetReverseFirst(text);
+    const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    state.reverseThreadId = id;
+    state.reverseTitle = reverseThreadTitle([{ role: "user", content: text }]);
+    state.reverseThread = [{ role: "user", content: text }];
+    if (cached?.content) {
+      state.reverseThread.push({ role: "assistant", content: String(cached.content), reasoning: String(cached.reasoning || "") });
+      persistReverseThread();
+      navigate({ name: "reverse", id });
       return;
     }
-    redrawReverse();
-    const text = plainNarrative(data.narrative);
-    const stream = $("#reverse-stream");
-    if (!stream || !text) {
-      placeholder.typing = false;
-      if (alive()) redrawReverse();
-      return;
-    }
-    const step = Math.max(1, Math.ceil(text.length / 55));
-    await new Promise((done) => {
-      let index = 0;
-      const tick = () => {
-        if (!alive()) {
-          placeholder.typing = false;
-          done();
-          return;
-        }
-        index = Math.min(text.length, index + step);
-        stream.textContent = text.slice(0, index);
-        if (index < text.length) setTimeout(tick, 16);
-        else done();
-      };
-      tick();
-    });
-    placeholder.typing = false;
-    if (alive()) redrawReverse();
-  }
-
-  async function regenerateReverse() {
-    const thread = state.reverseThread || [];
-    const user = [...thread].reverse().find((turn) => turn.role === "user");
-    if (!user) return;
-    const originRoute = state.route;
-    const alive = () => state.route === originRoute && state.route?.name === "reverse" && state.reverseThread === thread;
-    if (thread[thread.length - 1]?.role === "assistant") thread.pop();
-    const placeholder = { role: "assistant", pending: true };
-    thread.push(placeholder);
-    redrawReverse();
-    const onPreview = (preview) => {
-      if (alive()) updateStreamPreview(preview, "reverse");
-    };
+    const placeholder = { role: "assistant", content: "", pending: true };
+    state.reverseThread.push(placeholder);
+    navigate({ name: "reverse", id });
+    const owner = state.reverseThread;
+    const alive = () => state.reverseThread === owner;
     try {
-      state.reversePainted = false;
-      const result = await modelLookup(user.text, "reverse", state.settings, { onPreview, skipCache: true });
-      result.data.text = result.data.text || user.text;
-      if (!alive()) {
-        // The user moved on; modelLookup already cached the result.
-        placeholder.pending = false;
-        placeholder.result = result.data;
-        return;
-      }
-      if (state.reversePainted) {
-        placeholder.pending = false;
-        placeholder.result = result.data;
-        redrawReverse();
-      } else {
-        await typeReverse(placeholder, result.data, alive);
-      }
+      const result = await modelLookup(text, "reverse", state.settings, {
+        onPreview: (preview) => {
+          if (!alive() || !preview?.narrative) return;
+          updateReverseStream(preview.narrative);
+        }
+      });
+      placeholder.pending = false;
+      placeholder.content = String(result?.data?.narrative || "");
+      placeholder.reasoning = String(result?.data?.reasoning || "");
+      if (placeholder.content) cachePutReverseFirst(text, { content: placeholder.content, reasoning: placeholder.reasoning });
+      persistReverseThread();
+      if (alive()) redrawReverse();
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
       if (alive()) redrawReverse();
     }
+  }
+
+  function reverseHistory(excludeIndex = -1) {
+    return currentReverseThread()
+      .filter((turn, index) => index !== excludeIndex && turn.role && turn.content && !turn.pending)
+      .map((turn) => ({
+        role: turn.role,
+        content: turn.role === "assistant" ? stripReverseAnchors(turn.content) : String(turn.content)
+      }));
   }
 
   async function askReverseFollowUp(text) {
     const query = String(text || "").trim();
     if (!query) return;
-    state.reverseThread = state.reverseThread || [];
-    const history = state.reverseThread
-      .slice(-6)
-      .map((turn) => turn.role === "user" && turn.text
-        ? { role: "user", content: String(turn.text).slice(0, 1200) }
-        : turn.result?.narrative
-          ? { role: "assistant", content: plainNarrative(turn.result.narrative).slice(0, 3000) }
-          : null)
-      .filter(Boolean);
-    state.reverseThread.push({ role: "user", text: query });
-    const placeholder = { role: "assistant", pending: true };
-    state.reverseThread.push(placeholder);
-    const thread = state.reverseThread;
-    const originRoute = state.route;
-    const alive = () => state.route === originRoute && state.route?.name === "reverse" && state.reverseThread === thread;
+    const history = reverseHistory();
+    const placeholder = { role: "assistant", content: "", pending: true };
+    state.reverseThread.push({ role: "user", content: query }, placeholder);
+    persistReverseThread();
     redrawReverse();
-    const onPreview = (preview) => {
-      if (alive()) updateStreamPreview(preview, "reverse");
-    };
+    const owner = state.reverseThread;
+    const alive = () => state.reverseThread === owner;
     try {
-      const result = await modelLookup(query, "reverse", state.settings, { onPreview, history, skipCache: true });
-      result.data.text = result.data.text || query;
-      if (!alive()) {
-        // The user moved on; modelLookup already cached the result.
-        placeholder.pending = false;
-        placeholder.result = result.data;
-        return;
-      }
-      if (state.reversePainted) {
-        placeholder.pending = false;
-        placeholder.result = result.data;
-        redrawReverse();
-      } else {
-        await typeReverse(placeholder, result.data, alive);
-      }
+      const result = await modelLookup(query, "reverse", state.settings, {
+        history,
+        skipCache: true,
+        onPreview: (preview) => {
+          if (!alive() || !preview?.narrative) return;
+          updateReverseStream(preview.narrative);
+        }
+      });
+      placeholder.pending = false;
+      placeholder.content = String(result?.data?.narrative || "");
+      placeholder.reasoning = String(result?.data?.reasoning || "");
+      persistReverseThread();
+      if (alive()) redrawReverse();
     } catch (error) {
       placeholder.pending = false;
       placeholder.error = error?.message || "这次没有写完，再试一次。";
@@ -4566,104 +4575,55 @@
     }
   }
 
-  function closeDecisionPopover(immediate = false) {
-    const pop = $("#decision-popover");
-    if (!pop) return;
-    $(".reverse-annotated")?.classList.remove("has-docket");
-    if (pop.hidden) return;
-    const finish = () => {
-      pop.hidden = true;
-      pop.classList.remove("is-open");
-      pop.innerHTML = "";
-    };
-    if (immediate) finish();
-    else setTimeout(finish, 220);
-    pop.classList.remove("is-open");
-    $$(".anchor[aria-expanded='true'], .desk-pair.is-active").forEach((el) => {
-      el.setAttribute("aria-expanded", "false");
-      el.classList.remove("is-active");
-    });
-  }
-
-  function openDecisionPopover(button) {
-    const pop = $("#decision-popover");
-    const index = Number(button.closest("[data-turn]")?.dataset.turn);
-    const result = state.reverseThread?.[index]?.result || state.reverse;
-    if (!pop || !result) return;
-    const id = button.dataset.anchor || "";
-    const card = result.cards?.[id];
-    if (!card) return;
-    const same = pop.dataset.anchor === id && !pop.hidden;
-    if (same) return;
-    const swap = !pop.hidden && pop.dataset.anchor;
-    pop.dataset.anchor = id;
-    const markup = `
-      <div class="dock-line">
-        <span class="dock-text">${esc(card.text || button.dataset.text || "")}</span>
-        ${card.vibe ? `<span class="dock-vibe">${esc(card.vibe)}</span>` : ""}
-        <button class="dock-drill" type="button" data-action="anchor-drill" data-type="${attr(card.type || button.dataset.type || "chunk")}" data-text="${attr(card.text || button.dataset.text || "")}" aria-label="查看完整档案">↗</button>
-        <button class="dock-close" type="button" data-action="anchor-close" aria-label="收起">×</button>
-      </div>
-      <p class="dock-verdict">${esc(card.verdict || "")}</p>`;
-    if (swap) {
-      pop.classList.add("is-swapping");
-      setTimeout(() => {
-        pop.innerHTML = markup;
-        pop.classList.remove("is-swapping");
-      }, 150);
-    } else {
-      pop.innerHTML = markup;
+  async function regenerateReverse() {
+    const thread = currentReverseThread();
+    const last = thread[thread.length - 1];
+    if (!last || last.role !== "assistant" || last.pending) return;
+    const prompt = reverseHistory(thread.length - 1).filter((turn) => turn.role === "user").pop()?.content || "";
+    if (!prompt) return;
+    thread.pop();
+    const placeholder = { role: "assistant", content: "", pending: true };
+    thread.push(placeholder);
+    redrawReverse();
+    const history = reverseHistory(thread.length - 1);
+    const owner = thread;
+    const alive = () => state.reverseThread === owner;
+    try {
+      const result = await modelLookup(prompt, "reverse", state.settings, {
+        history,
+        skipCache: true,
+        onPreview: (preview) => {
+          if (!alive() || !preview?.narrative) return;
+          updateReverseStream(preview.narrative);
+        }
+      });
+      placeholder.pending = false;
+      placeholder.content = String(result?.data?.narrative || "");
+      placeholder.reasoning = String(result?.data?.reasoning || "");
+      persistReverseThread();
+      if (alive()) redrawReverse();
+    } catch (error) {
+      placeholder.pending = false;
+      placeholder.error = error?.message || "这次没有写完，再试一次。";
+      if (alive()) redrawReverse();
     }
-    pop.hidden = false;
-    requestAnimationFrame(() => pop.classList.add("is-open"));
-    $(".reverse-annotated")?.classList.add("has-docket");
-    $$(".desk-pair.is-active, .anchor.is-active").forEach((el) => {
-      el.classList.remove("is-active");
-      el.setAttribute("aria-expanded", "false");
-    });
-    button.setAttribute("aria-expanded", "true");
-    button.classList.add("is-active");
-    button.closest(".desk-pair")?.classList.add("is-active");
   }
 
-  function reversePage(result) {
-    const copy = copyFor("reverse");
-    if (result.narrative || result.pending) return reverseAnnotatedPage(result);
-    const paradigms = copy.paradigms || { word: "词", chunk: "意群", sentence: "句" };
-    return `
-      ${backTopbar({ label: copy.label || "语境寻词", title: "选词手记" })}
-      <main class="result-page reverse-page">
-        <header class="reverse-masthead reveal" style="--d:0">
-          <span class="reverse-desk">${esc(copy.masthead || "编辑部")} · ${esc(copy.desk || "WORD DESK")}</span>
-          <span class="reverse-count">${result.candidates.length} 个候选</span>
-        </header>
-        <section class="reverse-query reveal" style="--d:0.25">
-          <span class="reverse-query-label">你问</span>
-          <p class="reverse-query-text">${esc(result.text)}</p>
-        </section>
-        ${result.overview ? `<p class="reverse-overview reveal" style="--d:0.4">${esc(result.overview)}</p>` : ""}
-        <div class="reverse-list">
-          ${result.candidates.map((candidate, index) => `
-            <button class="reverse-card reveal" type="button" style="--d:${(0.6 + index * 0.2).toFixed(1)}"
-              data-action="reverse-pick" data-expression="${attr(candidate.expression)}" data-paradigm="${attr(candidate.paradigm)}">
-              <span class="reverse-index">${String(index + 1).padStart(2, "0")}</span>
-              <span class="reverse-body">
-                <span class="reverse-line">
-                  <span class="reverse-expression">${esc(candidate.expression)}</span>
-                  <span class="paradigm-tag">${esc(paradigms[candidate.paradigm] || "意群")}</span>
-                </span>
-                ${candidate.phonetic ? `<span class="reverse-phonetic">${esc(candidate.phonetic)}</span>` : ""}
-                <span class="reverse-scene">${esc(candidate.whenToUse)}</span>
-                ${candidate.gloss ? `<span class="reverse-gloss">${esc(candidate.gloss)}</span>` : ""}
-              </span>
-              ${icon("arrowUpRight")}
-            </button>`).join("")}
-        </div>
-        ${result.candidates.length ? "" : `<p class="reverse-empty">${esc(copy.empty || "没找到贴切的表达，换个更具体的场景再试。")}</p>`}
-        <div class="reverse-foot reveal" style="--d:1.4">
-          <button class="link-btn" type="button" data-action="reverse-again">${esc(copy.retry || "换个说法再问")}</button>
-        </div>
-      </main>`;
+  function submitReverseComposer() {
+    const field = $("#reverse-input");
+    const text = String(field?.value || "").trim();
+    if (!text) return;
+    field.value = "";
+    void askReverseFollowUp(text);
+  }
+
+  function gotoReverseAnchor(expression) {
+    const text = String(expression || "").trim();
+    if (!text) return;
+    persistReverseThread();
+    state.restoreScroll = document.querySelector(".screen")?.scrollTop || 0;
+    const type = reverseAnchorWords(text) <= 2 ? "word" : "chunk";
+    runSearch(text, type);
   }
 
   /* ============================================================
@@ -6834,12 +6794,10 @@
     let loadingTimerId = null;
     if (type === "reverse" && hasModelConfig()) {
       clearLoadingTimer();
-      state.reverseThread = [{ role: "user", text: query }, { role: "assistant", pending: true }];
-      state.reversePainted = false;
-      state.autoOpenedTurn = -1;
-      closeDecisionPopover(true);
-      navigate({ name: "reverse", query, pending: true, result: { text: query, narrative: "", cards: {}, pending: true } });
-    } else {
+      void startReverse(query);
+      return;
+    }
+    {
       navigate({ name: "loading", query, type }, { instant: true });
       startLoadingStatus(type);
       loadingTimerId = state.loadingTimer;
@@ -6975,7 +6933,7 @@
     const payload = {
       contents: turns.length ? turns : [{ role: "user", parts: [{ text: "" }] }],
       generationConfig: {
-        temperature: 0.3,
+        temperature: state.pendingTemperature ?? 0.3,
         maxOutputTokens: maxTokens
       }
     };
@@ -7052,9 +7010,8 @@
     return JSON.stringify({ task: "chunk", detail, query: String(query) });
   }
 
-  function reversePrompt(text, detail = "standard") {
-    const level = sentenceLevelOf(state.settings?.sentenceLevel);
-    return JSON.stringify({ task: "reverse", detail, level: level.id, text: String(text) });
+  function reversePrompt(text) {
+    return String(text || "").trim();
   }
 
   function sentencePrompt(query, detail = "standard", pieces = []) {
@@ -7082,9 +7039,11 @@
       const cached = cacheGetChunk(query);
       if (cached) return { type: "chunk", data: cached };
     }
-    if (type === "reverse" && !options.skipCache) {
-      const cached = reverseStore[reverseIdFor(query)];
-      if (cached?.result) return { type: "reverse", data: cached.result };
+    if (type === "reverse" && !options.skipCache && !(options.history || []).length) {
+      const cached = cacheGetReverseFirst(query);
+      if (cached?.content) {
+        return { type: "reverse", data: { id: reverseIdFor(query), text: query, narrative: cached.content, reasoning: cached.reasoning || "" } };
+      }
     }
     const pieces = type === "sentence" ? splitSentences(query) : [];
     const sentenceCacheKey = type === "sentence"
@@ -7131,7 +7090,7 @@
       : type === "chunk"
         ? Math.max(detailTokens, 2400)
         : type === "reverse"
-          ? 1200
+          ? Math.max(4096, Number(state.settings?.reverseMaxTokens) || 4096)
           : detailTokens;
     const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";
@@ -7150,6 +7109,8 @@
         : next;
     };
     const startedAt = Date.now();
+    state.lastReasoning = "";
+    state.pendingTemperature = type === "reverse" ? 0.7 : 0.3;
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
     const streamOnce = () => postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
       if (typeof options.onPreview === "function") {
@@ -7220,14 +7181,8 @@
       text: String(content).slice(0, 2400)
     };
 
-    const annotatedProtocol = /<(?:s|c|w)\s+id=|```json:cards/.test(content);
-    if (type === "reverse" && annotatedProtocol) {
-      const annotated = parseAnnotatedStream(content);
-      const data = ensureReverse(annotated, query);
-      data.source = "model";
-      data.model = cfg.model;
-      cachePutReverse(data.id, query, data);
-      return { type: "reverse", data };
+    if (type === "reverse") {
+      return { type: "reverse", data: { id: reverseIdFor(query), text: query, narrative: String(content).trim(), reasoning: String(state.lastReasoning || "") } };
     }
     let parsed;
     let retryLength = null;
@@ -7272,13 +7227,6 @@
       data.model = cfg.model;
       cachePutChunk(query, data, detail);
       return { type: "chunk", data };
-    }
-    if (type === "reverse") {
-      const data = ensureReverse(parsed, query);
-      data.source = "model";
-      data.model = cfg.model;
-      cachePutReverse(data.id, query, data);
-      return { type: "reverse", data };
     }
     if (type === "word") {
       const data = normalizeModelWord(parsed, query);
@@ -7404,7 +7352,7 @@
     const body = {
       model: cfg.model,
       messages,
-      temperature: 0.3,
+      temperature: state.pendingTemperature ?? 0.3,
       max_tokens: maxTokens,
       stream: true,
       stream_options: { include_usage: true },
@@ -7485,6 +7433,8 @@
           const json = JSON.parse(payload);
           if (json?.usage) onUsage?.(json.usage);
           const choice = json?.choices?.[0];
+          const reasoning = choice?.delta?.reasoning_content || choice?.delta?.reasoning || choice?.message?.reasoning_content;
+          if (reasoning) state.lastReasoning = String(state.lastReasoning || "") + String(reasoning);
           const piece = streamDeltaText(choice?.delta) || (typeof choice?.message?.content === "string" ? choice.message.content : "");
           if (piece) {
             content += piece;
@@ -7518,15 +7468,11 @@
 
   function streamPreviewFromJson(text, type, query) {
     if (type === "reverse") {
-      const partial = parseAnnotatedStream(text);
-      let clean = String(partial.narrative || "")
-        .replace(/```[\s\S]*$/, "")
-        .replace(/<([scw])\b[^>]*>([\s\S]*?)<\/\1>/g, "$2");
-      // A half-arrived tag must never surface as `w1">` gibberish in the preview.
-      const dangling = clean.indexOf("<");
-      if (dangling !== -1) clean = clean.slice(0, dangling);
-      clean = clean.replace(/[{}]/g, "").trim();
-      if (!clean || /"type"\s*:|"verdict"\s*:/.test(clean)) return null;
+      let clean = String(text || "").replace(/```[\s\S]*$/, "");
+      const open = clean.lastIndexOf("[[");
+      if (open !== -1 && clean.indexOf("]]", open) === -1) clean = clean.slice(0, open);
+      clean = clean.trim();
+      if (!clean) return null;
       return { kind: "reverse", narrative: clean, received: String(text).length };
     }
     if (type === "chunk") return null;
@@ -7553,18 +7499,8 @@
   function updateStreamPreview(preview, type) {
     if (!preview) return;
     if (preview.kind === "reverse") {
-      const stream = $("#reverse-stream");
-      if (stream) {
-        if (String(preview.raw || "").trim()) state.reversePainted = true;
-        const now = Date.now();
-        if (now - (state.reversePaintAt || 0) > 60) {
-          state.reversePaintAt = now;
-          stream.innerHTML = renderAnchoredText(cleanStreamNarrative(preview.raw || preview.narrative || ""), {});
-        }
-        const wrap = stream.closest(".reverse-typing");
-        if (wrap) wrap.classList.toggle("has-text", Boolean((preview.narrative || "").trim()));
-        return;
-      }
+      updateReverseStream(preview.narrative || "");
+      return;
     }
     const host = $("#live-preview");
     if (!host) return;
@@ -7599,35 +7535,6 @@
       ${(preview.senses || []).length ? `<ul class="live-preview-senses">${preview.senses.map((sense) => `<li>${esc(shorten(sense, 42))}</li>`).join("")}</ul>` : ""}`;
   }
 
-  document.addEventListener("click", (event) => {
-    if (event.target.closest("#decision-popover") || event.target.closest("[data-action='anchor-open']")) return;
-    closeDecisionPopover();
-  });
-
-  document.addEventListener("submit", (event) => {
-    const form = event.target;
-    if (!(form instanceof HTMLFormElement) || form.id !== "reverse-composer") return;
-    event.preventDefault();
-    const field = $("#reverse-input");
-    const text = String(field?.value || "").trim();
-    if (!text) return;
-    field.value = "";
-    void askReverseFollowUp(text);
-  });
-
-  document.addEventListener("keydown", (event) => {
-    const anchorEl = event.target instanceof Element ? event.target.closest(".anchor.has-card") : null;
-    if (anchorEl && (event.key === "Enter" || event.key === " ")) {
-      event.preventDefault();
-      if (event.key === " ") closeDecisionPopover();
-      openDecisionPopover(anchorEl);
-      return;
-    }
-
-
-    if (event.key === "Escape") closeDecisionPopover();
-  });
-
   function thinkingParams(cfg) {
     const profile = activeProfile(cfg);
     if (!profileSupportsThinking(profile) && !cfg.enableThinking) return {};
@@ -7644,7 +7551,7 @@
     const body = {
       model: cfg.model,
       messages,
-      temperature: 0.3,
+      temperature: state.pendingTemperature ?? 0.3,
       max_tokens: maxTokens,
       stream: false,
       ...thinkingParams(cfg)
@@ -8062,44 +7969,17 @@
         break;
       }
 
-      case "anchor-open": {
+      case "reverse-anchor": {
         event.preventDefault();
-        const anchor = target.closest("[data-action='anchor-open']");
-        if (anchor) openDecisionPopover(anchor);
-        break;
-      }
-
-      case "anchor-close": {
-        event.preventDefault();
-        closeDecisionPopover();
-        break;
-      }
-
-      case "anchor-drill": {
-        event.preventDefault();
-        const card = target.closest("[data-action='anchor-drill']");
-        if (!card) break;
-        const text = card.dataset.text || "";
-        const type = card.dataset.type || "chunk";
-        if (!text) break;
-        state.restoreScroll = document.querySelector(".screen")?.scrollTop || 0;
-        closeDecisionPopover();
-        runSearch(text, type === "word" ? "word" : type);
-        break;
-      }
-
-      case "reverse-pick": {
-        event.preventDefault();
-        const expression = target.dataset.expression || "";
-        const paradigm = target.dataset.paradigm || "chunk";
-        if (!expression) break;
-        runSearch(expression, paradigm);
+        gotoReverseAnchor(target.dataset.text || "");
         break;
       }
 
       case "reverse-again":
       case "reverse-new": {
         event.preventDefault();
+        state.reverseThread = [];
+        state.reverseThreadId = "";
         navigate({ name: "home" });
         const field = $("#search-input");
         if (field) requestAnimationFrame(() => field.focus());
@@ -8118,9 +7998,10 @@
 
       case "reverse-copy": {
         event.preventDefault();
-        const text = state.reverse?.narrative || "";
-        if (!text) break;
-        void copyText(text.replace(/\s+/g, " ").trim(), "正文已复制");
+        const thread = currentReverseThread();
+        const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content);
+        if (!last) break;
+        void copyText(String(last.content).trim(), "正文已复制");
         break;
       }
 
@@ -9647,6 +9528,18 @@
     app.addEventListener("pointercancel", () => { wordSwipe = null; }, { passive: true });
 
     document.addEventListener("click", handleClick);
+    document.addEventListener("keydown", (event) => {
+      const anchor = event.target instanceof Element ? event.target.closest(".rev-anchor") : null;
+      if (anchor && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        gotoReverseAnchor(anchor.dataset.text || "");
+        return;
+      }
+      if (event.key !== "Enter" || event.target?.id !== "reverse-input") return;
+      if (event.isComposing) return;
+      event.preventDefault();
+      submitReverseComposer();
+    });
     app.addEventListener("input", handleInput);
     app.addEventListener("change", handleInput);
     app.addEventListener("submit", handleSubmit);
