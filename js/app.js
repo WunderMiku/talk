@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "251"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "252"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2041,6 +2041,8 @@
           if (stored) {
             state.reverseThreadId = stored.id;
             state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
+            state.reverseBudget = Number(stored.budget) || state.reverseBudget;
+            state.reverseStyle = stored.style || state.reverseStyle;
           }
         }
         if (!state.reverseThread?.length) {
@@ -4412,7 +4414,14 @@
       .filter((turn) => turn.content);
     if (!messages.length) return;
     const map = loadReverseThreads();
-    map[id] = { id, title: reverseThreadTitle(thread), updatedAt: Date.now(), messages };
+    map[id] = {
+      id,
+      title: reverseThreadTitle(thread),
+      updatedAt: Date.now(),
+      budget: Number(state.reverseBudget) || null,
+      style: state.reverseStyle || "",
+      messages
+    };
     saveReverseThreads(map);
   }
 
@@ -4542,6 +4551,8 @@
     if (!text) return;
     const cached = cacheGetReverseFirst(text);
     const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    state.reverseBudget = reverseBudget();
+    state.reverseStyle = reverseStyleName(state.reverseBudget);
     state.reverseThreadId = id;
     state.reverseTitle = reverseThreadTitle([{ role: "user", content: text }]);
     state.reverseThread = [{ role: "user", content: text }];
@@ -4558,6 +4569,8 @@
     const alive = () => state.reverseThread === owner;
     try {
       const result = await modelLookup(text, "reverse", state.settings, {
+        reverseStyle: state.reverseStyle,
+        reverseBudget: state.reverseBudget,
         onPreview: (preview) => {
           if (!alive() || !preview?.narrative) return;
           updateReverseStream(preview.narrative);
@@ -4599,6 +4612,8 @@
       const result = await modelLookup(query, "reverse", state.settings, {
         history,
         skipCache: true,
+        reverseStyle: state.reverseStyle,
+        reverseBudget: state.reverseBudget,
         onPreview: (preview) => {
           if (!alive() || !preview?.narrative) return;
           updateReverseStream(preview.narrative);
@@ -4633,6 +4648,8 @@
       const result = await modelLookup(prompt, "reverse", state.settings, {
         history,
         skipCache: true,
+        reverseStyle: state.reverseStyle,
+        reverseBudget: state.reverseBudget,
         onPreview: (preview) => {
           if (!alive() || !preview?.narrative) return;
           updateReverseStream(preview.narrative);
@@ -6493,7 +6510,7 @@
       </div>
       <div class="setting-group">
         <span class="settings-subhead">语境寻词长度</span>
-        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · 越大越完整，也更慢</p>
+        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · 600–999 只给结论 · 1000–1999 分块讲解 · 2000–3000 成句拆解</p>
         <input class="setting-range" type="range" min="600" max="3000" step="100"
           value="${Number(draft.reverseMaxTokens) || 1500}" data-setting="reverseMaxTokens" aria-label="语境寻词输出上限" />
       </div>
@@ -7025,10 +7042,22 @@
 
   state.translatorStyles = TRANSLATOR_STYLES.map((style) => style.id);
 
-  function systemPrompt(type) {
+  function reverseBudget() {
+    return Math.max(600, Math.min(3000, Number(state.settings?.reverseMaxTokens) || 1500));
+  }
+
+  function reverseStyleName(budget = reverseBudget()) {
+    if (window.TALK_PROMPTS.reverseFor) return window.TALK_PROMPTS.reverseFor(budget);
+    return "editor";
+  }
+
+  function systemPrompt(type, reverseStyle = "") {
     if (type === "sentence") return SENTENCE_SYSTEM_PROMPT;
     if (type === "chunk") return CHUNK_SYSTEM_PROMPT;
-    if (type === "reverse") return REVERSE_SYSTEM_PROMPT;
+    if (type === "reverse") {
+      const prompts = window.TALK_PROMPTS.reversePrompts;
+      return (reverseStyle && prompts?.[reverseStyle]) || REVERSE_SYSTEM_PROMPT;
+    }
     return WORD_SYSTEM_PROMPT;
   }
 
@@ -7117,7 +7146,7 @@
         .map((turn) => ({ role: turn.role === "assistant" ? "assistant" : "user", content: String(turn.content) }))
       : [];
     const messages = [
-      { role: "system", content: systemPrompt(type) },
+      { role: "system", content: systemPrompt(type, options.reverseStyle) },
       ...history,
       { role: "user", content: prompt }
     ];
@@ -7137,7 +7166,7 @@
       : type === "chunk"
         ? Math.max(detailTokens, 2400)
         : type === "reverse"
-          ? Math.max(600, Math.min(3000, Number(state.settings?.reverseMaxTokens) || 1500))
+          ? (Number(options.reverseBudget) || reverseBudget())
           : detailTokens;
     const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";

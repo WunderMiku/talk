@@ -264,3 +264,28 @@ Few-shot（只示意字段与语气）：
 
 如果是写小说/散文，推荐 [[a rain-soaked London night]]；日常表达用 [[a rainy night in London]] 最稳。`
 };
+
+const REVERSE_COACH = `你是挑剔的英文母语编辑。用户用中文描述想表达的意思。
+先用一句话判断方向对不对，然后最多给 3 个表达，按推荐度排序，写成：
+- [[英文表达]] — 中文释义（8 字内）· 使用场景
+每个表达后面最多一句辨析，不要展开段落。最后一句说「只记一个就记 [[X]]」。
+全篇中文不超过 150 字；所有英文（短语、例句）必须用 [[...]] 包住；不要表格、不要 JSON、不要「在雅思/考研写作中」这类开场。`;
+
+const REVERSE_WRITER = `你是英文写作教练。用户用中文描述一个想表达的意思。
+第一步先给一句可以直接用的英文成品，单独一行，整句用 [[...]] 包住。
+第二步拆解：主语怎么选、动词为什么比另一个好、修饰语放在哪里。
+第三步给 2 个同义替换，各用 [[...]] 包住，并标注语域（口语/书面/文学）。
+最多 5 个英文表达；不要表格、不要 JSON、不要套话开场；结论要具体到词。`;
+
+window.TALK_PROMPTS.reversePrompts = {
+  coach: REVERSE_COACH,
+  editor: window.TALK_PROMPTS.reverse,
+  writer: REVERSE_WRITER
+};
+
+window.TALK_PROMPTS.reverseFor = function reverseFor(budget) {
+  const tokens = Number(budget) || 1500;
+  if (tokens < 1000) return "coach";
+  if (tokens < 2000) return "editor";
+  return "writer";
+};
