@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "253"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "254"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -8981,7 +8981,11 @@
       const key = target.dataset.setting;
       state.draft[key] = target.type === "checkbox" ? target.checked : target.value;
       if (key === "reverseMaxTokens") {
-        const value = Number(target.value) || 1500;
+        let value = Number(target.value) || 1500;
+        for (const stop of [1000, 2000]) {
+          if (Math.abs(value - stop) <= 40) value = stop;
+        }
+        if (String(value) !== String(target.value)) target.value = String(value);
         const badge = $("#reverse-token-value");
         if (badge) badge.textContent = String(value);
         const zone = $("#reverse-token-zone");
