@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "255"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "256"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4085,7 +4085,7 @@
             ${wordPosSwitchHtml(wordPosGroups(word))}
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
-            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(state.route?.query || word.word)}" aria-label="复制单词" title="复制单词">${icon("copy")}</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(word.word)}" aria-label="复制单词" title="复制单词">${icon("copy")}</button>
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(word.translation || word.short)}</p>
@@ -4285,7 +4285,7 @@
             <span class="ipa">${esc(chunk.phonetic || "—")}</span>
             <span class="dot-sep"></span>
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(chunk.chunk)}">${icon("volume")} 发音</button>
-            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(state.route?.query || chunk.chunk)}" aria-label="复制意群" title="复制意群">${icon("copy")}</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(chunk.chunk)}" aria-label="复制意群" title="复制意群">${icon("copy")}</button>
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(chunk.translation || chunk.chunk)}</p>
@@ -5221,7 +5221,7 @@
             <span class="wave"></span>
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(sentence.text)}">${icon("volume")} 朗读</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(sentence.text)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
-            <button class="speak-btn" type="button" data-action="copy-text" data-copy="${attr(multi ? sentence.text : (state.route?.query || sentence.text))}" aria-label="复制句子" title="复制句子">${icon("copy")}</button>
+            <button class="speak-btn" type="button" data-action="copy-text" data-copy="${attr(sentence.text)}" aria-label="复制句子" title="复制句子">${icon("copy")}</button>
           </div>
         </section>
 
