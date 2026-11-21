@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "254"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "255"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3743,13 +3743,26 @@
   }
 
   function ensureMarkdownAnchors(source) {
+    const englishSentence = (text) => {
+      const value = String(text || "").trim();
+      if (value.length < 8 || /[\u4e00-\u9fff]/.test(value)) return "";
+      const words = value.split(/\s+/).filter(Boolean);
+      if (words.length < 3 || !/^[A-Za-z"'“(]/.test(value)) return "";
+      return value;
+    };
     return String(source || "").split("\n").map((line) => {
-      if (line.includes("[[") || /^\s*#{1,4}\s/.test(line) || /^\s*>/.test(line)) return line;
-      const pair = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n—–]{1,70}?)(\s+[—–]\s+)(.+)$/);
+      if (line.includes("[[") || /^\s*#{1,4}\s/.test(line)) return line;
+      const pair = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n—–]{1,90}?)(\s+[—–]\s+)(.+)$/);
       if (pair) return `${pair[1]}[[${pair[2].trim()}]]${pair[3]}${pair[4]}`;
-      const solo = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n]{1,120}?[.!?])\s*$/);
-      if (solo) return `${solo[1]}[[${solo[2]}]]`;
-      return line;
+      const solo = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n]{1,140}?[.!?])\s*$/);
+      if (solo) return `${solo[1]}[[${solo[2].trim()}]]`;
+      const quote = line.match(/^(\s*>\s*)(.+)$/);
+      if (quote) {
+        const body = englishSentence(quote[2]);
+        return body ? `${quote[1]}[[${body}]]` : line;
+      }
+      const plain = englishSentence(line);
+      return plain ? `[[${plain}]]` : line;
     }).join("\n");
   }
 
@@ -4072,7 +4085,7 @@
             ${wordPosSwitchHtml(wordPosGroups(word))}
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
-            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(`${word.translation || word.short}${word.short && word.translation ? `\n${word.short}` : ""}`)}" aria-label="复制释义" title="复制释义">${icon("copy")}</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(state.route?.query || word.word)}" aria-label="复制单词" title="复制单词">${icon("copy")}</button>
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(word.translation || word.short)}</p>
@@ -4272,7 +4285,7 @@
             <span class="ipa">${esc(chunk.phonetic || "—")}</span>
             <span class="dot-sep"></span>
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(chunk.chunk)}">${icon("volume")} 发音</button>
-            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(`${chunk.translation}${chunk.short ? `\n${chunk.short}` : ""}`)}" aria-label="复制释义" title="复制释义">${icon("copy")}</button>
+            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(state.route?.query || chunk.chunk)}" aria-label="复制意群" title="复制意群">${icon("copy")}</button>
           </div>
           <div class="word-gloss-row reveal" style="--d:1.1">
             <p class="word-gloss">${esc(chunk.translation || chunk.chunk)}</p>
@@ -5208,6 +5221,7 @@
             <span class="wave"></span>
             <button class="speak-btn" type="button" data-action="speak" data-text="${attr(sentence.text)}">${icon("volume")} 朗读</button>
             <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(sentence.text)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
+            <button class="speak-btn" type="button" data-action="copy-text" data-copy="${attr(multi ? sentence.text : (state.route?.query || sentence.text))}" aria-label="复制句子" title="复制句子">${icon("copy")}</button>
           </div>
         </section>
 
@@ -6905,12 +6919,12 @@
       clearLoadingTimer();
       if (result.type !== "reverse") addHistory(result.type, query);
       const route = result.type === "word"
-        ? { name: "word", word: result.data.word, result: result.data }
+        ? { name: "word", word: result.data.word, query, result: result.data }
         : result.type === "chunk"
-          ? { name: "chunk", query: result.data.chunk, result: result.data }
+          ? { name: "chunk", query, result: result.data }
           : result.type === "reverse"
             ? { name: "reverse", id: result.data.id, result: result.data }
-            : { name: "sentence", id: result.data.id, result: result.data };
+            : { name: "sentence", id: result.data.id, query, result: result.data };
       if (result.type === "reverse") {
         state.reverseThread = [{ role: "user", text: query }, { role: "assistant", result: result.data }];
       }
