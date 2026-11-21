@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "252"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "253"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -6510,9 +6510,20 @@
       </div>
       <div class="setting-group">
         <span class="settings-subhead">语境寻词长度</span>
-        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · 600–999 只给结论 · 1000–1999 分块讲解 · 2000–3000 成句拆解</p>
+        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · <span id="reverse-token-zone">${reverseZoneName(Number(draft.reverseMaxTokens) || 1500)}</span></p>
         <input class="setting-range" type="range" min="600" max="3000" step="100"
           value="${Number(draft.reverseMaxTokens) || 1500}" data-setting="reverseMaxTokens" aria-label="语境寻词输出上限" />
+        <div class="token-scale" id="reverse-token-scale">
+          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) < 1000 ? " is-active" : ""}" style="flex:4">只给结论</span>
+          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) >= 1000 && (Number(draft.reverseMaxTokens) || 1500) < 2000 ? " is-active" : ""}" style="flex:10">分块讲解</span>
+          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) >= 2000 ? " is-active" : ""}" style="flex:10">成句拆解</span>
+        </div>
+        <div class="token-ticks">
+          <span style="left:0">600</span>
+          <span style="left:16.7%">1000</span>
+          <span style="left:58.3%">2000</span>
+          <span style="left:100%">3000</span>
+        </div>
       </div>
       <div class="setting-group">
         <span class="settings-subhead">生成信息</span>
@@ -7044,6 +7055,12 @@
 
   function reverseBudget() {
     return Math.max(600, Math.min(3000, Number(state.settings?.reverseMaxTokens) || 1500));
+  }
+
+  function reverseZoneName(budget = reverseBudget()) {
+    if (budget < 1000) return "只给结论";
+    if (budget < 2000) return "分块讲解";
+    return "成句拆解";
   }
 
   function reverseStyleName(budget = reverseBudget()) {
@@ -8964,8 +8981,18 @@
       const key = target.dataset.setting;
       state.draft[key] = target.type === "checkbox" ? target.checked : target.value;
       if (key === "reverseMaxTokens") {
+        const value = Number(target.value) || 1500;
         const badge = $("#reverse-token-value");
-        if (badge) badge.textContent = String(Number(target.value) || 1500);
+        if (badge) badge.textContent = String(value);
+        const zone = $("#reverse-token-zone");
+        if (zone) zone.textContent = reverseZoneName(value);
+        const scale = $("#reverse-token-scale");
+        if (scale) {
+          [...scale.children].forEach((el, index) => {
+            const active = index === (value < 1000 ? 0 : value < 2000 ? 1 : 2);
+            el.classList.toggle("is-active", active);
+          });
+        }
       }
       if (key === "qwenTtsModel") {
         if (/^qwen3-tts/i.test(target.value) && /^longanhuan/i.test(state.draft.qwenTtsVoice || "")) {
