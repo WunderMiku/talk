@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "248"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "249"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4234,7 +4234,7 @@
       <article class="chunk-example reveal" style="--d:0">
         <div class="chunk-example-head">
           <span class="chunk-example-index">${String(index + 1).padStart(2, "0")}</span>
-          <p class="chunk-example-en">${esc(item.en)}</p>
+          <p class="chunk-example-en"><span class="chunk-example-link" role="button" tabindex="0" data-action="example-lookup" data-text="${attr(item.en)}">${esc(item.en)}</span></p>
         </div>
         ${item.zh ? `<p class="chunk-example-zh">${esc(item.zh)}</p>` : ""}
         <div class="example-actions">
@@ -9578,6 +9578,12 @@
       if (anchor && (event.key === "Enter" || event.key === " ")) {
         event.preventDefault();
         gotoReverseAnchor(anchor.dataset.text || "");
+        return;
+      }
+      const example = event.target instanceof Element ? event.target.closest('[data-action="example-lookup"]') : null;
+      if (example && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        example.click();
         return;
       }
       if (event.key !== "Enter" || event.target?.id !== "reverse-input") return;

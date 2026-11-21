@@ -10723,3 +10723,12 @@ html.motion-ready .reveal.reveal-soft.is-in {
 }
 .translation-example span { display: block; margin-top: 2px; font-size: 11.5px; color: var(--muted); }
 .translation-example:hover { border-left-color: var(--ink); }
+
+.chunk-example-link {
+  cursor: pointer;
+  border-bottom: 1px solid transparent;
+}
+.chunk-example-link:hover,
+.chunk-example-link:focus-visible {
+  border-bottom-color: var(--line-strong);
+}
