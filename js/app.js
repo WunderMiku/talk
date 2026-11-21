@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "250"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "251"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -9593,6 +9593,12 @@
     app.addEventListener("pointercancel", () => { wordSwipe = null; }, { passive: true });
 
     document.addEventListener("click", handleClick);
+    function englishOnly(text) {
+      const head = String(text || "").split(/\s[—–]\s|\s-\s/)[0] || "";
+      const cleaned = head.replace(/[「」“”"'`]/g, "").replace(/\s+/g, " ").trim();
+      return /[A-Za-z]/.test(cleaned) ? cleaned : "";
+    }
+
     function appendToComposer(text) {
       const field = $("#reverse-input");
       if (!field) return false;
@@ -9616,7 +9622,7 @@
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 14) return;
       if (!$("#reverse-input")) return;
       const selection = window.getSelection();
-      const text = String(selection?.toString() || "").trim();
+      const text = englishOnly(selection?.toString() || "");
       if (!text) return;
       const node = selection.anchorNode;
       const element = node?.nodeType === 3 ? node.parentElement : node;
