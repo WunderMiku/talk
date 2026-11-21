@@ -10732,3 +10732,11 @@ html.motion-ready .reveal.reveal-soft.is-in {
 .chunk-example-link:focus-visible {
   border-bottom-color: var(--line-strong);
 }
+
+/* The thread is reading material: let people select words and sentences. */
+.screen[data-page="reverse"] .reverse-markdown,
+.screen[data-page="reverse"] .reverse-markdown * {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}

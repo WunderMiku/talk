@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "249"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "250"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3740,8 +3740,20 @@
     return html;
   }
 
+  function ensureMarkdownAnchors(source) {
+    return String(source || "").split("\n").map((line) => {
+      if (line.includes("[[") || /^\s*#{1,4}\s/.test(line) || /^\s*>/.test(line)) return line;
+      const pair = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n—–]{1,70}?)(\s+[—–]\s+)(.+)$/);
+      if (pair) return `${pair[1]}[[${pair[2].trim()}]]${pair[3]}${pair[4]}`;
+      const solo = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n]{1,120}?[.!?])\s*$/);
+      if (solo) return `${solo[1]}[[${solo[2]}]]`;
+      return line;
+    }).join("\n");
+  }
+
   function markdownLite(source, final = true) {
     let text = String(source || "").replace(/\r\n/g, "\n");
+    if (final) text = ensureMarkdownAnchors(text);
     if (!final) {
       const open = text.lastIndexOf("[[");
       if (open !== -1 && text.indexOf("]]", open) === -1) text = text.slice(0, open);
@@ -4485,7 +4497,7 @@
           <p class="reverse-hint">带下划线或底色的表达可以直接点开看完整档案。</p>` : ""}
         </div>
         <form class="reverse-composer" autocomplete="off">
-          <input id="reverse-input" type="text" name="q" placeholder="输入英文句子，或继续追问语气、搭配…" />
+          <input id="reverse-input" type="text" name="q" placeholder="输入英文句子，或长按正文选词加入…" />
           <button class="reverse-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
         </form>
       </main>`;
@@ -7926,7 +7938,15 @@
      Interactions
      ============================================================ */
 
+  let suppressClickUntil = 0;
+
   async function handleClick(event) {
+    if (Date.now() < suppressClickUntil) {
+      suppressClickUntil = 0;
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     const target = event.target.closest("[data-action]");
     if (!target) return;
     const action = target.dataset.action;
@@ -9573,6 +9593,37 @@
     app.addEventListener("pointercancel", () => { wordSwipe = null; }, { passive: true });
 
     document.addEventListener("click", handleClick);
+    function appendToComposer(text) {
+      const field = $("#reverse-input");
+      if (!field) return false;
+      const clean = String(text || "").replace(/\s+/g, " ").trim();
+      if (!clean) return false;
+      field.value = field.value.trim() ? `${field.value.trim()} ${clean}` : clean;
+      field.focus();
+      field.setSelectionRange(field.value.length, field.value.length);
+      toast("已加入输入框");
+      return true;
+    }
+
+    let pressStart = null;
+    document.addEventListener("pointerdown", (event) => {
+      pressStart = { x: event.clientX, y: event.clientY, at: Date.now(), target: event.target };
+    }, { passive: true });
+    document.addEventListener("pointerup", (event) => {
+      const start = pressStart;
+      pressStart = null;
+      if (!start || Date.now() - start.at < 450) return;
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 14) return;
+      if (!$("#reverse-input")) return;
+      const selection = window.getSelection();
+      const text = String(selection?.toString() || "").trim();
+      if (!text) return;
+      const node = selection.anchorNode;
+      const element = node?.nodeType === 3 ? node.parentElement : node;
+      if (!element?.closest?.(".reverse-markdown")) return;
+      if (appendToComposer(text)) suppressClickUntil = Date.now() + 700;
+    });
+
     document.addEventListener("keydown", (event) => {
       const anchor = event.target instanceof Element ? event.target.closest(".rev-anchor") : null;
       if (anchor && (event.key === "Enter" || event.key === " ")) {
