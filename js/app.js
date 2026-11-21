@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "247"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "248"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -31,7 +31,7 @@
 
   const CONFIG_KEY = "talk.model.v1";
   const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel", "foldMode", "showGenMeta"];
+  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel", "foldMode", "showGenMeta", "reverseMaxTokens"];
   const EXAMPLE_STYLE_KEY = "talk.exampleStyles.v1";
   // One table drives the prompt, the settings picker and the on-page slicing.
   const SENTENCE_LEVELS = [
@@ -260,7 +260,8 @@
     ttsEngine: "native",
     qwenTtsModel: "qwen-audio-3.1-tts-plus",
     qwenTtsVoice: "longanhuan_v3.1",
-    showGenMeta: true
+    showGenMeta: true,
+    reverseMaxTokens: 1500
   };
 
   const DETAIL_LEVELS = {
@@ -1947,6 +1948,12 @@
       if (route.name === "translator") {
         updateTranslatorLanguage();
         updateTranslatorStyleControls();
+        if (route.text) {
+          const field = $("#translator-input");
+          if (field) field.value = route.text;
+          updateTranslatorLanguage();
+          openTranslationWorkspace(route.text);
+        }
       }
     };
 
@@ -2937,6 +2944,7 @@
             </div>
             <p class="translation-text">${esc(variant.text)}</p>
             ${variant.nuance ? `<p class="translation-nuance">${esc(variant.nuance)}</p>` : ""}
+            ${(variant.examples || []).length ? `<div class="translation-examples">${variant.examples.map((item) => `<button class="translation-example" type="button" data-action="example-lookup" data-text="${attr(item.en)}">${esc(item.en)}<span>${esc(item.zh)}</span></button>`).join("")}</div>` : ""}
             <span class="translation-open">搭配与知识点 <span aria-hidden="true">↗</span></span>
           </article>`;
         }).join("")}
@@ -2962,6 +2970,10 @@
           <span>${esc(item.zh || "")}${item.note ? ` · ${esc(item.note)}` : ""}</span>
         </div>`).join("") : `<p class="translation-detail-empty">这次没返回，重新生成试试。</p>`}
       </div>
+      ${(variant.examples || []).length ? `<div class="translation-detail-section">
+        <h3>例句</h3>
+        ${variant.examples.map((item) => `<button class="translation-example" type="button" data-action="example-lookup" data-text="${attr(item.en)}">${esc(item.en)}<span>${esc(item.zh)}</span></button>`).join("")}
+      </div>` : ""}
       <div class="translation-detail-section">
         <h3>知识点</h3>
         ${points.length ? `<ul class="translation-points">${points.map((point) => `<li>${esc(point)}</li>`).join("")}</ul>` : `<p class="translation-detail-empty">这次没返回，重新生成试试。</p>`}
@@ -3000,10 +3012,17 @@
             note: String(item?.note || "").trim()
           })).filter((item) => item.phrase)
         : [];
+      const examples = Array.isArray(found.examples)
+        ? found.examples.map((item) => ({
+            en: String(item?.en || item?.text || "").trim(),
+            zh: String(item?.zh || item?.translation || "").trim()
+          })).filter((item) => item.en)
+        : [];
       return {
         style: style.id,
         text: String(found.text || found.translation || "").trim(),
         nuance: String(found.nuance || found.note || "").trim(),
+        examples,
         phrases,
         points: Array.isArray(found.points)
           ? found.points.map((item) => String(item || "").trim()).filter(Boolean)
@@ -3475,7 +3494,8 @@
   }
 
   function homePage() {
-    const recent = state.history.length ? state.history.slice(0, 3) : sanitizeHistory(DATA.recent);
+    const dictionaryHistory = state.history.filter((item) => item.type !== "translation");
+    const recent = dictionaryHistory.length ? dictionaryHistory.slice(0, 3) : sanitizeHistory(DATA.recent);
     const daily = dailyEntry();
     const moods = visibleMoods();
     const copy = copyFor("home");
@@ -3693,7 +3713,7 @@
   /* Reverse replies are plain Markdown with [[expression]] anchors. The
      renderer runs on every streamed frame, so it has to be cheap and it has to
      tolerate a half-written [[ at the tail. */
-  const REVERSE_ANCHOR_RE = /\[\[([^\[\]\n]{1,80})\]\]/g;
+  const REVERSE_ANCHOR_RE = /\[\[([^\n]{1,140}?)\]\]/g;
 
   function reverseAnchorWords(text) {
     return String(text || "").trim().split(/\s+/).filter(Boolean).length;
@@ -4405,14 +4425,18 @@
   }
 
   function reverseSuggestions() {
-    const sent = new Set(
-      currentReverseThread()
-        .filter((turn) => turn.role === "user")
-        .map((turn) => String(turn.content || "").trim())
-    );
-    return ["再口语一点怎么说", "放进正式写作里怎么改", "举两个真实例句"]
-      .filter((text) => !sent.has(text))
-      .slice(0, 2);
+    const thread = currentReverseThread();
+    const sent = new Set(thread.filter((turn) => turn.role === "user").map((turn) => String(turn.content || "").trim()));
+    const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content);
+    const anchors = [...String(last?.content || "").matchAll(REVERSE_ANCHOR_RE)].map((hit) => hit[1].trim()).filter(Boolean);
+    const first = anchors[0] ? anchors[0].slice(0, 16) : "";
+    const second = anchors[1] ? anchors[1].slice(0, 16) : "";
+    const pool = [];
+    if (first) pool.push(`「${first}」更口语怎么说`);
+    if (first && second) pool.push(`「${first}」和「${second}」怎么选`);
+    if (first) pool.push(`把「${first}」放进正式句子`);
+    if (!pool.length) pool.push("再口语一点怎么说", "放进正式写作里怎么改");
+    return [...new Set(pool)].filter((text) => !sent.has(text)).slice(0, 2);
   }
 
   function reverseTurnHtml(turn) {
@@ -6456,6 +6480,12 @@
         </div>
       </div>
       <div class="setting-group">
+        <span class="settings-subhead">语境寻词长度</span>
+        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · 越大越完整，也更慢</p>
+        <input class="setting-range" type="range" min="600" max="3000" step="100"
+          value="${Number(draft.reverseMaxTokens) || 1500}" data-setting="reverseMaxTokens" aria-label="语境寻词输出上限" />
+      </div>
+      <div class="setting-group">
         <span class="settings-subhead">生成信息</span>
         <div class="level-row">
           <button class="level-chip${draft.showGenMeta !== false ? " active" : ""}" type="button" data-action="gen-meta" data-on="1" aria-pressed="${draft.showGenMeta !== false}">显示</button>
@@ -7095,7 +7125,7 @@
       : type === "chunk"
         ? Math.max(detailTokens, 2400)
         : type === "reverse"
-          ? 1500
+          ? Math.max(600, Math.min(3000, Number(state.settings?.reverseMaxTokens) || 1500))
           : detailTokens;
     const maxTokens = Math.min(wanted, outputCeiling(cfg));
     let content = "";
@@ -8689,18 +8719,19 @@
         }
         break;
 
+      case "example-lookup": {
+        event.preventDefault();
+        const text = String(target.dataset.text || "").trim();
+        if (text) void runSearch(text, "sentence");
+        break;
+      }
+
       case "history-item":
         event.preventDefault();
         closeSheet({ immediate: true });
         if (target.dataset.type === "translation") {
           const text = String(target.dataset.query || "").trim();
-          navigate({ name: "translate" });
-          const input = $("#translator-input");
-          if (input && text) {
-            input.value = text;
-            updateTranslatorLanguage();
-            runTranslation(text);
-          }
+          navigate({ name: "translator", text });
           break;
         }
         runSearch(target.dataset.query || "", target.dataset.type || "auto");
@@ -8883,6 +8914,10 @@
     if (target.matches("[data-setting]") && state.draft) {
       const key = target.dataset.setting;
       state.draft[key] = target.type === "checkbox" ? target.checked : target.value;
+      if (key === "reverseMaxTokens") {
+        const badge = $("#reverse-token-value");
+        if (badge) badge.textContent = String(Number(target.value) || 1500);
+      }
       if (key === "qwenTtsModel") {
         if (/^qwen3-tts/i.test(target.value) && /^longanhuan/i.test(state.draft.qwenTtsVoice || "")) {
           state.draft.qwenTtsVoice = "Cherry";
@@ -8909,6 +8944,11 @@
   }
 
   function handleSubmit(event) {
+    if (event.target.classList?.contains("reverse-composer")) {
+      event.preventDefault();
+      submitReverseComposer();
+      return;
+    }
     if (event.target.id === "translator-form") {
       event.preventDefault();
       const input = $("#translator-input");
