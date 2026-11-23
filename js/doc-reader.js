@@ -8,7 +8,7 @@
 (function () {
   const DB_NAME = "talk.docs.v1";
   const DB_VERSION = 1;
-  const CONCURRENCY = 3;
+  const CONCURRENCY = 4;
   const RETRIES = 1;
   const LEVELS = ["gaokao", "cet4", "cet6", "kaoyan", "ielts", "toefl", "advanced"];
   const FORMATS = {
@@ -70,6 +70,19 @@
     try { localStorage.setItem(FORMAT_KEY, next); } catch (_) { /* no-op */ }
     applyFormat();
     renderShell();
+  }
+
+  function attr(value) {
+    return esc(String(value ?? "")).replace(/"/g, "&quot;");
+  }
+
+  function wordsOf(text) {
+    return String(text || "").trim().split(/\s+/).filter(Boolean).length;
+  }
+
+  function passageNumber(block) {
+    const list = (S.doc?.blocks || []).filter((item) => item.type === "passage");
+    return list.findIndex((item) => item.hash === block.hash) + 1;
   }
 
   function t(zh, en) {
@@ -187,7 +200,7 @@
       html += escapeParagraphs(source.slice(index, match.index));
       if (number) {
         const note = marks[number - 1];
-        html += `<span class="reader-term">${esc(found)}</span><sup class="reader-anchor" data-note="${number}" title="${esc(note.inContextZh || "")}">${number}</sup>`;
+        html += `<span class="reader-term term-mark">${esc(found)}</span><sup class="reader-anchor" data-note="${number}" title="${esc(note.inContextZh || "")}">${number}</sup>`;
       } else {
         html += escapeParagraphs(found);
       }
@@ -378,6 +391,7 @@
           <span class="reader-bar-progress mono">${p.done}/${p.total}</span>
           <button class="btn btn-primary reader-bar-export" type="button" data-reader-action="options">${t("导出 PDF", "Export PDF")}</button>
         </header>
+        <div class="reader-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}"><i style="width:${p.total ? Math.round((p.done / p.total) * 100) : 0}%"></i><span class="reader-progress-label mono">${p.done}/${p.total} · ${p.total ? Math.round((p.done / p.total) * 100) : 0}%</span></div>
         ${running ? `<div class="reader-running"><span class="reader-typing"><i></i><i></i><i></i></span>${t("正在精读", "Reading")} ${p.done}/${p.total}${p.done < p.total ? ` · <button class="reader-inline-action" type="button" data-reader-action="pause">${t("暂停", "Pause")}</button>` : ""}</div>` : ""}
         ${!running && p.done < p.total ? `<div class="reader-running is-paused">${t("还有", "Still")} ${p.total - p.done} ${t("段没读", "passages left")} · <button class="reader-inline-action" type="button" data-reader-action="resume">${t("继续", "Resume")}</button></div>` : ""}
         <article class="reader-sheet${S.showCover ? "" : " hide-cover"}">
@@ -414,89 +428,121 @@
     applyFormat();
   }
 
+  function sheetMasthead() {
+    const theme = window.TALK_THEME?.current?.() || {};
+    return `<header class="masthead"><span class="brand-mark">talk.</span><span class="masthead-meta mono">${esc((theme.label || "Paper").toUpperCase())} · ${t("精读本", "READER")}</span></header>`;
+  }
+
+  function sheetFoot(page) {
+    return `<footer class="sheet-foot"><span>${t("把词，看透。", "See a word through.")}</span><span class="sheet-foot-mono mono">WUNDERMIKU.GITHUB.IO/TALK · P.${String(page).padStart(2, "0")}</span></footer>`;
+  }
+
+  function secBar(num, title, sub) {
+    return `<div class="sec-bar"><span class="sec-num">${esc(num)}</span><span class="sec-title">${esc(title)}</span><span class="sec-rule"></span><span class="sec-sub mono">${esc(sub)}</span></div>`;
+  }
+
+  function paragraphs(text) {
+    return String(text || "").split(/\n{2,}/).map((chunk) => `<p>${esc(chunk.trim())}</p>`).join("");
+  }
+
   function coverHtml() {
     const o = S.overview;
-    const theme = window.TALK_THEME?.current?.() || {};
     const doc = S.doc;
+    const count = doc.blocks.filter((b) => b.type === "passage").length;
     return `
-      <header class="reader-cover">
-        <div class="pdf-brand">
-          <span class="pdf-logo">talk.</span>
-          <span class="pdf-plate mono">${esc((theme.label || "Paper").toUpperCase())} · ${t("精读本", "READER")}</span>
-        </div>
-        <p class="reader-kicker">${esc(o.genre || t("精读", "CLOSE READING"))} · ${esc(o.tone || "")}</p>
-        <h1 class="reader-title">${esc(o.titleZh)}</h1>
-        ${o.subtitle ? `<p class="reader-subtitle">${esc(o.subtitle)}</p>` : ""}
-        <div class="pdf-meta mono">${doc.wordCount} ${t("词", "words")} · ${doc.blocks.filter((b) => b.type === "passage").length} ${t("节", "sections")} · ${t("按", "level")} ${LEVEL_NAMES[doc.level] || doc.level} ${t("取词", "")}</div>
-        ${o.summary ? `<div class="pdf-card pdf-summary"><span class="pdf-card-label mono">${t("整篇主旨", "SUMMARY")}</span><p>${esc(o.summary)}</p></div>` : ""}
-        ${o.readingTips.length ? `<div class="pdf-block"><div class="pdf-head"><b class="pdf-num">01</b><h2>${t("阅读提示", "How to read")}</h2><i></i></div><ul class="reader-tips">${o.readingTips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul></div>` : ""}
-        ${o.glossary.length ? `<div class="pdf-block"><div class="pdf-head"><b class="pdf-num">02</b><h2>${t("核心术语", "Key terms")}</h2><i></i><span class="pdf-head-meta mono">${t("全篇统一", "consistent")}</span></div><div class="reader-glossary">${o.glossary.map((item) => `<span class="reader-gloss"><b>${esc(item.term)}</b>${esc(item.zh)}${item.note ? `<i>${esc(item.note)}</i>` : ""}</span>`).join("")}</div></div>` : ""}
-        <div class="pdf-signoff">
-          <span>${t("把词，看透。", "See a word through.")}</span>
-          <span class="mono">WUNDERMIKU.GITHUB.IO/TALK</span>
-        </div>
-      </header>`;
+      <article class="rv-sheet">
+        ${sheetMasthead()}
+        <div class="cover-genre">${esc(o.genre || t("精读", "Close reading"))} · ${esc(o.tone || "")}</div>
+        <h1 class="cover-title-zh">${esc(o.titleZh)}</h1>
+        ${doc.title ? `<p class="cover-title-en">${esc(doc.title)}</p>` : ""}
+        ${o.subtitle ? `<p class="cover-subtitle">${esc(o.subtitle)}</p>` : ""}
+        <div class="cover-stats mono">${doc.wordCount} ${t("词", "WORDS")} · ${count} ${t("节", "SECTIONS")} · ${t("按", "LEVEL")} ${esc(LEVEL_NAMES[doc.level] || doc.level)} ${t("取词", "")}</div>
+        ${o.summary ? `${secBar("01", t("导读概览", "Overview"), t("PRE-READING", "PRE-READING"))}<div class="t-card"><span class="card-kicker">“ ${t("整篇主旨", "SUMMARY")}</span><p class="summary-prose">${esc(o.summary)}</p></div>` : ""}
+        ${o.readingTips.length ? `${secBar("02", t("精读前提示", "Noticing cues"), t("NOTICING CUES", "NOTICING CUES"))}<ul class="tips-list">${o.readingTips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>` : ""}
+        ${o.glossary.length ? `${secBar("03", t("全篇统一术语锚点", "Global glossary"), t("GLOBAL GLOSSARY", "GLOBAL GLOSSARY"))}<div class="glossary-grid">${o.glossary.map((item) => `<div class="gloss-item"><div class="gloss-head"><span class="gloss-en">${esc(item.term)}</span><span class="gloss-zh">${esc(item.zh)}</span></div>${item.note ? `<p class="gloss-note">${esc(item.note)}</p>` : ""}</div>`).join("")}</div>` : ""}
+        ${sheetFoot(1)}
+      </article>`;
   }
 
   function bodyHtml() {
     const doc = S.doc;
-    let passageNo = 0;
-    return (doc.blocks || []).map((block) => {
+    const sheets = [];
+    let current = null;
+    (doc.blocks || []).forEach((block) => {
       if (block.type === "heading") {
-        return `<div class="pdf-head chapter level-${block.level}"><b class="pdf-num">§</b><h2>${esc(block.text)}</h2><i></i></div>`;
+        if (current && current.parts.length) sheets.push(current);
+        current = { heading: block.text, parts: [] };
+        return;
       }
-      passageNo += 1;
-      const key = blockId(doc.docHash, block.hash);
-      const result = S.blocks.get(key);
-      if (!result) return `<article class="reader-block is-pending" data-reader-block="${passageNo}"><div class="reader-block-head"><span>${String(passageNo).padStart(2, "0")}</span><i>${t("正在精读…", "Reading…")}</i></div><div class="reader-skeleton"></div></article>`;
-      return blockHtml(block, result, passageNo);
-    }).join("");
+      if (!current) current = { heading: "", parts: [] };
+      current.parts.push(block);
+    });
+    if (current && current.parts.length) sheets.push(current);
+    return sheets.map((sheet, index) => sectionSheetHtml(sheet, index + 1)).join("");
   }
 
-  function blockHtml(block, result, number) {
-    const { html, marks } = annotate(block.text, result.notes);
-    const notes = (result.notes || []).map((note, i) => {
-      const hit = marks.find((item) => item.term.toLowerCase() === String(note.term).toLowerCase());
-      return `<li class="reader-note-item" id="rn-${number}-${i + 1}">${hit ? `<sup>${hit.number}</sup>` : `<sup class="is-muted">·</sup>`}<span class="reader-note-main"><b>${esc(note.term)}</b><span class="reader-pos">${esc(note.pos)}</span><span class="reader-zh">${esc(note.inContextZh)}</span></span>${note.nuance ? `<i>${esc(note.nuance)}</i>` : ""}${note.chunk ? `<code>${esc(note.chunk)}</code>` : ""}</li>`;
-    }).join("");
-    const sentences = (result.sentences || []).map((item, i) => `
-      <li class="reader-sentence">
-        <span class="pdf-tick">${String(i + 1).padStart(2, "0")}</span>
-        <div class="reader-sentence-body">
-          <p class="reader-sentence-en">${esc(item.en)}</p>
-          <p class="reader-sentence-zh">${esc(item.zh)}</p>
-          ${item.role || item.reading ? `<p class="reader-sentence-note">${item.role ? `<b>${esc(item.role)}</b>` : ""}${item.reading ? ` ${esc(item.reading)}` : ""}</p>` : ""}
-        </div>
-      </li>`).join("");
-    const chunks = (result.chunks || []).map((item) => `
-      <li class="reader-chunk">
-        <span class="reader-chunk-type mono">${esc(item.type || "chunk")}</span>
-        <b>${esc(item.en)}</b>
-        <span>${esc(item.zh)}</span>
-      </li>`).join("");
-    const craft = (result.craft || []).map((item) => `
-      <li class="reader-craft-item">
-        <span class="reader-craft-name">${esc(item.name)}</span>
-        ${item.en ? `<cite>${esc(item.en)}</cite>` : ""}
-        <p>${esc(item.effect)}</p>
-      </li>`).join("");
-    const paragraphs = String(result.translation || "").split(/\n{2,}/).filter(Boolean);
+  function sectionSheetHtml(sheet, sectionNo) {
+    const words = sheet.parts.reduce((sum, block) => sum + (block.words || wordsOf(block.text)), 0);
+    const title = sheet.heading || `${t("精读", "Reading")} ${String(sectionNo).padStart(2, "0")}`;
+    const main = sheet.parts.map((block, partNo) => passageBodyHtml(block, partNo)).join("");
+    const notes = sheet.parts.map((block, partNo) => notesColumnHtml(block, partNo)).join("");
     return `
-      <article class="reader-block" data-reader-block="${number}">
-        <div class="pdf-head">
-          <b class="pdf-num">${String(number).padStart(2, "0")}</b>
-          <h2>${t("精读", "Passage")} ${String(number).padStart(2, "0")}</h2>
-          <i></i>
-          <span class="pdf-head-meta mono">${block.words} ${t("词", "words")}</span>
+      <article class="rv-sheet">
+        ${sheetMasthead()}
+        ${secBar(`§${sectionNo}`, title, `${words} WORDS`)}
+        <div class="spread-grid">
+          <div class="spread-main">
+            ${sheet.heading && sheet.heading !== title ? `<h2 class="chapter-heading-en">${esc(sheet.heading)}</h2>` : ""}
+            ${main}
+          </div>
+          ${notes ? `<aside class="sidenotes-col" aria-label="${attr(t("本节语境眉批", "Context notes"))}">${notes}</aside>` : ""}
         </div>
-        <div class="reader-en"><p>${html}</p></div>
-        ${paragraphs.length ? `<div class="pdf-card reader-translation"><span class="pdf-card-label mono">“ ${t("整段意译", "TRANSLATION")}</span>${paragraphs.map((para) => `<p>${esc(para)}</p>`).join("")}</div>` : ""}
-        ${sentences ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("句子解读", "Sentence by sentence")}</h3><i></i></div><ol class="reader-sentences">${sentences}</ol></div>` : ""}
-        ${chunks ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("意群分解", "Chunks")}</h3><i></i></div><ul class="reader-chunks">${chunks}</ul></div>` : ""}
-        ${craft ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("句子刻画", "Craft")}</h3><i></i></div><ul class="reader-craft">${craft}</ul></div>` : ""}
-        ${S.showFocus && result.focusSentence ? `<aside class="pdf-card reader-focus"><span class="pdf-card-label mono">${t("焦点难句", "FOCUS")}</span><cite>${esc(result.focusSentence.en)}</cite>${result.focusSentence.why ? `<p>${esc(result.focusSentence.why)}</p>` : ""}</aside>` : ""}
-        ${S.showNotes && notes ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("语境词注", "Notes")}</h3><i></i></div><ol class="reader-notes">${notes}</ol></div>` : ""}
+        ${sheetFoot(sectionNo + 1)}
       </article>`;
+  }
+
+  function passageBodyHtml(block, partNo) {
+    const key = blockId(S.doc.docHash, block.hash);
+    const result = S.blocks.get(key);
+    const number = passageNumber(block);
+    if (!result) {
+      return `<div class="reader-part is-pending" data-reader-block="${number}"><div class="reader-skeleton"></div><p class="reader-pending-note">${t("这一节正在精读…", "Reading this section…")}</p></div>`;
+    }
+    if (result.error) {
+      return `<div class="reader-part" data-reader-block="${number}"><p class="reader-error-line">${esc(result.error)}</p></div>`;
+    }
+    const sentences = Array.isArray(result.sentences) ? result.sentences : [];
+    const chunks = Array.isArray(result.chunks) ? result.chunks : [];
+    const craft = Array.isArray(result.craft) ? result.craft : [];
+    return `
+      <div class="reader-part" data-reader-block="${number}">
+        <div class="en-prose">${String(annotate(block.text, result.notes || []).html || "").split(/\n{2,}/).filter(Boolean).map((para) => `<p>${para}</p>`).join("")}</div>
+        ${result.translation ? `<div class="zh-trans-card"><span class="card-kicker">“ ${t("整段意译", "Translation")}</span><div class="zh-body">${paragraphs(result.translation)}</div></div>` : ""}
+        ${sentences.length ? `<div class="pdf-block"><div class="pdf-head small"><b class="pdf-num">01</b><h2>${t("句子解读", "Sentence by sentence")}</h2><i></i></div><ol class="reader-sentences">${sentences.map((row, i) => `<li class="reader-sentence"><span class="pdf-tick mono">${String(i + 1).padStart(2, "0")}</span><p class="rs-en">${esc(row.en)}</p>${row.zh ? `<p class="rs-zh">${esc(row.zh)}</p>` : ""}${row.role ? `<p class="rs-role mono">${esc(row.role)}${row.reading ? ` · ${esc(row.reading)}` : ""}</p>` : ""}</li>`).join("")}</ol></div>` : ""}
+        ${chunks.length ? `<div class="pdf-block"><div class="pdf-head small"><b class="pdf-num">02</b><h2>${t("意群分解", "Chunks")}</h2><i></i></div><div class="reader-chunks">${chunks.map((row) => `<div class="reader-chunk"><span class="rc-type mono">${esc(row.type)}</span><p class="rc-en">${esc(row.en)}</p>${row.zh ? `<p class="rc-zh">${esc(row.zh)}</p>` : ""}</div>`).join("")}</div></div>` : ""}
+        ${craft.length ? `<div class="pdf-block"><div class="pdf-head small"><b class="pdf-num">03</b><h2>${t("句子刻画", "Craft")}</h2><i></i></div><div class="reader-craft">${craft.map((row) => `<div class="reader-craft-item"><span class="pdf-craft-name mono">${esc(row.name)}</span><p class="pdf-craft-en">${esc(row.en)}</p>${row.effect ? `<p class="pdf-craft-effect">${esc(row.effect)}</p>` : ""}</div>`).join("")}</div></div>` : ""}
+        ${result.focusSentence?.en ? `<div class="focus-card"><span class="card-kicker">${t("焦点难句", "Hard sentence")}</span><p class="focus-en">${esc(result.focusSentence.en)}</p>${result.focusSentence.why ? `<p class="focus-why">${esc(result.focusSentence.why)}</p>` : ""}</div>` : ""}
+      </div>`;
+  }
+
+  function notesColumnHtml(block, partNo) {
+    const key = blockId(S.doc.docHash, block.hash);
+    const result = S.blocks.get(key);
+    if (!result || !result.notes?.length) return "";
+    const source = String(block.text || "").toLowerCase();
+    const notes = (result.notes || [])
+      .filter((note) => source.includes(String(note.term || "").toLowerCase()))
+      .slice()
+      .sort((a, b) => source.indexOf(String(a.term).toLowerCase()) - source.indexOf(String(b.term).toLowerCase()));
+    return notes.map((note, i) => `
+      <div class="sidenote-item" data-note="${attr(note.term)}">
+        <span class="sn-num">${i + 1}</span>
+        <div>
+          <div class="sn-head"><span class="sn-term">${esc(note.term)}</span>${note.pos ? `<span class="sn-pos">${esc(note.pos)}</span>` : ""}${note.inContextZh ? `<span class="sn-zh">${esc(note.inContextZh)}</span>` : ""}</div>
+          ${note.nuance ? `<p class="sn-nuance">${esc(note.nuance)}</p>` : ""}
+          ${note.chunk ? `<span class="sn-chunk">${esc(note.chunk)}</span>` : ""}
+        </div>
+      </div>`).join("");
   }
 
   function appendixHtml() {
@@ -517,16 +563,14 @@
     if (!seen.size) return "";
     const rows = [...seen.values()].sort((a, b) => a.note.term.toLowerCase().localeCompare(b.note.term.toLowerCase()));
     return `
-      <section class="reader-appendix">
-        <div class="pdf-head"><b class="pdf-num">§</b><h2>${t("词汇总表", "Glossary")}</h2><i></i><span class="pdf-head-meta mono">${rows.length} ${t("条", "terms")}</span></div>
-        <ol class="reader-gloss-list">
-          ${rows.map(({ note, blocks }) => `<li class="reader-gloss-row"><span class="reader-gloss-term"><b>${esc(note.term)}</b><span class="reader-pos">${esc(note.pos)}</span></span><span class="reader-gloss-zh">${esc(note.inContextZh)}</span><span class="reader-ref mono">${blocks.map((n) => `§${n}`).join(" ")}</span></li>`).join("")}
-        </ol>
-        <div class="pdf-signoff">
-          <span>${t("把词，看透。", "See a word through.")}</span>
-          <span class="mono">WUNDERMIKU.GITHUB.IO/TALK</span>
+      <article class="rv-sheet reader-appendix">
+        ${sheetMasthead()}
+        ${secBar("§", t("词汇总表", "Glossary"), `${rows.length} ${t("条", "TERMS")}`)}
+        <div class="glossary-grid">
+          ${rows.map(({ note, blocks }) => `<div class="gloss-item"><div class="gloss-head"><span class="gloss-en">${esc(note.term)}</span>${note.pos ? `<span class="gloss-pos mono">${esc(note.pos)}</span>` : ""}<span class="gloss-zh">${esc(note.inContextZh)}</span><span class="gloss-ref mono">${blocks.map((n) => `§${n}`).join(" ")}</span></div>${note.nuance ? `<p class="gloss-note">${esc(note.nuance)}</p>` : ""}</div>`).join("")}
         </div>
-      </section>`;
+        ${sheetFoot(99)}
+      </article>`;
   }
 
   function updateBlock(block, result, number) {
@@ -680,8 +724,17 @@
 
   function paintProgress() {
     const p = progress();
-    const el = document.querySelector("[data-reader-progress]");
-    if (el) el.textContent = `${p.done} / ${p.total}`;
+    document.querySelectorAll("[data-reader-progress]").forEach((el) => { el.textContent = `${p.done} / ${p.total}`; });
+    const bar = document.querySelector(".reader-progress");
+    if (bar) {
+      const pct = p.total ? Math.round((p.done / p.total) * 100) : 0;
+      bar.setAttribute("aria-valuenow", String(p.done));
+      bar.setAttribute("aria-valuemax", String(p.total));
+      const fill = bar.querySelector("i");
+      if (fill) fill.style.width = `${pct}%`;
+      const label = bar.querySelector(".reader-progress-label");
+      if (label) label.textContent = `${p.done}/${p.total} · ${pct}%`;
+    }
   }
 
   /* ---------------- events ---------------- */

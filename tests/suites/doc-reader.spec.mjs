@@ -23,13 +23,13 @@ suite("reader · long text", { timeout: 90_000 }, (s) => {
     await page.waitForSelector(".reader-input");
     await page.fill("#reader-text", TEXT);
     await page.click('[data-reader-action="start"]');
-    await page.waitForSelector(".reader-cover", { timeout: 30_000 });
-    await page.waitForSelector(".reader-block:not(.is-pending)", { timeout: 30_000 });
+    await page.waitForSelector(".cover-title-zh", { timeout: 30_000 });
+    await page.waitForSelector("[data-reader-block]:not(.is-pending)", { timeout: 30_000 });
 
     t.expect(await page.evaluate(() => document.querySelector(".screen")?.dataset.page)).toBe("reader");
-    t.expect(await page.locator(".reader-title").innerText()).toBe("条约的静默掏空");
-    t.expect(await page.locator(".reader-block").count()).toBeGreaterThan(0);
-    t.expect(await page.locator(".reader-note-item").count()).toBeGreaterThan(0);
+    t.expect(await page.locator(".cover-title-zh").innerText()).toBe("条约的静默掏空");
+    t.expect(await page.locator("[data-reader-block]").count()).toBeGreaterThan(0);
+    t.expect(await page.locator(".sidenote-item").count()).toBeGreaterThan(0);
     t.expect(await page.locator(".reader-anchor").count()).toBeGreaterThan(0);
     t.expect(await page.evaluate(() => location.hash.startsWith("#/reader/"))).toBe(true);
 
@@ -37,8 +37,8 @@ suite("reader · long text", { timeout: 90_000 }, (s) => {
     t.expect(calls).toBeGreaterThan(0);
 
     await page.reload({ waitUntil: "domcontentloaded" });
-    await page.waitForSelector(".reader-block:not(.is-pending)", { timeout: 30_000 });
-    t.expect(await page.locator(".reader-title").innerText()).toBe("条约的静默掏空");
+    await page.waitForSelector("[data-reader-block]:not(.is-pending)", { timeout: 30_000 });
+    t.expect(await page.locator(".cover-title-zh").innerText()).toBe("条约的静默掏空");
     t.expect(state.env.server.mock.requestsOf("docBlock").length).toBe(calls);
   });
 
@@ -48,13 +48,16 @@ suite("reader · long text", { timeout: 90_000 }, (s) => {
     await page.waitForSelector(".reader-input");
     await page.fill("#reader-text", TEXT);
     await page.click('[data-reader-action="start"]');
-    await page.waitForSelector(".reader-block:not(.is-pending)", { timeout: 30_000 });
+    await page.waitForSelector("[data-reader-block]:not(.is-pending)", { timeout: 30_000 });
     await page.emulateMedia({ media: "print" });
-    const styles = await page.evaluate(() => ({
-      toolbar: getComputedStyle(document.querySelector(".reader-toolbar")).display,
-      screen: getComputedStyle(document.querySelector(".screen")).position,
-      overflow: getComputedStyle(document.querySelector(".screen")).overflow
-    }));
+    const styles = await page.evaluate(() => {
+      const bar = document.querySelector(".reader-bar");
+      return {
+        toolbar: bar ? getComputedStyle(bar).display : "none",
+        screen: getComputedStyle(document.querySelector(".screen")).position,
+        overflow: getComputedStyle(document.querySelector(".screen")).overflow
+      };
+    });
     t.expect(styles.toolbar).toBe("none");
     t.expect(styles.screen).toBe("static");
     t.expect(styles.overflow).toBe("visible");
