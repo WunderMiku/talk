@@ -2,8 +2,7 @@
 window.TALK_CONTENT = {
   modules: {
     dictionary: "词典",
-    translator: "翻译",
-    reader: "精读"
+    translator: "翻译"
   },
   home: {
     eyebrow: "英语 · 在语境中理解",
