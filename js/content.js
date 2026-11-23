@@ -230,14 +230,14 @@ window.TALK_CONTENT.themeDecks = [
   }
 ];
 
-/* Rhine Lab voice: technical, quiet, observational. */
-window.TALK_CONTENT.themeCopy.rhine = {
+/* Swiss Lab voice: technical, quiet, observational. */
+window.TALK_CONTENT.themeCopy["swiss-lab"] = {
   modules: {
     dictionary: "索引",
     translator: "转译"
   },
   home: {
-    eyebrow: "RHINE LAB · 语言观察站",
+    eyebrow: "LEXICON LAB · 语言观察站",
     titleLead: "把词，",
     titleAccent: "校准。",
     lede: "语言是信息。拆开它的结构，记录它的温度，再把它放回<strong>真实语境</strong>里。",
@@ -261,18 +261,18 @@ window.TALK_CONTENT.themeCopy.rhine = {
     footerRight: "记录每一次理解"
   },
   translator: {
-    kicker: "RHINE LAB · 语言转译站",
+    kicker: "LEXICON LAB · 语言转译站",
     titleLead: "一句，",
     titleAccent: "多种输出。",
     lede: "保留原意，只改变语气、场合与力度。让同一句话在不同语境里成立。",
     inputPlaceholder: "把要转译的句子放进来…",
     empty: "系统会给出几种可用的英文输出。",
-    workspaceKicker: "RHINE LAB / OUTPUT",
+    workspaceKicker: "LEXICON LAB / OUTPUT",
     workspaceTitle: "转译结果"
   },
   themeSalon: {
     kicker: "主题档案 · 语言观察",
-    brand: "RHINE",
+    brand: "LEXICON",
     masthead: "LANGUAGE INDEX",
     editionLabel: "主题索引",
     leadLabel: "SAMPLE",
@@ -291,7 +291,7 @@ window.TALK_CONTENT.themeCopy.rhine = {
     sceneLabel: "记录",
   },
   settings: {
-    kicker: "RHINE LAB / TERMINAL",
+    kicker: "LEXICON LAB / TERMINAL",
     title: "控制台",
     tabs: [
       ["model", "接口"],
@@ -301,8 +301,8 @@ window.TALK_CONTENT.themeCopy.rhine = {
   }
 };
 
-/* Endfield voice: an industrial field terminal. Labelled, numbered, terse. */
-window.TALK_CONTENT.themeCopy.endfield = {
+/* Topo Acid voice: an industrial field terminal. Labelled, numbered, terse. */
+window.TALK_CONTENT.themeCopy["topo-acid"] = {
   modules: {
     dictionary: "词条",
     translator: "转译"
@@ -372,18 +372,18 @@ window.TALK_CONTENT.themeCopy.endfield = {
   }
 };
 
-window.TALK_CONTENT.themeCopy.bitterworld = {
+window.TALK_CONTENT.themeCopy["retro-stub"] = {
   modules: {
     dictionary: "词册",
     translator: "译站"
   },
   home: {
-    eyebrow: "BITTERWORLD · 未许之地",
+    eyebrow: "LEXICON STUB · 词义票根",
     titleLead: "把词，",
     titleAccent: "摊开。",
     lede: "每个词都是一张票根：从哪来、经过谁、能换到什么。",
     manifesto: {
-      ru: "BITTERWORLD BITTER 44",
+      ru: "LEXICON TRANSIT NO. 44",
       zh: "每一张票，都有去处"
     },
     searchKicker: "查票",
@@ -413,7 +413,7 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
   },
   themeSalon: {
     kicker: "主题档案 · 票册",
-    brand: "BITTERWORLD",
+    brand: "LEXICON",
     masthead: "TICKET ARCHIVE",
     editionLabel: "票册",
     leadLabel: "LEAD",
@@ -432,7 +432,7 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
     sceneLabel: "现场",
   },
   settings: {
-    kicker: "BITTERWORLD / DESK",
+    kicker: "LEXICON / DESK",
     title: "登记处",
     tabs: [
       ["model", "接口"],
@@ -442,13 +442,13 @@ window.TALK_CONTENT.themeCopy.bitterworld = {
   }
 };
 
-window.TALK_CONTENT.themeCopy.rhineaccess = {
+window.TALK_CONTENT.themeCopy["archive-grid"] = {
   modules: {
     dictionary: "档案",
     translator: "转译"
   },
   home: {
-    eyebrow: "RHINE LAB · ANALYSIS OS",
+    eyebrow: "CORPUS LAB · ANALYSIS OS",
     titleLead: "把词，",
     titleAccent: "归档。",
     lede: "每个词都是一份现场记录：来源、结构、用法与被引用过的位置。",
@@ -483,7 +483,7 @@ window.TALK_CONTENT.themeCopy.rhineaccess = {
   },
   themeSalon: {
     kicker: "档案 · 主题记录",
-    brand: "RHINE LAB",
+    brand: "CORPUS LAB",
     masthead: "THEME ARCHIVE",
     editionLabel: "主题档案",
     leadLabel: "LEAD",

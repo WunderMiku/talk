@@ -1,9 +1,9 @@
 /* ============================================================
-   Rhine Lab — quiet, technical, observational.
+   Swiss Lab — quiet, technical, observational.
    Only overrides; base tokens stay in theme.css.
    ============================================================ */
 
-[data-theme="rhine"] {
+[data-theme="swiss-lab"] {
   --paper: #e9e5dc;
   --paper-deep: #ded9cf;
   --card: #f1eee7;
@@ -47,63 +47,63 @@
   --shadow-float: 0 0 0 1px rgba(17, 17, 16, 0.06), 0 24px 60px -42px rgba(17, 17, 16, 0.4);
 }
 
-[data-theme="rhine"] body {
+[data-theme="swiss-lab"] body {
   background:
     repeating-linear-gradient(90deg, transparent 0 31px, rgba(17, 17, 16, 0.045) 31px 32px),
     linear-gradient(120deg, #d6d1c6 0%, #e4dfd5 50%, #cfcbc1 100%);
 }
 
-[data-theme="rhine"] .ambient {
+[data-theme="swiss-lab"] .ambient {
   display: none;
 }
 
-[data-theme="rhine"] .grain {
+[data-theme="swiss-lab"] .grain {
   opacity: 0.1;
 }
 
-[data-theme="rhine"] .stage-meta,
-[data-theme="rhine"] .stage-hint {
+[data-theme="swiss-lab"] .stage-meta,
+[data-theme="swiss-lab"] .stage-hint {
   color: #4d4b45;
   letter-spacing: 0.16em;
 }
 
-[data-theme="rhine"] .stage-mark {
+[data-theme="swiss-lab"] .stage-mark {
   font-family: var(--display);
   font-weight: 800;
 }
 
-[data-theme="rhine"] .stage-mark .dot,
-[data-theme="rhine"] .brand .dot {
+[data-theme="swiss-lab"] .stage-mark .dot,
+[data-theme="swiss-lab"] .brand .dot {
   color: #c46a3b;
 }
 
-[data-theme="rhine"] .device {
+[data-theme="swiss-lab"] .device {
   border: 1px solid #111110;
   border-radius: 0;
   background: #111110;
   box-shadow: 12px 12px 0 rgba(17, 17, 16, 0.14);
 }
 
-[data-theme="rhine"] .device::after {
+[data-theme="swiss-lab"] .device::after {
   border-radius: 0;
 }
 
-[data-theme="rhine"] .app {
+[data-theme="swiss-lab"] .app {
   border-radius: 0;
   background: #e9e5dc;
 }
 
-[data-theme="rhine"] .module-bar {
+[data-theme="swiss-lab"] .module-bar {
   background: rgba(233, 229, 220, 0.96);
   border-bottom: 1px solid #111110;
 }
 
-[data-theme="rhine"] .module-bar-label {
+[data-theme="swiss-lab"] .module-bar-label {
   color: #111110;
   font-weight: 700;
 }
 
-[data-theme="rhine"] .module-switch {
+[data-theme="swiss-lab"] .module-switch {
   gap: 0;
   padding: 0;
   border: 1px solid #111110;
@@ -111,52 +111,52 @@
   background: transparent;
 }
 
-[data-theme="rhine"] .module-btn {
+[data-theme="swiss-lab"] .module-btn {
   padding: 8px 13px;
   border-radius: 0;
   color: #111110;
 }
 
-[data-theme="rhine"] .module-btn.active {
+[data-theme="swiss-lab"] .module-btn.active {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .module-version {
+[data-theme="swiss-lab"] .module-version {
   color: #111110;
 }
 
-[data-theme="rhine"] .topbar {
+[data-theme="swiss-lab"] .topbar {
   background: var(--paper);
 }
 
-[data-theme="rhine"] .brand {
+[data-theme="swiss-lab"] .brand {
   color: #111110;
   font-family: var(--display);
   font-size: 30px;
 }
 
-[data-theme="rhine"] .icon-btn,
-[data-theme="rhine"] .speak-btn {
+[data-theme="swiss-lab"] .icon-btn,
+[data-theme="swiss-lab"] .speak-btn {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #111110;
 }
 
-[data-theme="rhine"] .icon-btn:hover,
-[data-theme="rhine"] .speak-btn:hover {
+[data-theme="swiss-lab"] .icon-btn:hover,
+[data-theme="swiss-lab"] .speak-btn:hover {
   background: #111110;
   color: #f1eee7;
   transform: none;
 }
 
-[data-theme="rhine"] .home-hero {
+[data-theme="swiss-lab"] .home-hero {
   position: relative;
   padding-top: 13px;
 }
 
-[data-theme="rhine"] .home-hero::before {
+[data-theme="swiss-lab"] .home-hero::before {
   content: "SECTION 01 / LANGUAGE INDEX";
   position: absolute;
   top: 0;
@@ -167,7 +167,7 @@
   letter-spacing: 0.08em;
 }
 
-[data-theme="rhine"] .home-hero::after {
+[data-theme="swiss-lab"] .home-hero::after {
   content: "";
   position: absolute;
   top: 10px;
@@ -178,14 +178,14 @@
   box-shadow: 0 0 0 0 #111110;
 }
 
-[data-theme="rhine"] .eyebrow {
+[data-theme="swiss-lab"] .eyebrow {
   color: #6c6a63;
   font-size: 9px;
   letter-spacing: 0.13em;
 }
 
-[data-theme="rhine"] .eyebrow .spark,
-[data-theme="rhine"] .translator-eyebrow .spark {
+[data-theme="swiss-lab"] .eyebrow .spark,
+[data-theme="swiss-lab"] .translator-eyebrow .spark {
   width: 6px;
   height: 6px;
   border-radius: 50%;
@@ -193,7 +193,7 @@
   box-shadow: 0 0 0 3px rgba(196, 106, 59, 0.15);
 }
 
-[data-theme="rhine"] .home-title {
+[data-theme="swiss-lab"] .home-title {
   margin-top: 9px;
   color: #111110;
   font-family: var(--display);
@@ -202,7 +202,7 @@
   letter-spacing: -0.075em;
 }
 
-[data-theme="rhine"] .home-title em {
+[data-theme="swiss-lab"] .home-title em {
   display: inline-block;
   padding: 0 0.09em 0.025em;
   background: #111110;
@@ -212,19 +212,19 @@
   box-shadow: none;
 }
 
-[data-theme="rhine"] .home-lede {
+[data-theme="swiss-lab"] .home-lede {
   max-width: 35ch;
   color: #4f4d47;
   font-size: 12px;
   line-height: 1.75;
 }
 
-[data-theme="rhine"] .home-lede strong {
+[data-theme="swiss-lab"] .home-lede strong {
   color: #111110;
   font-weight: 700;
 }
 
-[data-theme="rhine"] .theme-manifesto {
+[data-theme="swiss-lab"] .theme-manifesto {
   margin: 18px 0 0;
   padding: 11px 13px;
   border: 1px solid #111110;
@@ -234,7 +234,7 @@
   transform: none;
 }
 
-[data-theme="rhine"] .manifesto-ru {
+[data-theme="swiss-lab"] .manifesto-ru {
   display: block;
   color: #f1eee7;
   font-family: var(--mono);
@@ -243,7 +243,7 @@
   letter-spacing: 0.08em;
 }
 
-[data-theme="rhine"] .manifesto-zh {
+[data-theme="swiss-lab"] .manifesto-zh {
   display: block;
   margin-top: 4px;
   color: #c46a3b;
@@ -251,9 +251,9 @@
   letter-spacing: 0.2em;
 }
 
-[data-theme="rhine"] .search-card,
-[data-theme="rhine"] .translator-input-shell,
-[data-theme="rhine"] .workspace-input-shell {
+[data-theme="swiss-lab"] .search-card,
+[data-theme="swiss-lab"] .translator-input-shell,
+[data-theme="swiss-lab"] .workspace-input-shell {
   position: relative;
   border: 1px solid #111110;
   border-radius: 0;
@@ -261,8 +261,8 @@
   box-shadow: none;
 }
 
-[data-theme="rhine"] .search-card::before,
-[data-theme="rhine"] .search-card::after {
+[data-theme="swiss-lab"] .search-card::before,
+[data-theme="swiss-lab"] .search-card::after {
   position: absolute;
   color: #55524b;
   font-family: var(--mono);
@@ -271,23 +271,23 @@
   pointer-events: none;
 }
 
-[data-theme="rhine"] .search-card::before {
+[data-theme="swiss-lab"] .search-card::before {
   content: "+";
   top: 8px;
   left: 9px;
 }
 
-[data-theme="rhine"] .search-card::after {
+[data-theme="swiss-lab"] .search-card::after {
   content: "+";
   right: 9px;
   bottom: 8px;
 }
 
-[data-theme="rhine"] .search-top {
+[data-theme="swiss-lab"] .search-top {
   padding-top: 4px;
 }
 
-[data-theme="rhine"] .search-input {
+[data-theme="swiss-lab"] .search-input {
   color: #111110;
   font-size: 22px;
   font-weight: 500;
@@ -295,7 +295,7 @@
   letter-spacing: -0.03em;
 }
 
-[data-theme="rhine"] .search-submit {
+[data-theme="swiss-lab"] .search-submit {
   border: 1px solid #111110;
   border-radius: 0;
   background: #111110;
@@ -303,98 +303,98 @@
   transform: none;
 }
 
-[data-theme="rhine"] .search-submit:hover {
+[data-theme="swiss-lab"] .search-submit:hover {
   background: #c46a3b;
 }
 
-[data-theme="rhine"] .search-submit svg {
+[data-theme="swiss-lab"] .search-submit svg {
   width: 20px;
   height: 20px;
 }
 
-[data-theme="rhine"] .mode-switch,
-[data-theme="rhine"] .translator-mode-switch,
-[data-theme="rhine"] .cache-display-switch {
+[data-theme="swiss-lab"] .mode-switch,
+[data-theme="swiss-lab"] .translator-mode-switch,
+[data-theme="swiss-lab"] .cache-display-switch {
   padding: 0;
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
 }
 
-[data-theme="rhine"] .mode-btn,
-[data-theme="rhine"] .translator-mode-btn,
-[data-theme="rhine"] .cache-display-btn {
+[data-theme="swiss-lab"] .mode-btn,
+[data-theme="swiss-lab"] .translator-mode-btn,
+[data-theme="swiss-lab"] .cache-display-btn {
   border-radius: 0;
   color: #55524b;
 }
 
-[data-theme="rhine"] .mode-btn.active,
-[data-theme="rhine"] .translator-mode-btn.active,
-[data-theme="rhine"] .cache-display-btn.active {
+[data-theme="swiss-lab"] .mode-btn.active,
+[data-theme="swiss-lab"] .translator-mode-btn.active,
+[data-theme="swiss-lab"] .cache-display-btn.active {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .recent-label,
-[data-theme="rhine"] .mono,
-[data-theme="rhine"] .side-note {
+[data-theme="swiss-lab"] .recent-label,
+[data-theme="swiss-lab"] .mono,
+[data-theme="swiss-lab"] .side-note {
   letter-spacing: 0.08em;
 }
 
-[data-theme="rhine"] .chip,
-[data-theme="rhine"] .related-pill {
+[data-theme="swiss-lab"] .chip,
+[data-theme="swiss-lab"] .related-pill {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
 }
 
-[data-theme="rhine"] .chip:hover,
-[data-theme="rhine"] .related-pill:hover {
+[data-theme="swiss-lab"] .chip:hover,
+[data-theme="swiss-lab"] .related-pill:hover {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .section-kicker {
+[data-theme="swiss-lab"] .section-kicker {
   color: #a94e26;
   font-weight: 700;
   letter-spacing: 0.13em;
 }
 
-[data-theme="rhine"] .section-head h2 {
+[data-theme="swiss-lab"] .section-head h2 {
   font-family: var(--display);
   font-size: 30px;
   font-weight: 800;
   letter-spacing: -0.06em;
 }
 
-[data-theme="rhine"] .daily {
+[data-theme="swiss-lab"] .daily {
   border: 1px solid #111110;
   border-radius: 0;
   background: #111110;
   box-shadow: none;
 }
 
-[data-theme="rhine"] .daily-badge {
+[data-theme="swiss-lab"] .daily-badge {
   border-radius: 0;
   background: #c46a3b;
   color: #111110;
   border: 0;
 }
 
-[data-theme="rhine"] .daily-arrow {
+[data-theme="swiss-lab"] .daily-arrow {
   border: 1px solid #f1eee7;
   background: transparent;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .mood-refresh {
+[data-theme="swiss-lab"] .mood-refresh {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #111110;
 }
 
-[data-theme="rhine"] .theme-poster {
+[data-theme="swiss-lab"] .theme-poster {
   position: relative;
   padding: 17px 22px 14px;
   border: 1px solid #111110;
@@ -402,8 +402,8 @@
   box-shadow: 7px 7px 0 rgba(17, 17, 16, 0.08);
 }
 
-[data-theme="rhine"] .theme-poster::before,
-[data-theme="rhine"] .theme-poster::after {
+[data-theme="swiss-lab"] .theme-poster::before,
+[data-theme="swiss-lab"] .theme-poster::after {
   position: absolute;
   color: #6c6a63;
   font-family: var(--mono);
@@ -412,24 +412,24 @@
   pointer-events: none;
 }
 
-[data-theme="rhine"] .theme-poster::before {
+[data-theme="swiss-lab"] .theme-poster::before {
   content: "+";
   top: 8px;
   left: 8px;
 }
 
-[data-theme="rhine"] .theme-poster::after {
+[data-theme="swiss-lab"] .theme-poster::after {
   content: "+";
   right: 8px;
   bottom: 8px;
 }
 
-[data-theme="rhine"] .poster-masthead {
+[data-theme="swiss-lab"] .poster-masthead {
   border-bottom: 1px solid #111110;
   padding-bottom: 7px;
 }
 
-[data-theme="rhine"] .poster-brand-mark {
+[data-theme="swiss-lab"] .poster-brand-mark {
   padding: 3px 5px;
   background: #111110;
   color: #f1eee7;
@@ -438,19 +438,19 @@
   letter-spacing: 0.04em;
 }
 
-[data-theme="rhine"] .poster-brand-section,
-[data-theme="rhine"] .poster-edition {
+[data-theme="swiss-lab"] .poster-brand-section,
+[data-theme="swiss-lab"] .poster-edition {
   color: #55524b;
   font-weight: 500;
 }
 
-[data-theme="rhine"] .poster-rule {
+[data-theme="swiss-lab"] .poster-rule {
   height: 1px;
   margin: 10px 0 14px;
   background: #111110;
 }
 
-[data-theme="rhine"] .poster-title {
+[data-theme="swiss-lab"] .poster-title {
   color: #111110;
   font-family: var(--display);
   font-size: clamp(35px, 10.5vw, 50px);
@@ -458,128 +458,128 @@
   letter-spacing: -0.075em;
 }
 
-[data-theme="rhine"] .poster-kicker {
+[data-theme="swiss-lab"] .poster-kicker {
   color: #6c6a63;
 }
 
-[data-theme="rhine"] .poster-subtitle {
+[data-theme="swiss-lab"] .poster-subtitle {
   color: #55524b;
 }
 
-[data-theme="rhine"] .poster-body {
+[data-theme="swiss-lab"] .poster-body {
   border-top: 2px solid #111110;
 }
 
-[data-theme="rhine"] .poster-lead {
+[data-theme="swiss-lab"] .poster-lead {
   border-bottom: 1px solid #111110;
   background: transparent;
   color: #111110;
   clip-path: none;
 }
 
-[data-theme="rhine"] .poster-lead-label {
+[data-theme="swiss-lab"] .poster-lead-label {
   color: #a94e26;
 }
 
-[data-theme="rhine"] .poster-lead-word {
+[data-theme="swiss-lab"] .poster-lead-word {
   color: #111110;
   font-family: var(--display);
   font-size: clamp(39px, 11vw, 54px);
   letter-spacing: -0.075em;
 }
 
-[data-theme="rhine"] .poster-lead-pos,
-[data-theme="rhine"] .poster-col-pos {
+[data-theme="swiss-lab"] .poster-lead-pos,
+[data-theme="swiss-lab"] .poster-col-pos {
   color: #77736b;
 }
 
-[data-theme="rhine"] .poster-lead-gloss,
-[data-theme="rhine"] .poster-col-gloss {
+[data-theme="swiss-lab"] .poster-lead-gloss,
+[data-theme="swiss-lab"] .poster-col-gloss {
   color: #111110;
 }
 
-[data-theme="rhine"] .poster-lead-why,
-[data-theme="rhine"] .poster-col-why {
+[data-theme="swiss-lab"] .poster-lead-why,
+[data-theme="swiss-lab"] .poster-col-why {
   color: #5f5b54;
 }
 
-[data-theme="rhine"] .poster-col {
+[data-theme="swiss-lab"] .poster-col {
   border-bottom: 1px solid #111110;
 }
 
-[data-theme="rhine"] .poster-col:nth-child(2n) {
+[data-theme="swiss-lab"] .poster-col:nth-child(2n) {
   border-left: 1px solid #111110;
 }
 
-[data-theme="rhine"] .poster-col-index {
+[data-theme="swiss-lab"] .poster-col-index {
   color: #a94e26;
 }
 
-[data-theme="rhine"] .poster-col-word {
+[data-theme="swiss-lab"] .poster-col-word {
   font-family: var(--display);
   color: #111110;
 }
 
-[data-theme="rhine"] .poster-scene {
+[data-theme="swiss-lab"] .poster-scene {
   padding: 9px 0 9px 10px;
   border-left: 1px solid #111110;
   background: transparent;
 }
 
-[data-theme="rhine"] .poster-scene span {
+[data-theme="swiss-lab"] .poster-scene span {
   color: #a94e26;
 }
 
-[data-theme="rhine"] .poster-scene p {
+[data-theme="swiss-lab"] .poster-scene p {
   color: #55524b;
 }
 
-[data-theme="rhine"] .poster-footer {
+[data-theme="swiss-lab"] .poster-footer {
   border-top: 1px solid #111110;
   color: #55524b;
 }
 
-[data-theme="rhine"] .poster-picker,
-[data-theme="rhine"] .poster-single {
+[data-theme="swiss-lab"] .poster-picker,
+[data-theme="swiss-lab"] .poster-single {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #111110;
 }
 
-[data-theme="rhine"] .poster-single {
+[data-theme="swiss-lab"] .poster-single {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .poster-picker:hover,
-[data-theme="rhine"] .poster-single:hover:not(:disabled) {
+[data-theme="swiss-lab"] .poster-picker:hover,
+[data-theme="swiss-lab"] .poster-single:hover:not(:disabled) {
   background: #c46a3b;
   color: #111110;
 }
 
-[data-theme="rhine"] .poster-nav button {
+[data-theme="swiss-lab"] .poster-nav button {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #111110;
 }
 
-[data-theme="rhine"] .poster-nav button:hover:not(:disabled) {
+[data-theme="swiss-lab"] .poster-nav button:hover:not(:disabled) {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .poster-batch-status {
+[data-theme="swiss-lab"] .poster-batch-status {
   color: #55524b;
 }
 
-[data-theme="rhine"] .result-page {
+[data-theme="swiss-lab"] .result-page {
   position: relative;
   isolation: isolate;
 }
 
-[data-theme="rhine"] .result-page::before {
+[data-theme="swiss-lab"] .result-page::before {
   content: "";
   position: absolute;
   top: 27px;
@@ -591,255 +591,255 @@
   opacity: 0.55;
 }
 
-[data-theme="rhine"] .word-title {
+[data-theme="swiss-lab"] .word-title {
   font-family: var(--display);
   font-size: clamp(56px, 17vw, 82px);
   font-weight: 800;
   letter-spacing: -0.08em;
 }
 
-[data-theme="rhine"] .pos-tab {
+[data-theme="swiss-lab"] .pos-tab {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #55524b;
 }
 
-[data-theme="rhine"] .pos-tab.active {
+[data-theme="swiss-lab"] .pos-tab.active {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .word-gloss-tag {
+[data-theme="swiss-lab"] .word-gloss-tag {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #a94e26;
 }
 
-[data-theme="rhine"] .meaning-card {
+[data-theme="swiss-lab"] .meaning-card {
   border: 1px solid #111110;
   border-radius: 0;
   background: #f1eee7;
   box-shadow: none;
 }
 
-[data-theme="rhine"] .meaning-card::before {
+[data-theme="swiss-lab"] .meaning-card::before {
   background: #c46a3b;
 }
 
-[data-theme="rhine"] .meaning-pager-foot {
+[data-theme="swiss-lab"] .meaning-pager-foot {
   border-top: 1px solid #111110;
 }
 
-[data-theme="rhine"] .meaning-pager-arrow {
+[data-theme="swiss-lab"] .meaning-pager-arrow {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #111110;
 }
 
-[data-theme="rhine"] .meaning-pager-arrow:hover {
+[data-theme="swiss-lab"] .meaning-pager-arrow:hover {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .block-index {
+[data-theme="swiss-lab"] .block-index {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   color: #55524b;
 }
 
-[data-theme="rhine"] .block-head .rule {
+[data-theme="swiss-lab"] .block-head .rule {
   height: 1px;
   background: #111110;
 }
 
-[data-theme="rhine"] .family-card,
-[data-theme="rhine"] .relation-card,
-[data-theme="rhine"] .example-card,
-[data-theme="rhine"] .origin-card,
-[data-theme="rhine"] .memory-card,
-[data-theme="rhine"] .collocation {
+[data-theme="swiss-lab"] .family-card,
+[data-theme="swiss-lab"] .relation-card,
+[data-theme="swiss-lab"] .example-card,
+[data-theme="swiss-lab"] .origin-card,
+[data-theme="swiss-lab"] .memory-card,
+[data-theme="swiss-lab"] .collocation {
   border: 1px solid #111110;
   border-radius: 0;
   box-shadow: none;
 }
 
-[data-theme="rhine"] .family-card {
+[data-theme="swiss-lab"] .family-card {
   background: transparent;
 }
 
-[data-theme="rhine"] .relation-card.syn,
-[data-theme="rhine"] .relation-card.ant {
+[data-theme="swiss-lab"] .relation-card.syn,
+[data-theme="swiss-lab"] .relation-card.ant {
   background: transparent;
 }
 
-[data-theme="rhine"] .rel-chip {
+[data-theme="swiss-lab"] .rel-chip {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
 }
 
-[data-theme="rhine"] .example-card {
+[data-theme="swiss-lab"] .example-card {
   background: #f1eee7;
 }
 
-[data-theme="rhine"] .origin-card {
+[data-theme="swiss-lab"] .origin-card {
   background: transparent;
 }
 
-[data-theme="rhine"] .memory-card {
+[data-theme="swiss-lab"] .memory-card {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .memory-label {
+[data-theme="swiss-lab"] .memory-label {
   color: #c46a3b;
 }
 
-[data-theme="rhine"] .memory-text {
+[data-theme="swiss-lab"] .memory-text {
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .origin-timeline::before {
+[data-theme="swiss-lab"] .origin-timeline::before {
   background: #111110;
 }
 
-[data-theme="rhine"] .origin-stage::before {
+[data-theme="swiss-lab"] .origin-stage::before {
   background: #c46a3b;
   border-color: #e9e5dc;
 }
 
-[data-theme="rhine"] .translation-card {
+[data-theme="swiss-lab"] .translation-card {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 
-[data-theme="rhine"] .translator-style-chip {
+[data-theme="swiss-lab"] .translator-style-chip {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
 }
 
-[data-theme="rhine"] .translator-style-chip.selected {
+[data-theme="swiss-lab"] .translator-style-chip.selected {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .translator-style-chip.selected strong {
+[data-theme="swiss-lab"] .translator-style-chip.selected strong {
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .translation-workspace,
-[data-theme="rhine"] .sheet,
-[data-theme="rhine"] .word-layer {
+[data-theme="swiss-lab"] .translation-workspace,
+[data-theme="swiss-lab"] .sheet,
+[data-theme="swiss-lab"] .word-layer {
   border-radius: 0;
 }
 
-[data-theme="rhine"] .sheet {
+[data-theme="swiss-lab"] .sheet {
   border-top: 1px solid #111110;
   background: #e9e5dc;
 }
 
-[data-theme="rhine"] .sheet-handle {
+[data-theme="swiss-lab"] .sheet-handle {
   border-radius: 0;
   background: #111110;
 }
 
-[data-theme="rhine"] .settings-tabs {
+[data-theme="swiss-lab"] .settings-tabs {
   border-bottom: 1px solid #111110;
   padding: 0;
 }
 
-[data-theme="rhine"] .settings-tab {
+[data-theme="swiss-lab"] .settings-tab {
   border-radius: 0;
   border-right: 1px solid #111110;
 }
 
-[data-theme="rhine"] .settings-tab.active {
+[data-theme="swiss-lab"] .settings-tab.active {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .model-profile-chip,
-[data-theme="rhine"] .model-profile-add,
-[data-theme="rhine"] .tts-engine-switch,
-[data-theme="rhine"] .detail-switch,
-[data-theme="rhine"] .theme-switch,
-[data-theme="rhine"] .cache-display-switch,
-[data-theme="rhine"] .theme-option,
-[data-theme="rhine"] .cache-settings-summary,
-[data-theme="rhine"] .theme-cache-setting,
-[data-theme="rhine"] .notice-card,
-[data-theme="rhine"] .toast {
+[data-theme="swiss-lab"] .model-profile-chip,
+[data-theme="swiss-lab"] .model-profile-add,
+[data-theme="swiss-lab"] .tts-engine-switch,
+[data-theme="swiss-lab"] .detail-switch,
+[data-theme="swiss-lab"] .theme-switch,
+[data-theme="swiss-lab"] .cache-display-switch,
+[data-theme="swiss-lab"] .theme-option,
+[data-theme="swiss-lab"] .cache-settings-summary,
+[data-theme="swiss-lab"] .theme-cache-setting,
+[data-theme="swiss-lab"] .notice-card,
+[data-theme="swiss-lab"] .toast {
   border-radius: 0;
 }
 
-[data-theme="rhine"] .model-profile-chip.active,
-[data-theme="rhine"] .theme-option.active {
+[data-theme="swiss-lab"] .model-profile-chip.active,
+[data-theme="swiss-lab"] .theme-option.active {
   background: #111110;
   color: #f1eee7;
   border-color: #111110;
 }
 
-[data-theme="rhine"] .theme-option {
+[data-theme="swiss-lab"] .theme-option {
   color: #55524b;
 }
 
-[data-theme="rhine"] .settings-footer {
+[data-theme="swiss-lab"] .settings-footer {
   border-top: 1px solid #111110;
 }
 
-[data-theme="rhine"] .btn {
+[data-theme="swiss-lab"] .btn {
   border-radius: 0;
   border: 1px solid #111110;
   box-shadow: none;
 }
 
-[data-theme="rhine"] .btn-primary {
+[data-theme="swiss-lab"] .btn-primary {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .btn-secondary {
+[data-theme="swiss-lab"] .btn-secondary {
   background: transparent;
   color: #111110;
 }
 
-[data-theme="rhine"] .qwen-tts-panel input[type="text"],
-[data-theme="rhine"] .field input,
-[data-theme="rhine"] .field textarea,
-[data-theme="rhine"] .field select {
+[data-theme="swiss-lab"] .qwen-tts-panel input[type="text"],
+[data-theme="swiss-lab"] .field input,
+[data-theme="swiss-lab"] .field textarea,
+[data-theme="swiss-lab"] .field select {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
 }
 
-[data-theme="rhine"] .theme-cache-setting {
+[data-theme="swiss-lab"] .theme-cache-setting {
   border-top: 1px solid #111110;
 }
 
-[data-theme="rhine"] .theme-picker-item {
+[data-theme="swiss-lab"] .theme-picker-item {
   border: 1px solid #111110;
   border-radius: 0;
   background: transparent;
 }
 
-[data-theme="rhine"] .theme-picker-item.active {
+[data-theme="swiss-lab"] .theme-picker-item.active {
   background: #111110;
   color: #f1eee7;
 }
 
-[data-theme="rhine"] .theme-picker-item.active .theme-picker-copy small,
-[data-theme="rhine"] .theme-picker-item.active .theme-picker-count,
-[data-theme="rhine"] .theme-picker-item.active .theme-picker-index {
+[data-theme="swiss-lab"] .theme-picker-item.active .theme-picker-copy small,
+[data-theme="swiss-lab"] .theme-picker-item.active .theme-picker-count,
+[data-theme="swiss-lab"] .theme-picker-item.active .theme-picker-index {
   color: rgba(241, 238, 231, 0.65);
 }
 
-[data-theme="rhine"] .word-delete {
+[data-theme="swiss-lab"] .word-delete {
   color: #a94e26;
 }

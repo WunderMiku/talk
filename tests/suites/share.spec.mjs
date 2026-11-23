@@ -12,7 +12,7 @@ suite("share · composed page image", { timeout: 60_000 }, (s) => {
   });
 
   s.test("composes a 1080 wide image from the current page", async (state, t) => {
-    const page = await state.env.newPage({ theme: "bitterworld" });
+    const page = await state.env.newPage({ theme: "retro-stub" });
     await page.open("/");
     await page.fill("#search-input", "take");
     await page.keyboard.press("Enter");

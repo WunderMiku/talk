@@ -29,56 +29,56 @@
     },
     constructivist: {
       id: "constructivist",
-      label: "USSR",
+      label: "Constructivist",
       themeColor: "#d23b2f",
       accent: "#9e1f18",
       accentFill: "#d23b2f",
-      css: "css/themes/ussr.css",
+      css: "css/themes/constructivist.css",
       copyKey: "constructivist",
-      description: "俄式构成主义：粗斜切块与标语",
+      description: "构成主义：粗斜切块与几何标语",
       exampleStyle: "口号式、短促有力的英语"
     },
-    rhine: {
-      id: "rhine",
-      label: "Rhine Lab",
+    "swiss-lab": {
+      id: "swiss-lab",
+      label: "Swiss Lab",
       themeColor: "#e7e3da",
       accent: "#8f451f",
       accentFill: "#c46a3b",
-      css: "css/themes/rhine.css",
-      copyKey: "rhine",
+      css: "css/themes/swiss-lab.css",
+      copyKey: "swiss-lab",
       description: "安静的实验室：细线、刻度与观察记录",
       exampleStyle: "冷静、精确的观察记录式英语"
     },
-    endfield: {
-      id: "endfield",
-      label: "Endfield",
+    "topo-acid": {
+      id: "topo-acid",
+      label: "Topo Acid",
       themeColor: "#f4f4f2",
       accent: "#6f6100",
       accentFill: "#fffa00",
-      css: "css/themes/endfield.css",
-      copyKey: "endfield",
+      css: "css/themes/topo-acid.css",
+      copyKey: "topo-acid",
       description: "工业终端：纸白底、切角与唯一一种信号黄",
       exampleStyle: "工程说明与现场记录式英语"
     },
-    rhineaccess: {
-      id: "rhineaccess",
-      label: "Rhine Lab · Access",
+    "archive-grid": {
+      id: "archive-grid",
+      label: "Archive Grid",
       themeColor: "#f2f0ea",
       accent: "#4f6500",
       accentFill: "#c8f000",
-      css: "css/themes/rhineaccess.css",
-      copyKey: "rhineaccess",
+      css: "css/themes/archive-grid.css",
+      copyKey: "archive-grid",
       description: "实验记录终端：纸白、细线窗口与唯一一种酸性绿",
       exampleStyle: "实验室运行记录式英语"
     },
-    bitterworld: {
-      id: "bitterworld",
-      label: "Bitterworld",
+    "retro-stub": {
+      id: "retro-stub",
+      label: "Retro Stub",
       themeColor: "#f1e6cb",
       accent: "#2f6f6a",
       accentFill: "#be3a28",
-      css: "css/themes/bitterworld.css",
-      copyKey: "bitterworld",
+      css: "css/themes/retro-stub.css",
+      copyKey: "retro-stub",
       description: "票根拼贴：米纸、墨线、检票章与一条虚线路线",
       exampleStyle: "旅途与票根口吻的英语"
     }

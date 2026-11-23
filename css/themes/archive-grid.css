@@ -1,12 +1,12 @@
 /* ============================================================
-   Rhine Lab · Access — a special theme modelled on the
+   Archive Grid — a special theme modelled on the
    "ANALYSIS OS" footage: paper white, hairline windows, one acid
    green, tiny mono labels, and a laboratory desktop that boots.
    Experimental: scan line, window chrome, hover lift, blinking
    status dots. All motion is switchable off by prefers-reduced-motion.
    ============================================================ */
 
-[data-theme="rhineaccess"] {
+[data-theme="archive-grid"] {
   --paper: #f2f0ea;
   --paper-deep: #e7e4db;
   --card: #fbfaf6;
@@ -61,7 +61,7 @@
 
 /* ---------- ground: blueprint grid, scan line --------------------- */
 
-[data-theme="rhineaccess"] .screen {
+[data-theme="archive-grid"] .screen {
   background-color: var(--paper);
   background-image:
     repeating-linear-gradient(0deg, rgba(19, 19, 19, 0.045) 0 1px, transparent 1px 24px),
@@ -69,7 +69,7 @@
   background-position: 0 0, 0 0;
 }
 
-[data-theme="rhineaccess"] .screen::after {
+[data-theme="archive-grid"] .screen::after {
   content: "";
   position: fixed;
   left: 0;
@@ -90,16 +90,16 @@
 
 /* ---------- top bar: a window chrome strip ----------------------- */
 
-[data-theme="rhineaccess"] .topbar {
+[data-theme="archive-grid"] .topbar {
   background: var(--paper);
   border-bottom: 1px solid var(--ink);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
 
-[data-theme="rhineaccess"] .topbar::after { background: none; }
+[data-theme="archive-grid"] .topbar::after { background: none; }
 
-[data-theme="rhineaccess"] .brand {
+[data-theme="archive-grid"] .brand {
   font-family: var(--mono);
   font-size: 15px;
   font-weight: 700;
@@ -107,14 +107,14 @@
   text-transform: uppercase;
 }
 
-[data-theme="rhineaccess"] .brand .dot { color: var(--ra-green); }
+[data-theme="archive-grid"] .brand .dot { color: var(--ra-green); }
 
-[data-theme="rhineaccess"] .module-switch {
+[data-theme="archive-grid"] .module-switch {
   border: 1px solid var(--ink);
   background: var(--card);
 }
 
-[data-theme="rhineaccess"] .module-btn {
+[data-theme="archive-grid"] .module-btn {
   border-right: 1px solid var(--ink);
   font-family: var(--mono);
   font-size: 10px;
@@ -122,55 +122,55 @@
   color: var(--ink);
 }
 
-[data-theme="rhineaccess"] .module-btn:last-child { border-right: 0; }
+[data-theme="archive-grid"] .module-btn:last-child { border-right: 0; }
 
-[data-theme="rhineaccess"] .module-btn.active,
-[data-theme="rhineaccess"] .module-btn.is-active {
+[data-theme="archive-grid"] .module-btn.active,
+[data-theme="archive-grid"] .module-btn.is-active {
   background: var(--ink);
   color: var(--paper);
 }
 
-[data-theme="rhineaccess"] .module-version {
+[data-theme="archive-grid"] .module-version {
   font-family: var(--mono);
   letter-spacing: 0.1em;
   color: var(--muted);
 }
 
-[data-theme="rhineaccess"] .round-btn {
+[data-theme="archive-grid"] .round-btn {
   border: 1px solid var(--ink);
   background: var(--card);
   border-radius: 0;
 }
 
-[data-theme="rhineaccess"] .round-btn:hover {
+[data-theme="archive-grid"] .round-btn:hover {
   background: var(--ra-green);
   border-color: var(--ink);
 }
 
 /* ---------- headings: condensed plates, mono eyebrows ------------- */
 
-[data-theme="rhineaccess"] .home-title,
-[data-theme="rhineaccess"] .word-title,
-[data-theme="rhineaccess"] .translator-title,
-[data-theme="rhineaccess"] .poster-masthead h1 {
+[data-theme="archive-grid"] .home-title,
+[data-theme="archive-grid"] .word-title,
+[data-theme="archive-grid"] .translator-title,
+[data-theme="archive-grid"] .poster-masthead h1 {
   font-weight: 820;
   letter-spacing: -0.045em;
 }
 
-[data-theme="rhineaccess"] .home-title em {
+[data-theme="archive-grid"] .home-title em {
   background: linear-gradient(transparent 62%, var(--ra-green) 62%);
 }
 
-[data-theme="rhineaccess"] .home-eyebrow,
-[data-theme="rhineaccess"] .section-kicker,
-[data-theme="rhineaccess"] .daily-section-kicker {
+[data-theme="archive-grid"] .home-eyebrow,
+[data-theme="archive-grid"] .section-kicker,
+[data-theme="archive-grid"] .daily-section-kicker {
   font-family: var(--mono);
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--muted);
 }
 
-[data-theme="rhineaccess"] .home-eyebrow::before {
+[data-theme="archive-grid"] .home-eyebrow::before {
   content: "";
   display: inline-block;
   width: 7px;
@@ -187,15 +187,15 @@
 
 /* ---------- cards become OS windows ------------------------------ */
 
-[data-theme="rhineaccess"] .search-card,
-[data-theme="rhineaccess"] .meaning-card,
-[data-theme="rhineaccess"] .example-card,
-[data-theme="rhineaccess"] .family-card,
-[data-theme="rhineaccess"] .summary-card,
-[data-theme="rhineaccess"] .translation-card,
-[data-theme="rhineaccess"] .key-card,
-[data-theme="rhineaccess"] .sentence-part,
-[data-theme="rhineaccess"] .theme-manifesto {
+[data-theme="archive-grid"] .search-card,
+[data-theme="archive-grid"] .meaning-card,
+[data-theme="archive-grid"] .example-card,
+[data-theme="archive-grid"] .family-card,
+[data-theme="archive-grid"] .summary-card,
+[data-theme="archive-grid"] .translation-card,
+[data-theme="archive-grid"] .key-card,
+[data-theme="archive-grid"] .sentence-part,
+[data-theme="archive-grid"] .theme-manifesto {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
@@ -203,23 +203,23 @@
   transition: transform 140ms var(--ease-out), box-shadow 140ms var(--ease-out);
 }
 
-[data-theme="rhineaccess"] .search-card:hover,
-[data-theme="rhineaccess"] .meaning-card:hover,
-[data-theme="rhineaccess"] .example-card:hover,
-[data-theme="rhineaccess"] .family-card:hover,
-[data-theme="rhineaccess"] .translation-card:hover {
+[data-theme="archive-grid"] .search-card:hover,
+[data-theme="archive-grid"] .meaning-card:hover,
+[data-theme="archive-grid"] .example-card:hover,
+[data-theme="archive-grid"] .family-card:hover,
+[data-theme="archive-grid"] .translation-card:hover {
   transform: translate(-2px, -2px);
   box-shadow: var(--shadow-card);
 }
 
-[data-theme="rhineaccess"] .search-card {
+[data-theme="archive-grid"] .search-card {
   position: relative;
   padding-top: 26px;
 }
 
-[data-theme="rhineaccess"] .search-card::before,
-[data-theme="rhineaccess"] .meaning-card::before,
-[data-theme="rhineaccess"] .example-card::before {
+[data-theme="archive-grid"] .search-card::before,
+[data-theme="archive-grid"] .meaning-card::before,
+[data-theme="archive-grid"] .example-card::before {
   content: "ANALYSIS OS / RECORD";
   position: absolute;
   left: 0;
@@ -238,12 +238,12 @@
   border-bottom: 1px solid var(--ink);
 }
 
-[data-theme="rhineaccess"] .meaning-card::before { content: "ANALYSIS OS / SENSES"; }
-[data-theme="rhineaccess"] .example-card::before { content: "ANALYSIS OS / CORPUS"; }
+[data-theme="archive-grid"] .meaning-card::before { content: "ANALYSIS OS / SENSES"; }
+[data-theme="archive-grid"] .example-card::before { content: "ANALYSIS OS / CORPUS"; }
 
-[data-theme="rhineaccess"] .meaning-card { padding-top: 30px; }
+[data-theme="archive-grid"] .meaning-card { padding-top: 30px; }
 
-[data-theme="rhineaccess"] .meaning-card::after {
+[data-theme="archive-grid"] .meaning-card::after {
   content: "●";
   position: absolute;
   top: 5px;
@@ -254,7 +254,7 @@
 }
 
 /* block index = black plate */
-[data-theme="rhineaccess"] .block-index {
+[data-theme="archive-grid"] .block-index {
   border: 0;
   background: var(--ink);
   color: var(--paper);
@@ -263,12 +263,12 @@
   padding: 4px 6px;
 }
 
-[data-theme="rhineaccess"] .block-head h2 {
+[data-theme="archive-grid"] .block-head h2 {
   font-weight: 820;
   letter-spacing: -0.02em;
 }
 
-[data-theme="rhineaccess"] .block-head .rule {
+[data-theme="archive-grid"] .block-head .rule {
   height: 1px;
   background: repeating-linear-gradient(90deg, var(--ink) 0 3px, transparent 3px 6px);
   opacity: 0.5;
@@ -276,7 +276,7 @@
 
 /* ---------- buttons, chips, inputs ------------------------------- */
 
-[data-theme="rhineaccess"] .btn {
+[data-theme="archive-grid"] .btn {
   border-radius: 0;
   border: 1px solid var(--ink);
   font-family: var(--sans);
@@ -284,30 +284,30 @@
   transition: transform 120ms var(--ease-out), box-shadow 120ms var(--ease-out), background 120ms;
 }
 
-[data-theme="rhineaccess"] .btn-primary {
+[data-theme="archive-grid"] .btn-primary {
   background: var(--ink);
   color: var(--paper);
 }
 
-[data-theme="rhineaccess"] .btn-primary:hover {
+[data-theme="archive-grid"] .btn-primary:hover {
   background: var(--ra-green);
   color: var(--ink);
   transform: translate(-1px, -1px);
   box-shadow: 3px 3px 0 var(--ink);
 }
 
-[data-theme="rhineaccess"] .btn-secondary { background: var(--card); }
+[data-theme="archive-grid"] .btn-secondary { background: var(--card); }
 
-[data-theme="rhineaccess"] .btn-secondary:hover {
+[data-theme="archive-grid"] .btn-secondary:hover {
   background: var(--ra-green);
   transform: translate(-1px, -1px);
   box-shadow: 3px 3px 0 var(--ink);
 }
 
-[data-theme="rhineaccess"] .chip,
-[data-theme="rhineaccess"] .kicker-pill,
-[data-theme="rhineaccess"] .level-chip,
-[data-theme="rhineaccess"] .translator-style-chip {
+[data-theme="archive-grid"] .chip,
+[data-theme="archive-grid"] .kicker-pill,
+[data-theme="archive-grid"] .level-chip,
+[data-theme="archive-grid"] .translator-style-chip {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
@@ -315,48 +315,48 @@
   letter-spacing: 0.04em;
 }
 
-[data-theme="rhineaccess"] .chip.accent,
-[data-theme="rhineaccess"] .kicker-pill.accent,
-[data-theme="rhineaccess"] .level-chip.is-active,
-[data-theme="rhineaccess"] .translator-style-chip.selected {
+[data-theme="archive-grid"] .chip.accent,
+[data-theme="archive-grid"] .kicker-pill.accent,
+[data-theme="archive-grid"] .level-chip.is-active,
+[data-theme="archive-grid"] .translator-style-chip.selected {
   background: var(--ra-green);
   border-color: var(--ink);
   color: var(--ink);
 }
 
-[data-theme="rhineaccess"] .search-input,
-[data-theme="rhineaccess"] .translator-input,
-[data-theme="rhineaccess"] .field-input {
+[data-theme="archive-grid"] .search-input,
+[data-theme="archive-grid"] .translator-input,
+[data-theme="archive-grid"] .field-input {
   border-radius: 0;
   background: var(--card);
   border: 1px solid var(--ink);
 }
 
-[data-theme="rhineaccess"] .search-input:focus,
-[data-theme="rhineaccess"] .translator-input:focus {
+[data-theme="archive-grid"] .search-input:focus,
+[data-theme="archive-grid"] .translator-input:focus {
   outline: 2px solid var(--ra-green);
   outline-offset: 1px;
 }
 
-[data-theme="rhineaccess"] .search-submit {
+[data-theme="archive-grid"] .search-submit {
   border-radius: 0;
   background: var(--ink);
   color: var(--ra-green);
 }
 
-[data-theme="rhineaccess"] .search-submit:hover { background: var(--ra-green); color: var(--ink); }
+[data-theme="archive-grid"] .search-submit:hover { background: var(--ra-green); color: var(--ink); }
 
 /* ---------- daily card: a sample slide --------------------------- */
 
-[data-theme="rhineaccess"] .daily {
+[data-theme="archive-grid"] .daily {
   background: var(--ink);
   border-radius: 0;
   border: 1px solid var(--ink);
 }
 
-[data-theme="rhineaccess"] .daily .daily-word { color: var(--ra-green); }
+[data-theme="archive-grid"] .daily .daily-word { color: var(--ra-green); }
 
-[data-theme="rhineaccess"] .daily .daily-badge {
+[data-theme="archive-grid"] .daily .daily-badge {
   border: 1px solid rgba(242, 240, 234, 0.5);
   border-radius: 0;
   color: var(--paper);
@@ -364,31 +364,31 @@
 
 /* ---------- sheets: a floating window ---------------------------- */
 
-[data-theme="rhineaccess"] .sheet {
+[data-theme="archive-grid"] .sheet {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
   box-shadow: 8px 8px 0 rgba(19, 19, 19, 0.9);
 }
 
-[data-theme="rhineaccess"] .sheet-backdrop { background: rgba(19, 19, 19, 0.55); }
+[data-theme="archive-grid"] .sheet-backdrop { background: rgba(19, 19, 19, 0.55); }
 
-[data-theme="rhineaccess"] .sheet-head {
+[data-theme="archive-grid"] .sheet-head {
   border-bottom: 1px solid var(--ink);
   background: var(--paper-deep);
   font-family: var(--mono);
   letter-spacing: 0.12em;
 }
 
-[data-theme="rhineaccess"] .settings-tab.is-active,
-[data-theme="rhineaccess"] .sheet-tab.is-active {
+[data-theme="archive-grid"] .settings-tab.is-active,
+[data-theme="archive-grid"] .sheet-tab.is-active {
   background: var(--ink);
   color: var(--paper);
 }
 
 /* ---------- motion: boot sequence -------------------------------- */
 
-[data-theme="rhineaccess"] .reveal {
+[data-theme="archive-grid"] .reveal {
   animation-name: ra-boot;
   animation-duration: 0.5s;
   animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
@@ -399,7 +399,7 @@
   to { opacity: 1; transform: none; filter: none; }
 }
 
-[data-theme="rhineaccess"] .screen[data-page="loading"] .skeleton {
+[data-theme="archive-grid"] .screen[data-page="loading"] .skeleton {
   background: linear-gradient(90deg, var(--paper-deep) 0%, rgba(200, 240, 0, 0.28) 50%, var(--paper-deep) 100%);
   background-size: 220% 100%;
   animation: ra-shimmer 1.5s linear infinite;
@@ -410,56 +410,56 @@
   to { background-position: -120% 0; }
 }
 
-[data-theme="rhineaccess"] .theme-manifesto::after {
+[data-theme="archive-grid"] .theme-manifesto::after {
   content: none;
 }
 
-[data-theme="rhineaccess"] .theme-manifesto {
+[data-theme="archive-grid"] .theme-manifesto {
   background: var(--paper-deep);
   border-left: 0;
   border: 1px solid var(--ink);
 }
 
-[data-theme="rhineaccess"] .theme-manifesto strong { letter-spacing: 0.12em; }
+[data-theme="archive-grid"] .theme-manifesto strong { letter-spacing: 0.12em; }
 
 /* poster + archive, lightly dressed */
-[data-theme="rhineaccess"] .theme-poster {
+[data-theme="archive-grid"] .theme-poster {
   background: var(--card);
   border: 1px solid var(--ink);
 }
 
-[data-theme="rhineaccess"] .poster-masthead {
+[data-theme="archive-grid"] .poster-masthead {
   background: var(--ink);
   color: var(--paper);
 }
 
-[data-theme="rhineaccess"] .poster-masthead em { color: var(--ra-green); }
+[data-theme="archive-grid"] .poster-masthead em { color: var(--ra-green); }
 
 /* ---------- reduced motion ---------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="rhineaccess"] .screen::after { animation: none; opacity: 0.35; }
-  [data-theme="rhineaccess"] .reveal { animation: none; }
-  [data-theme="rhineaccess"] .home-eyebrow::before,
-  [data-theme="rhineaccess"] .meaning-card::after,
-  [data-theme="rhineaccess"] .theme-manifesto::after { animation: none; }
-  [data-theme="rhineaccess"] .search-card:hover,
-  [data-theme="rhineaccess"] .meaning-card:hover,
-  [data-theme="rhineaccess"] .example-card:hover,
-  [data-theme="rhineaccess"] .family-card:hover,
-  [data-theme="rhineaccess"] .translation-card:hover { transform: none; }
+  [data-theme="archive-grid"] .screen::after { animation: none; opacity: 0.35; }
+  [data-theme="archive-grid"] .reveal { animation: none; }
+  [data-theme="archive-grid"] .home-eyebrow::before,
+  [data-theme="archive-grid"] .meaning-card::after,
+  [data-theme="archive-grid"] .theme-manifesto::after { animation: none; }
+  [data-theme="archive-grid"] .search-card:hover,
+  [data-theme="archive-grid"] .meaning-card:hover,
+  [data-theme="archive-grid"] .example-card:hover,
+  [data-theme="archive-grid"] .family-card:hover,
+  [data-theme="archive-grid"] .translation-card:hover { transform: none; }
 }
 
 /* ---------- corrections from the first render ------------------- */
 
-[data-theme="rhineaccess"] .module-switch {
+[data-theme="archive-grid"] .module-switch {
   border-radius: 0;
   background: var(--card);
   padding: 2px;
   gap: 0;
 }
 
-[data-theme="rhineaccess"] .module-btn {
+[data-theme="archive-grid"] .module-btn {
   border-radius: 0;
   min-width: 62px;
   padding: 6px 12px;
@@ -468,21 +468,21 @@
   background: transparent;
 }
 
-[data-theme="rhineaccess"] .module-btn.is-active {
+[data-theme="archive-grid"] .module-btn.is-active {
   background: var(--ink);
   color: var(--paper);
 }
 
-[data-theme="rhineaccess"] .cache-state-pill,
-[data-theme="rhineaccess"] .source-pill,
-[data-theme="rhineaccess"] .status-pill {
+[data-theme="archive-grid"] .cache-state-pill,
+[data-theme="archive-grid"] .source-pill,
+[data-theme="archive-grid"] .status-pill {
   border-radius: 0;
   border: 1px solid var(--line-strong);
   background: var(--card);
 }
 
 /* the senses card already had a lime edge; turn it into a title bar */
-[data-theme="rhineaccess"] .meaning-card::before {
+[data-theme="archive-grid"] .meaning-card::before {
   top: 0;
   bottom: auto;
   left: 0;
@@ -503,13 +503,13 @@
   color: var(--muted);
 }
 
-[data-theme="rhineaccess"] .hero-note {
+[data-theme="archive-grid"] .hero-note {
   border: 1px solid var(--line-strong);
   border-radius: 0;
   background: var(--card);
 }
 
-[data-theme="rhineaccess"] .theme-manifesto {
+[data-theme="archive-grid"] .theme-manifesto {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -517,102 +517,102 @@
   padding: 10px 12px;
 }
 
-[data-theme="rhineaccess"] .theme-manifesto strong {
+[data-theme="archive-grid"] .theme-manifesto strong {
   margin: 0;
   font-family: var(--mono);
   font-size: 11px;
   letter-spacing: 0.14em;
 }
 
-[data-theme="rhineaccess"] .theme-manifesto span {
+[data-theme="archive-grid"] .theme-manifesto span {
   font-size: 11px;
   color: var(--muted);
 }
 
 /* ---------- translator desk -------------------------------------- */
 
-[data-theme="rhineaccess"] .translator-input-card,
-[data-theme="rhineaccess"] .translator-empty,
-[data-theme="rhineaccess"] .translator-workspace,
-[data-theme="rhineaccess"] .workspace-input,
-[data-theme="rhineaccess"] .translation-card {
+[data-theme="archive-grid"] .translator-input-card,
+[data-theme="archive-grid"] .translator-empty,
+[data-theme="archive-grid"] .translator-workspace,
+[data-theme="archive-grid"] .workspace-input,
+[data-theme="archive-grid"] .translation-card {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
   box-shadow: 5px 5px 0 rgba(19, 19, 19, 0.9);
 }
 
-[data-theme="rhineaccess"] .translator-empty {
+[data-theme="archive-grid"] .translator-empty {
   box-shadow: none;
   border-style: dashed;
 }
 
-[data-theme="rhineaccess"] .translator-style-chip,
-[data-theme="rhineaccess"] .translator-mode-btn,
-[data-theme="rhineaccess"] .translator-example-btn {
+[data-theme="archive-grid"] .translator-style-chip,
+[data-theme="archive-grid"] .translator-mode-btn,
+[data-theme="archive-grid"] .translator-example-btn {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
   color: var(--ink);
 }
 
-[data-theme="rhineaccess"] .translator-style-chip.selected {
+[data-theme="archive-grid"] .translator-style-chip.selected {
   background: var(--card);
   color: var(--ink);
   box-shadow: inset 0 -3px 0 var(--ra-green);
   border-color: var(--ink);
 }
 
-[data-theme="rhineaccess"] .translator-style-chip.selected .translator-style-emoji {
+[data-theme="archive-grid"] .translator-style-chip.selected .translator-style-emoji {
   filter: grayscale(1);
 }
 
-[data-theme="rhineaccess"] .translator-mode-btn.active,
-[data-theme="rhineaccess"] .translator-mode-btn.is-active {
+[data-theme="archive-grid"] .translator-mode-btn.active,
+[data-theme="archive-grid"] .translator-mode-btn.is-active {
   background: var(--ink);
   color: var(--paper);
 }
 
-[data-theme="rhineaccess"] .translator-submit,
-[data-theme="rhineaccess"] .workspace-submit {
+[data-theme="archive-grid"] .translator-submit,
+[data-theme="archive-grid"] .workspace-submit {
   border-radius: 0;
   background: var(--ink);
   color: var(--ra-green);
 }
 
-[data-theme="rhineaccess"] .translator-input,
-[data-theme="rhineaccess"] .workspace-input {
+[data-theme="archive-grid"] .translator-input,
+[data-theme="archive-grid"] .workspace-input {
   border-radius: 0;
   background: transparent;
   border: 0;
 }
 
 /* Windows in this OS have no rounded corners */
-[data-theme="rhineaccess"] *:not(svg):not(path):not(circle):not(rect):not(line):not(polyline):not(polygon):not(.switch-knob):not(.sheet-handle) {
+[data-theme="archive-grid"] *:not(svg):not(path):not(circle):not(rect):not(line):not(polyline):not(polygon):not(.switch-knob):not(.sheet-handle) {
   border-radius: 0;
 }
 
 /* ---------- relation desks: two dossiers, not pastel blobs -------- */
 
-[data-theme="rhineaccess"] .relation-card {
+[data-theme="archive-grid"] .relation-card {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
   box-shadow: 4px 4px 0 rgba(19, 19, 19, 0.9);
 }
 
-[data-theme="rhineaccess"] .relation-card.syn,
-[data-theme="rhineaccess"] .relation-card.ant {
+[data-theme="archive-grid"] .relation-card.syn,
+[data-theme="archive-grid"] .relation-card.ant {
   background: var(--card);
 }
 
-[data-theme="rhineaccess"] .relation-head {
+[data-theme="archive-grid"] .relation-head {
   border-bottom: 1px solid var(--ink);
   background: var(--paper-deep);
   padding: 7px 10px;
 }
 
-[data-theme="rhineaccess"] .relation-head h3 {
+[data-theme="archive-grid"] .relation-head h3 {
   font-family: var(--mono);
   font-size: 9px;
   font-weight: 700;
@@ -621,7 +621,7 @@
   color: var(--ink);
 }
 
-[data-theme="rhineaccess"] .relation-icon {
+[data-theme="archive-grid"] .relation-icon {
   width: 16px;
   height: 16px;
   display: inline-grid;
@@ -633,9 +633,9 @@
   font-size: 10px;
 }
 
-[data-theme="rhineaccess"] .rel-list { padding: 8px; }
+[data-theme="archive-grid"] .rel-list { padding: 8px; }
 
-[data-theme="rhineaccess"] .rel-chip {
+[data-theme="archive-grid"] .rel-chip {
   border: 1px solid var(--line-strong);
   border-style: solid;
   border-radius: 0;
@@ -644,53 +644,53 @@
   transition: background 120ms, box-shadow 120ms, transform 120ms;
 }
 
-[data-theme="rhineaccess"] .rel-chip:hover {
+[data-theme="archive-grid"] .rel-chip:hover {
   background: var(--ra-green);
   box-shadow: 2px 2px 0 var(--ink);
   transform: translate(-1px, -1px);
 }
 
-[data-theme="rhineaccess"] .rel-word {
+[data-theme="archive-grid"] .rel-word {
   font-family: var(--mono);
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
 
-[data-theme="rhineaccess"] .rel-gloss {
+[data-theme="archive-grid"] .rel-gloss {
   font-size: 10px;
   color: var(--muted);
 }
 
 /* example cards: give the window bar room to breathe */
-[data-theme="rhineaccess"] .example-card {
+[data-theme="archive-grid"] .example-card {
   padding-top: 32px;
 }
 
-[data-theme="rhineaccess"] .example-card::before {
+[data-theme="archive-grid"] .example-card::before {
   content: "ANALYSIS OS / CORPUS";
 }
 
-[data-theme="rhineaccess"] .family-card {
+[data-theme="archive-grid"] .family-card {
   border: 1px solid var(--ink);
   border-radius: 0;
   background: var(--card);
   box-shadow: 3px 3px 0 rgba(19, 19, 19, 0.75);
 }
 
-[data-theme="rhineaccess"] .family-card:hover {
+[data-theme="archive-grid"] .family-card:hover {
   box-shadow: 4px 4px 0 rgba(19, 19, 19, 0.9);
 }
 
 /* keep the chips inside their dossiers */
-[data-theme="rhineaccess"] .rel-chip {
+[data-theme="archive-grid"] .rel-chip {
   min-width: 0;
   overflow: hidden;
 }
 
-[data-theme="rhineaccess"] .rel-word { flex: 0 0 auto; }
+[data-theme="archive-grid"] .rel-word { flex: 0 0 auto; }
 
-[data-theme="rhineaccess"] .rel-gloss {
+[data-theme="archive-grid"] .rel-gloss {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -699,62 +699,62 @@
 }
 
 /* dashed base rule lives on .relation-card .rel-chip — outrank it */
-[data-theme="rhineaccess"] .relation-card .rel-chip {
+[data-theme="archive-grid"] .relation-card .rel-chip {
   border: 1px solid var(--line-strong);
   border-style: solid;
 }
 
 /* a whisper of backlight: warm for antonyms, acid for synonyms */
-[data-theme="rhineaccess"] .relation-card.syn {
+[data-theme="archive-grid"] .relation-card.syn {
   box-shadow:
     4px 4px 0 rgba(19, 19, 19, 0.9),
     0 0 26px rgba(200, 240, 0, 0.22),
     inset 0 0 42px rgba(200, 240, 0, 0.06);
 }
 
-[data-theme="rhineaccess"] .relation-card.ant {
+[data-theme="archive-grid"] .relation-card.ant {
   box-shadow:
     4px 4px 0 rgba(19, 19, 19, 0.9),
     0 0 26px rgba(200, 62, 40, 0.18),
     inset 0 0 42px rgba(200, 62, 40, 0.05);
 }
 
-[data-theme="rhineaccess"] .relation-card.syn .relation-head h3::after {
+[data-theme="archive-grid"] .relation-card.syn .relation-head h3::after {
   content: " +";
   color: var(--ra-green);
 }
 
-[data-theme="rhineaccess"] .relation-card.ant .relation-head h3::after {
+[data-theme="archive-grid"] .relation-card.ant .relation-head h3::after {
   content: " −";
   color: #c83e28;
 }
 
-[data-theme="rhineaccess"] .relation-card.syn .rel-chip:hover {
+[data-theme="archive-grid"] .relation-card.syn .rel-chip:hover {
   background: rgba(200, 240, 0, 0.35);
 }
 
-[data-theme="rhineaccess"] .relation-card.ant .rel-chip:hover {
+[data-theme="archive-grid"] .relation-card.ant .rel-chip:hover {
   background: rgba(200, 62, 40, 0.18);
   box-shadow: 2px 2px 0 rgba(19, 19, 19, 0.9), 0 0 14px rgba(200, 62, 40, 0.35);
 }
 
 /* Masthead labels sit on the black bar: muted greys on ink read as smeared,
    so lift them to paper and give the tiny caps a little more air. */
-[data-theme="rhineaccess"] .poster-masthead .poster-brand-section,
-[data-theme="rhineaccess"] .poster-masthead .poster-edition {
+[data-theme="archive-grid"] .poster-masthead .poster-brand-section,
+[data-theme="archive-grid"] .poster-masthead .poster-edition {
   color: color-mix(in srgb, var(--paper) 86%, transparent);
   font-size: 8px;
   letter-spacing: 0.12em;
 }
 
-[data-theme="rhineaccess"] .poster-masthead .poster-nav button {
+[data-theme="archive-grid"] .poster-masthead .poster-nav button {
   color: inherit;
   border-color: color-mix(in srgb, var(--paper) 42%, transparent);
 }
 
 /* The wordmark inherited ink and vanished into the ink bar, which made the
    section label look pushed toward the middle. Keep it on paper. */
-[data-theme="rhineaccess"] .poster-masthead .poster-brand-mark {
+[data-theme="archive-grid"] .poster-masthead .poster-brand-mark {
   color: var(--paper);
   letter-spacing: -0.02em;
 }

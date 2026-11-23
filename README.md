@@ -39,7 +39,7 @@
 | **语境寻词** | 描述场景，得到 3–5 个行内标注的英文说法；点开看语气与判断，可继续追问 |
 | **翻译** | 极简口语 / 地道习语 / 书面正式 / 网络流行 / 优雅文句，五选多，一次调用 |
 | **主题沙龙** | AI 策展：一个场景、五个词，像一期小展览 |
-| **六套主题** | Paper、USSR、Rhine Lab、Endfield、Rhine Lab · Access、Bitterworld，各有自己的语气和版式细节 |
+| **六套主题** | Paper、Constructivist、Swiss Lab、Topo Acid、Archive Grid、Retro Stub，各有自己的语气和版式细节 |
 | **离线可用** | PWA 外壳 + 词条缓存，断网也能翻查过的词 |
 | **两套发音** | 设备原生语音（默认、离线）或 Qwen 语音（可缓存音频） |
 | **模型模板** | 从供应商模板新建自己的配置，支持获取模型列表与连通性测试 |
@@ -48,7 +48,7 @@
 
 一个字进来，一整页出去。上面是词头和词源，下面是分层展开的义项；横屏时自动变成两栏，右栏专门放释义，加载骨架也照同样的两栏排布，词典 / 翻译的切换则收进左侧竖条。
 
-<img src="docs/screenshots/word-paper.jpg" width="330" alt="词条页（竖屏）"> <img src="docs/screenshots/word-ussr.jpg" width="330" alt="同一词条在 USSR 主题下">
+<img src="docs/screenshots/word-paper.jpg" width="330" alt="词条页（竖屏）"> <img src="docs/screenshots/word-constructivist.jpg" width="330" alt="同一词条在 Constructivist 主题下">
 
 三档深度（快速 / 标准 / 深入）控制返回多少义项、同根词、例句和搭配。深度只影响**新生成**的词条——已经缓存过的词不会因为你换深度就重新花钱请求。
 
@@ -88,16 +88,16 @@
 
 六套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
 
-<img src="docs/screenshots/home-paper.jpg" width="330" alt="首页 Paper 主题"> <img src="docs/screenshots/home-endfield.jpg" width="330" alt="首页 Endfield 主题">
+<img src="docs/screenshots/home-paper.jpg" width="330" alt="首页 Paper 主题"> <img src="docs/screenshots/home-topo-acid.jpg" width="330" alt="首页 Topo Acid 主题">
 
 - **Paper**：纸感与荧光笔，默认主题，字距最松。
-- **USSR**：构成主义的红黑斜切，标题像海报。
-- **Rhine Lab**：冷调的实验档案，细线、刻度与编号。
-- **Endfield**：工业终端的现场记录。纸白底、切角面板、编号区块，全站只有一种信号黄，只用来点「当前」。
-- **Rhine Lab · Access**：实验记录终端，纸白、细线窗口与唯一一种酸性绿。
-- **Bitterworld**：票根拼贴，米纸、墨线、检票章与一条虚线路线。
+- **Constructivist**：构成主义的红黑斜切，标题像海报。
+- **Swiss Lab**：冷调的实验档案，细线、刻度与编号。
+- **Topo Acid**：工业终端的现场记录。纸白底、切角面板、编号区块，全站只有一种信号黄，只用来点「当前」。
+- **Archive Grid**：实验记录终端，纸白、细线窗口与唯一一种酸性绿。
+- **Retro Stub**：票根拼贴，米纸、墨线、检票章与一条虚线路线。
 
-<img src="docs/screenshots/word-endfield.jpg" width="330" alt="词条页 Endfield 主题">
+<img src="docs/screenshots/word-topo-acid.jpg" width="330" alt="词条页 Topo Acid 主题">
 
 主题在 **设置 → 数据** 里切换，加一套新主题只需要一个 CSS 文件加一条注册表项，见 [THEME.md](THEME.md)。
 
@@ -159,11 +159,11 @@ Qwen 失败时提示原因并自动回退到设备语音，不会让一个词没
 index.html              单页外壳、资源版本参数与构建号
 css/styles.css          布局与组件，横屏间距收敛为 --word-* 变量
 css/theme.css           基础 token（Paper）
-css/themes/ussr.css     构成主义主题覆盖
-css/themes/rhine.css    Rhine Lab 主题覆盖
-css/themes/endfield.css Endfield 主题覆盖
-css/themes/rhineaccess.css  Rhine Lab · Access 主题覆盖
-css/themes/bitterworld.css  未许之地主题覆盖
+css/themes/constructivist.css 构成主义主题覆盖
+css/themes/swiss-lab.css     Swiss Lab 主题覆盖
+css/themes/topo-acid.css    Topo Acid 主题覆盖
+css/themes/archive-grid.css Archive Grid 主题覆盖
+css/themes/retro-stub.css   Retro Stub 主题覆盖
 js/theme.js             主题注册表
 js/content.js           基础文案 + 各主题的语气改写
 js/prompts.js           静态模型提示词（与主题无关）
@@ -235,6 +235,6 @@ npm test
 
 **talk.** is a static, backend-free English–Chinese dictionary and translator that runs entirely in the browser. It renders a word as a living entry — IPA, multiple parts of speech, etymology timeline, word family, synonyms, collocations, examples, mnemonics — parses whole sentences into key words, tone, and structure, and turns a described scene into a short list of annotated English expressions with a tone verdict for each. A multi-style translator turns one sentence into five English registers in a single model call.
 
-There is no build step and no bundled model: the site is plain HTML/CSS/JS (about 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and six visual themes (Paper, USSR, Rhine Lab, Endfield, Rhine Lab · Access, Bitterworld) share one token contract. Model channels are created from provider templates, fetched model lists, and a connectivity test; they are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
+There is no build step and no bundled model: the site is plain HTML/CSS/JS (about 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and six visual themes (Paper, Constructivist, Swiss Lab, Topo Acid, Archive Grid, Retro Stub) share one token contract. Model channels are created from provider templates, fetched model lists, and a connectivity test; they are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request pipeline, prompt structure, cache layout, and deployment details.

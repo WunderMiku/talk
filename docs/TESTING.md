@@ -59,7 +59,7 @@ server.mock.requestsOf("word");   // 抓到的请求，用来断言"没有重复
 | `reverse.spec.mjs` | 中文情境 → 三个候选、点卡片按范式路由、返回恢复手记、刷新仍从存储读 |
 | `sentence.spec.mjs` | 两句拆成两个块、单层折叠开合 |
 | `offline.spec.mjs` | 无 key 时的未收录页与改判行（不发请求） |
-| `theme.spec.mjs` | 未许之地的 token 生效、卡片直角 |
+| `theme.spec.mjs` | Retro Stub 的 token 生效、卡片直角 |
 
 ## 加用例
 

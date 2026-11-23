@@ -151,8 +151,8 @@ memory                                记法
 
 ```text
 css/theme.css        基础 token 契约（Paper 就是它本身）
-css/themes/ussr.css  constructivist 覆盖
-css/themes/rhine.css Rhine Lab 覆盖
+css/themes/constructivist.css  constructivist 覆盖
+css/themes/swiss-lab.css Swiss Lab 覆盖
 js/theme.js          注册表：id / label / themeColor / accent / css / copyKey / description
 js/content.js        基础文案 + themeCopy[<id>] 的主题语气改写
 js/prompts.js        与主题无关，主题不影响提示词

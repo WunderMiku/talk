@@ -1,5 +1,5 @@
 /* ============================================================
-   USSR — Russian constructivist. Loud, angular, poster-like.
+   Constructivist — loud, angular, poster-like.
    Only overrides; base tokens stay in theme.css.
    ============================================================ */
 
@@ -1436,7 +1436,7 @@
   bottom: -11vh;
   width: 40vh;
   height: 56vh;
-  background: url("ussr-statue.svg") no-repeat right bottom / contain;
+  background: url("constructivist-statue.svg") no-repeat right bottom / contain;
   opacity: 0.065;
   mix-blend-mode: multiply;
   pointer-events: none;

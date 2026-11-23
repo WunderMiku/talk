@@ -15,8 +15,8 @@ in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); this file only covers themes.
 | `js/prompts.js` | Static model system prompts |
 | `js/app.js` | Product logic and rendering |
 
-Load order in `index.html`: `css/styles.css` → `css/theme.css` → `css/themes/ussr.css` →
-`css/themes/rhine.css` → `css/themes/endfield.css` → `css/themes/bitterworld.css`, then `js/data.js`, `js/theme.js`, `js/content.js`, `js/prompts.js`,
+Load order in `index.html`: `css/styles.css` → `css/theme.css` → `css/themes/constructivist.css` →
+`css/themes/swiss-lab.css` → `css/themes/topo-acid.css` → `css/themes/retro-stub.css`, then `js/data.js`, `js/theme.js`, `js/content.js`, `js/prompts.js`,
 `vendor/idb.js`, `js/app.js`. Theme files therefore win over both base component
 rules and the token defaults.
 
@@ -52,21 +52,21 @@ before the app renders and updates the browser `theme-color` meta tag.
 
 ## The five themes
 
-USSR carries one piece of art beyond type and colour: a red silhouette of The
-Motherland Calls, traced from the 80th anniversary emblem and set into the
+Constructivist carries one piece of art beyond type and colour: a red silhouette of a
+monumental figure, traced from the 80th anniversary emblem and set into the
 bottom corner as a multiply-blended watermark.
 
 | id | label | voice | geometry |
 | --- | --- | --- | --- |
 | `paper` | Paper | paper and highlighter, the default | soft radii, quiet rules |
-| `constructivist` | USSR | red/black poster, diagonal blocks | hard cuts, stamps |
-| `rhine` | Rhine Lab | lab index, cool and clinical | hairlines, ticks, numbering |
-| `endfield` | Endfield | industrial field terminal | square, cut corners, one signal yellow |
-| `bitterworld` | 未许之地 | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
-| `rhineaccess` | Rhine Lab · Access | analysis OS windows, paper + one acid green | square windows, mono labels, scan line |
+| `constructivist` | Constructivist | red/black poster, diagonal blocks | hard cuts, stamps |
+| `swiss-lab` | Swiss Lab | lab index, cool and clinical | hairlines, ticks, numbering |
+| `topo-acid` | Topo Acid | industrial field terminal | square, cut corners, one signal yellow |
+| `retro-stub` | Retro Stub | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
+| `archive-grid` | Archive Grid | analysis OS windows, paper + one acid green | square windows, mono labels, scan line |
 
-Endfield is the most opinionated one, so it is the best example of what a theme
-may own: it flattens every radius with a single `[data-theme="endfield"] *`
+Topo Acid is the most opinionated one, so it is the best example of what a theme
+may own: it flattens every radius with a single `[data-theme="topo-acid"] *`
 rule, clips card corners with `clip-path`, prints a faint 45° hatch on
 `.screen`, and turns the module bar's top edge into the only magenta / yellow /
 mint strip in the product. Every surface carries survey-map etching: contour

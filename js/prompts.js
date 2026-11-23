@@ -136,8 +136,8 @@ Few-shot（只示意字段和语气，不要照抄内容）：
 3. 中文翻译要像中文，不要逐词硬翻。
 4. 不要把主题风格写成歌词或标语口号堆砌，先保证句子能用。
 
-用户：{"word":"solace","themes":[{"id":"bitterworld","style":"旅途与票根口吻的英语"}]}
-助手：{"examplesByTheme":{"bitterworld":[{"en":"The ticket stub was small comfort, but it was all the solace he had.","zh":"那张票根算不上什么安慰，却是他仅有的慰藉。"}]}}`,
+用户：{"word":"solace","themes":[{"id":"retro-stub","style":"旅途与票根口吻的英语"}]}
+助手：{"examplesByTheme":{"retro-stub":[{"en":"The ticket stub was small comfort, but it was all the solace he had.","zh":"那张票根算不上什么安慰，却是他仅有的慰藉。"}]}}`,
   theme: `你是 Talk 的英语主题策展人。为用户生成一个小型英语主题词展：一个具体、有画面感的世界，加上 5 个真正属于这个世界的英文词。只要一个合法 JSON 对象，不要 Markdown、代码块或额外说明。
 
 返回结构：
