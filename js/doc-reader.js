@@ -35,6 +35,7 @@
     showCover: true,
     showFocus: true,
     showNotes: true,
+    showAppendix: true,
     format: "a4",
     lastError: ""
   };
@@ -365,31 +366,50 @@
     const root = S.root;
     if (!root) return;
     if (!S.doc) { renderInput(); return; }
-    const doc = S.doc;
     const p = progress();
     const running = S.status === "running";
+    const lang = window.TALK_LLM?.getLang?.() === "en" ? 1 : 0;
     const cover = S.overview ? coverHtml() : `<div class="reader-cover is-pending"><div class="reader-skeleton"></div><p>${t("正在写导读…", "Writing the guide…")}</p></div>`;
+    const chip = (key, label) => `<button class="level-chip${S[key] ? " active" : ""}" type="button" data-reader-action="option" data-key="${key}" aria-pressed="${!!S[key]}">${label}</button>`;
     root.innerHTML = `
       <div class="reader-doc" id="reader-doc">
-        <div class="reader-toolbar" data-reader-toolbar>
-          <button class="btn btn-ghost" type="button" data-reader-action="back">${t("换一篇", "New text")}</button>
-          <span class="reader-progress" data-reader-progress>${p.done} / ${p.total}</span>
-          <label class="reader-toggle"><input type="checkbox" data-reader-toggle="cover" ${S.showCover ? "checked" : ""}> ${t("封面", "Cover")}</label>
-          <label class="reader-toggle"><input type="checkbox" data-reader-toggle="focus" ${S.showFocus ? "checked" : ""}> ${t("长难句", "Hard sentences")}</label>
-          <label class="reader-toggle"><input type="checkbox" data-reader-toggle="notes" ${S.showNotes ? "checked" : ""}> ${t("词注", "Notes")}</label>
-          <label class="reader-format"><span>${t("纸型", "Paper")}</span><select data-reader-format aria-label="${t("纸张与比例", "Paper size")}">${Object.entries(FORMATS).map(([id, format]) => `<option value="${id}"${S.format === id ? " selected" : ""}>${format.label[window.TALK_LLM?.getLang?.() === "en" ? 1 : 0]}</option>`).join("")}</select></label>
-          ${running ? `<button class="btn btn-ghost" type="button" data-reader-action="pause">${t("暂停", "Pause")}</button>` : ""}
-          ${!running && p.done < p.total ? `<button class="btn btn-ghost" type="button" data-reader-action="resume">${t("继续", "Resume")}</button>` : ""}
-          ${!running ? `<button class="btn btn-ghost" type="button" data-reader-action="refresh">${t("重新精读", "Re-read")}</button>` : ""}
-          <button class="btn btn-primary" type="button" data-reader-action="print">${t("打印 / PDF", "Print / PDF")}</button>
-          <p class="reader-print-hint">${t("打印时请勾选「背景图形」，以保留主题纸底与高亮。", "In the print dialog, enable “Background graphics” to keep the paper and highlights.")}</p>
-        </div>
+        <header class="reader-bar">
+          <button class="reader-bar-back" type="button" data-reader-action="back">← ${t("换一篇", "New text")}</button>
+          <span class="reader-bar-progress mono">${p.done}/${p.total}</span>
+          <button class="btn btn-primary reader-bar-export" type="button" data-reader-action="options">${t("导出 PDF", "Export PDF")}</button>
+        </header>
+        ${running ? `<div class="reader-running"><span class="reader-typing"><i></i><i></i><i></i></span>${t("正在精读", "Reading")} ${p.done}/${p.total}${p.done < p.total ? ` · <button class="reader-inline-action" type="button" data-reader-action="pause">${t("暂停", "Pause")}</button>` : ""}</div>` : ""}
+        ${!running && p.done < p.total ? `<div class="reader-running is-paused">${t("还有", "Still")} ${p.total - p.done} ${t("段没读", "passages left")} · <button class="reader-inline-action" type="button" data-reader-action="resume">${t("继续", "Resume")}</button></div>` : ""}
         <article class="reader-sheet${S.showCover ? "" : " hide-cover"}">
           ${cover}
           <main class="reader-body" data-reader-body>${bodyHtml()}</main>
-          ${S.showNotes ? appendixHtml() : ""}
+          ${S.showAppendix ? appendixHtml() : ""}
         </article>
         ${S.errors.length ? `<p class="reader-error">${esc(S.errors.slice(-2).join("；"))}</p>` : ""}
+        <div class="reader-options" data-reader-options hidden>
+          <div class="reader-options-backdrop" data-reader-action="close-options"></div>
+          <section class="reader-options-sheet" role="dialog" aria-label="${t("导出 PDF", "Export PDF")}">
+            <header class="reader-options-head">
+              <span class="mono">${t("导出 PDF", "EXPORT PDF")}</span>
+              <button class="reader-options-close" type="button" data-reader-action="close-options" aria-label="${t("关闭", "Close")}">×</button>
+            </header>
+            <div class="reader-options-row">
+              ${chip("showCover", t("封面", "Cover"))}
+              ${chip("showFocus", t("长难句", "Hard sentence"))}
+              ${chip("showNotes", t("词注", "Notes"))}
+              ${chip("showAppendix", t("词汇总表", "Glossary"))}
+            </div>
+            <label class="reader-format">
+              <span>${t("纸型", "Paper")}</span>
+              <select data-reader-format aria-label="${t("纸张与比例", "Paper size")}">
+                ${Object.entries(FORMATS).map(([id, format]) => `<option value="${id}"${S.format === id ? " selected" : ""}>${format.label[lang]}</option>`).join("")}
+              </select>
+            </label>
+            <button class="btn btn-primary reader-options-print" type="button" data-reader-action="print">${t("开始打印 / 存为 PDF", "Start printing / Save as PDF")}</button>
+            <button class="btn btn-ghost reader-options-refresh" type="button" data-reader-action="refresh">${t("重新精读", "Re-read this text")}</button>
+            <p class="reader-print-hint">${t("打印时请勾选「背景图形」，以保留主题纸底与高亮。", "In the print dialog, enable “Background graphics” to keep the paper and highlights.")}</p>
+          </section>
+        </div>
       </div>`;
     applyFormat();
   }
@@ -469,7 +489,7 @@
           <i></i>
           <span class="pdf-head-meta mono">${block.words} ${t("词", "words")}</span>
         </div>
-        <div class="pdf-card reader-en"><span class="pdf-card-label mono">${t("原文", "TEXT")}</span><p>${html}</p></div>
+        <div class="reader-en"><p>${html}</p></div>
         ${paragraphs.length ? `<div class="pdf-card reader-translation"><span class="pdf-card-label mono">“ ${t("整段意译", "TRANSLATION")}</span>${paragraphs.map((para) => `<p>${esc(para)}</p>`).join("")}</div>` : ""}
         ${sentences ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("句子解读", "Sentence by sentence")}</h3><i></i></div><ol class="reader-sentences">${sentences}</ol></div>` : ""}
         ${chunks ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("意群分解", "Chunks")}</h3><i></i></div><ul class="reader-chunks">${chunks}</ul></div>` : ""}
@@ -678,6 +698,18 @@
     void runMissing();
   }
 
+  function openOptions() {
+    const sheet = S.root?.querySelector("[data-reader-options]");
+    if (sheet) sheet.hidden = false;
+    document.documentElement.classList.add("reader-options-open");
+  }
+
+  function closeOptions() {
+    const sheet = S.root?.querySelector("[data-reader-options]");
+    if (sheet) sheet.hidden = true;
+    document.documentElement.classList.remove("reader-options-open");
+  }
+
   function pause() {
     S.runId += 1;
     S.controller?.abort();
@@ -717,7 +749,13 @@
     else if (action === "back") { S.runId += 1; S.controller?.abort(); S.doc = null; S.overview = null; S.blocks = new Map(); history.replaceState(history.state, "", "#/reader"); renderInput(); }
     else if (action === "pause") pause();
     else if (action === "resume") void runMissing();
-    else if (action === "refresh") void refreshDoc();
+    else if (action === "options") openOptions();
+    else if (action === "close-options") closeOptions();
+    else if (action === "option") {
+      const key = event.target.closest("[data-key]")?.dataset.key;
+      if (key && key in S) { S[key] = !S[key]; renderShell(); openOptions(); }
+    }
+    else if (action === "refresh") { closeOptions(); void refreshDoc(); }
     else if (action === "print") { document.documentElement.classList.add("reader-printing"); window.print(); window.setTimeout(() => document.documentElement.classList.remove("reader-printing"), 800); }
   });
 
@@ -725,13 +763,6 @@
     const target = event.target;
     if (target?.id === "reader-file") void openFile(target.files?.[0]);
     if (target?.dataset?.readerFormat !== undefined && target?.tagName === "SELECT") setFormat(target.value);
-    const toggle = target?.dataset?.readerToggle;
-    if (toggle) {
-      if (toggle === "cover") { S.showCover = target.checked; }
-      if (toggle === "focus") { S.showFocus = target.checked; }
-      if (toggle === "notes") { S.showNotes = target.checked; }
-      renderShell();
-    }
   });
 
   document.addEventListener("dragover", (event) => {
