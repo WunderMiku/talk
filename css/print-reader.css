@@ -614,7 +614,7 @@
 
 .sheet-foot { display: flex; justify-content: space-between; gap: 10px; margin-top: 18px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 9px; letter-spacing: 0.1em; color: var(--muted); }
 
-.reader-progress { position: relative; height: 3px; background: var(--line); margin: 8px 0 22px; }
+.reader-progress { position: relative; height: 3px; background: var(--line); margin: 8px 0 18px; }
 .reader-progress i { position: absolute; inset: 0 auto 0 0; background: var(--accent-ink); transition: width 0.3s ease; }
 .reader-progress-label { position: absolute; right: 0; top: 7px; font-size: 9px; color: var(--muted); }
 
@@ -654,3 +654,36 @@
   .en-prose { orphans: 2; widows: 2; }
   .sidenote-item, .t-card, .gloss-item, .focus-card { break-inside: avoid; }
 }
+
+
+/* Book-stack preview, mirroring the sample reader. */
+.screen[data-page="reader"] .reader-page {
+  background:
+    radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--paper) 70%, transparent), transparent 70%),
+    color-mix(in srgb, var(--ink) 5%, var(--paper));
+  padding: 10px 0 46px;
+}
+.reader-doc { max-width: 860px; margin: 0 auto; padding: 0 12px; }
+.reader-bar { display: flex; align-items: center; gap: 10px; padding: 4px 0 6px; }
+.reader-brand { font-weight: 800; letter-spacing: -0.04em; font-size: 20px; margin-right: auto; }
+.reader-brand i { color: var(--accent); font-style: normal; }
+.reader-bar-back { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 4px 0; }
+.reader-bar-export { height: 30px; padding: 0 14px; font-size: 12px; }
+.rv-sheet {
+  position: relative;
+  margin: 0 0 18px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 18%, transparent), 0 14px 34px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.rv-sheet::after {
+  content: "";
+  position: absolute; inset: 8px 8px -8px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  background: color-mix(in srgb, var(--paper) 92%, var(--ink) 8%);
+  z-index: -1;
+}
+.reader-focus-en .zh-trans-card,
+.reader-focus-en .sn-zh,
+.reader-focus-en .sn-nuance,
+.reader-focus-en .sn-chunk,
+.reader-focus-en .focus-why,
+.reader-focus-en .tip-item { display: none; }

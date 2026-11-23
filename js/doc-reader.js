@@ -385,8 +385,9 @@
     const cover = S.overview ? coverHtml() : `<div class="reader-cover is-pending"><div class="reader-skeleton"></div><p>${t("正在写导读…", "Writing the guide…")}</p></div>`;
     const chip = (key, label) => `<button class="level-chip${S[key] ? " active" : ""}" type="button" data-reader-action="option" data-key="${key}" aria-pressed="${!!S[key]}">${label}</button>`;
     root.innerHTML = `
-      <div class="reader-doc" id="reader-doc">
+      <div class="reader-doc${S.focusEn ? " reader-focus-en" : ""}" id="reader-doc">
         <header class="reader-bar">
+          <span class="reader-brand">talk<i>.</i></span>
           <button class="reader-bar-back" type="button" data-reader-action="back">← ${t("换一篇", "New text")}</button>
           <span class="reader-bar-progress mono">${p.done}/${p.total}</span>
           <button class="btn btn-primary reader-bar-export" type="button" data-reader-action="options">${t("导出 PDF", "Export PDF")}</button>
@@ -412,6 +413,7 @@
               ${chip("showFocus", t("长难句", "Hard sentence"))}
               ${chip("showNotes", t("词注", "Notes"))}
               ${chip("showAppendix", t("词汇总表", "Glossary"))}
+              ${chip("focusEn", t("专注英文", "English only"))}
             </div>
             <label class="reader-format">
               <span>${t("纸型", "Paper")}</span>
