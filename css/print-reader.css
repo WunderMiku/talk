@@ -162,3 +162,172 @@
   .reader-tips, .reader-glossary { font-size: 9pt; }
   a { color: inherit; text-decoration: none; }
 }
+
+/* ---------- talk. editorial layer: share-image grammar ---------- */
+
+.reader-sheet {
+  background: var(--paper);
+  color: var(--ink);
+  padding: 30px 24px 42px;
+  box-shadow: var(--shadow-card, 0 1px 2px rgba(0,0,0,.06));
+}
+
+.pdf-brand {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  margin-bottom: 26px;
+  border-bottom: 1.6px solid var(--ink);
+}
+.pdf-logo { font-size: 26px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+.pdf-plate { font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+
+.pdf-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 28px 0 12px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.pdf-head.chapter { margin-top: 34px; padding-top: 14px; border-top: 1.5px solid var(--ink); }
+.pdf-head.sub { margin: 20px 0 8px; }
+.pdf-num {
+  flex: 0 0 auto;
+  background: var(--ink);
+  color: var(--paper);
+  font: 600 10px/1 var(--mono, ui-monospace, monospace);
+  letter-spacing: 0.08em;
+  padding: 5px 6px;
+  min-width: 26px;
+  text-align: center;
+}
+.pdf-head h2, .pdf-head h3 { margin: 0; font-size: 19px; font-weight: 750; letter-spacing: -0.01em; }
+.pdf-head h3 { font-size: 13px; letter-spacing: 0.1em; text-transform: uppercase; }
+.pdf-head i { flex: 1 1 auto; height: 1px; background: var(--line-strong); }
+.pdf-head-meta { flex: 0 0 auto; font-size: 9px; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; }
+
+.pdf-card {
+  position: relative;
+  background: var(--card);
+  border: 1.2px solid var(--line-strong);
+  padding: 16px 18px 17px;
+  margin: 14px 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.pdf-card-label {
+  display: block;
+  font-size: 8px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.pdf-card p { margin: 0 0 10px; }
+.pdf-card p:last-child { margin-bottom: 0; }
+
+.reader-cover { break-after: page; page-break-after: always; }
+.reader-cover .reader-title { margin: 8px 0 10px; }
+.reader-subtitle { color: var(--muted); font-size: 14px; line-height: 1.6; }
+.pdf-meta { margin: 16px 0 20px; font-size: 10px; letter-spacing: 0.08em; color: var(--muted); }
+.pdf-summary p { font-size: 16px; line-height: 1.8; }
+.reader-tips li { margin: 6px 0; }
+.reader-glossary { display: flex; flex-direction: column; gap: 8px; }
+
+.reader-en p { font-size: 16px; line-height: 1.8; }
+.reader-term {
+  border-bottom: 1.8px solid var(--accent-ink, var(--accent, currentColor));
+  background: var(--accent-wash, transparent);
+}
+.reader-anchor { font-size: 0.62em; vertical-align: super; margin-left: 1px; color: var(--accent-ink, inherit); }
+.reader-translation p { font-size: 14.5px; line-height: 1.85; color: color-mix(in srgb, var(--ink) 86%, transparent); }
+
+.reader-sentences { list-style: none; margin: 6px 0 0 10px; padding: 0 0 0 20px; border-left: 1px solid var(--line-strong); }
+.reader-sentence { position: relative; padding: 0 0 16px; }
+.reader-sentence:last-child { padding-bottom: 2px; }
+.pdf-tick { position: absolute; left: -30px; top: 2px; font: 600 9px/1 var(--mono, monospace); color: var(--muted); background: var(--paper); padding: 2px 3px; }
+.reader-sentence-en { margin: 0 0 4px; font-weight: 600; }
+.reader-sentence-zh { margin: 0 0 4px; color: color-mix(in srgb, var(--ink) 82%, transparent); }
+.reader-sentence-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+.reader-sentence-note b { color: var(--ink); font-weight: 700; }
+
+.reader-chunks { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.reader-chunk { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line-strong); }
+.reader-chunk-type { font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.reader-chunk b { font-size: 14.5px; }
+.reader-chunk span:last-child { font-size: 13px; color: color-mix(in srgb, var(--ink) 80%, transparent); }
+
+.reader-craft { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.reader-craft-item { padding: 12px 14px; background: var(--card); border-left: 3px solid var(--accent-ink, var(--accent, var(--ink))); }
+.reader-craft-name { font: 600 9px/1.4 var(--mono, monospace); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.reader-craft-item cite { display: block; margin: 6px 0; font-size: 14px; }
+.reader-craft-item p { margin: 0; font-size: 13px; line-height: 1.7; }
+
+.reader-focus cite { font-size: 15px; font-weight: 600; display: block; margin-bottom: 8px; }
+.reader-focus p { margin: 0; font-size: 13px; color: color-mix(in srgb, var(--ink) 78%, transparent); }
+
+.reader-notes { list-style: none; margin: 4px 0 0 12px; padding: 0 0 0 20px; border-left: 1px dashed var(--line-strong); }
+.reader-note-item { position: relative; padding: 0 0 14px; }
+.reader-note-item sup { position: absolute; left: -31px; top: 1px; background: var(--paper); font: 600 9px/1 var(--mono, monospace); color: var(--accent-ink, var(--ink)); padding: 2px 3px; }
+.reader-note-main { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.reader-note-main b { font-size: 14.5px; }
+.reader-pos { font: 500 8px/1.6 var(--mono, monospace); letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--line-strong); padding: 1px 4px; color: var(--muted); }
+.reader-note-item i { display: block; margin-top: 4px; font-size: 12.5px; color: var(--muted); }
+.reader-note-item code { display: inline-block; margin-top: 5px; font-size: 11.5px; background: var(--field, transparent); padding: 2px 6px; }
+
+.reader-appendix { margin-top: 30px; break-before: page; page-break-before: always; }
+.reader-gloss-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+.reader-gloss-row { display: flex; align-items: baseline; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); break-inside: avoid; page-break-inside: avoid; }
+.reader-gloss-term { display: flex; align-items: baseline; gap: 6px; flex: 0 1 auto; }
+.reader-gloss-term b { font-size: 13.5px; }
+.reader-gloss-zh { flex: 1 1 auto; font-size: 12.5px; color: color-mix(in srgb, var(--ink) 78%, transparent); }
+.reader-ref { flex: 0 0 auto; font-size: 8.5px; color: var(--muted); }
+
+.pdf-signoff {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 34px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-strong);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  break-inside: avoid;
+}
+
+.reader-print-hint { margin: 8px 0 0; font-size: 10px; color: var(--muted); }
+
+@media print {
+  @page { margin: 0; }
+  html, body {
+    background: var(--paper) !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  .stage, .device, .app { background: var(--paper) !important; inset: 0 !important; box-shadow: none !important; border: 0 !important; }
+  .reader-sheet {
+    box-shadow: none !important;
+    padding: 16mm 15mm 18mm !important;
+    max-width: none !important;
+    min-height: 0 !important;
+  }
+  .stage-meta, .stage-hint, .statusbar, .ambient, .grain, .module-bar, .cache-corner, .toast,
+  .reader-toolbar, .reader-input-panel, .reader-error, .reader-print-hint, .reader-format { display: none !important; }
+  .app::before, .app::after, .device::before, .device::after, .screen::before, .screen::after { content: none !important; }
+  .screen { overflow: visible !important; position: static !important; }
+  .reader-body { column-count: var(--reader-columns, 2); column-gap: 14mm; }
+  .reader-cover, .reader-appendix, .pdf-head, .pdf-card, .reader-block, .reader-note-item, .reader-sentence {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .pdf-brand { margin-bottom: 8mm; }
+  .reader-en p { font-size: 13.5pt; line-height: 1.72; }
+  .reader-translation p { font-size: 11.5pt; }
+  .pdf-head { margin-top: 7mm; }
+}

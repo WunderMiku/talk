@@ -6,8 +6,71 @@
     "why": "主语从句加破折号式插入，把「让步」与「掏空」压在同一句里，讽刺由 quietly 承担。"
   },
   "notes": [
-    { "term": "quietly hollow out", "pos": "phr.", "inContextZh": "悄然掏空", "nuance": "把剧烈动作藏进副词，语气越轻，指控越重。", "chunk": "quietly hollow out <a safeguard>" },
-    { "term": "safeguard", "pos": "n.", "inContextZh": "保障条款", "nuance": "法律语境里指兜底机制，不是泛泛的「保护」。", "chunk": "" },
-    { "term": "concession", "pos": "n.", "inContextZh": "让步", "nuance": "外交语境中常暗示不对等的退让。", "chunk": "" }
-  ]
+    {
+      "term": "quietly hollow out",
+      "pos": "phr.",
+      "inContextZh": "悄然掏空",
+      "nuance": "把剧烈动作藏进副词，语气越轻，指控越重。",
+      "chunk": "quietly hollow out <a safeguard>"
+    },
+    {
+      "term": "safeguard",
+      "pos": "n.",
+      "inContextZh": "保障条款",
+      "nuance": "法律语境里指兜底机制，不是泛泛的「保护」。",
+      "chunk": ""
+    },
+    {
+      "term": "concession",
+      "pos": "n.",
+      "inContextZh": "让步",
+      "nuance": "外交语境中常暗示不对等的退让。",
+      "chunk": ""
+    }
+  ],
+  "sentences": [
+    {
+      "en": "Paragraph 1. The treaty relied on a safeguard that negotiators quietly hollowed out over several seasons of technical revisions.",
+      "zh": "第一段。条约依赖一道保障条款，而谈判者用几个季度的技术性修订把它悄悄掏空了。",
+      "role": "主干 + 定语从句",
+      "reading": "主干把「依赖」摆在前面，定语从句才揭示这道防线已经被掏空，读者的判断被推迟到最后。"
+    },
+    {
+      "en": "What looked like a modest concession turned out to be the hinge of the whole arrangement.",
+      "zh": "看似温和的让步，最后成了整份安排的枢纽。",
+      "role": "主语从句 + 转折",
+      "reading": "What looked like 先压低预期，turned out 才翻出真实分量，是典型的冷峻反讽句式。"
+    }
+  ],
+  "chunks": [
+    {
+      "en": "relied on a safeguard",
+      "zh": "依赖一道保障条款",
+      "type": "动词短语"
+    },
+    {
+      "en": "over several seasons of technical revisions",
+      "zh": "历经数季技术性修订",
+      "type": "介词框架"
+    },
+    {
+      "en": "the hinge of the whole arrangement",
+      "zh": "整份安排的枢纽",
+      "type": "名词短语"
+    }
+  ],
+  "craft": {
+    "devices": [
+      {
+        "name": "尾重结构",
+        "en": "the safeguard the treaty depended on",
+        "effect": "把最关键的名词压到句尾，读者读到最后一个词才看见被掏空的对象，反转更冷。"
+      },
+      {
+        "name": "名词化",
+        "en": "technical revisions",
+        "effect": "用名词化抹掉施动者，让「谁在修订」变得模糊，正好呼应 quietly 的隐蔽感。"
+      }
+    ]
+  }
 }

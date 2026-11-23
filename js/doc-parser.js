@@ -48,7 +48,8 @@
       .replace(/`([^`]+)`/g, "$1")
       .replace(/\*\*([^*]+)\*\*/g, "$1")
       .replace(/__([^_]+)__/g, "$1")
-      .replace(/(^|\s)\*([^*\n]+)\*(?=\s|$)/g, "$1$2")
+      .replace(/\*([^*\n]+)\*/g, "$1")
+      .replace(/(^|[^A-Za-z0-9])_([^_\n]+)_(?![A-Za-z0-9])/g, "$1$2")
       .replace(/<\/?[a-zA-Z][^>]*>/g, "")
       .trim();
   }
@@ -57,24 +58,35 @@
     const text = raw.replace(/```[\s\S]*?```/g, "");
     const paragraphs = [];
     let title = "";
-    text.split(/\n{2,}/).forEach((chunk) => {
-      const lines = chunk.split("\n").map((line) => line.trim()).filter(Boolean);
-      if (!lines.length) return;
-      const heading = /^(#{1,3})\s+(.*)$/.exec(lines[0]);
-      if (heading && lines.length === 1) {
-        const level = heading[1].length;
-        const value = cleanInline(heading[2]);
-        if (level === 1 && !title) title = value;
-        paragraphs.push({ type: "heading", level, text: value });
-        return;
-      }
-      const joined = lines
-        .filter((line) => !/^([-*_])\1{2,}$/.test(line))
+    let buffer = [];
+
+    const flush = () => {
+      if (!buffer.length) return;
+      const joined = buffer
         .map(cleanInline)
         .filter(Boolean)
         .join(" ");
+      buffer = [];
       if (joined && !/^([-*_])\1{2,}$/.test(joined)) paragraphs.push({ type: "text", text: joined });
+    };
+
+    text.split("\n").forEach((line) => {
+      const value = line.trim();
+      if (!value) { flush(); return; }
+      const heading = /^(#{1,3})\s+(.+)$/.exec(value);
+      if (heading) {
+        flush();
+        const level = heading[1].length;
+        const label = cleanInline(heading[2]);
+        if (!label) return;
+        if (level === 1 && !title) title = label;
+        paragraphs.push({ type: "heading", level, text: label });
+        return;
+      }
+      if (/^([-*_])\1{2,}$/.test(value)) { flush(); return; }
+      buffer.push(value);
     });
+    flush();
     return { paragraphs, title };
   }
 

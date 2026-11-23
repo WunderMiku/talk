@@ -115,6 +115,16 @@
     });
   }
 
+  async function idbDelete(store, key) {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(store, "readwrite");
+      tx.objectStore(store).delete(key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
   async function blocksOf(docHash) {
     const db = await openDb();
     return new Promise((resolve, reject) => {
@@ -139,42 +149,51 @@
   /* ---------------- annotation ---------------- */
 
   function annotate(text, notes) {
+    const source = String(text || "");
     const usable = (notes || [])
       .map((note) => ({ ...note, term: String(note.term || "").trim() }))
-      .filter((note) => note.term && text.includes(note.term))
-      .sort((a, b) => b.term.length - a.term.length);
-    if (!usable.length) return { html: escapeParagraphs(text), marks: [] };
+      .filter((note) => {
+        if (!note.term) return false;
+        const at = source.toLowerCase().indexOf(note.term.toLowerCase());
+        return at >= 0;
+      })
+      .map((note) => ({ ...note, at: source.toLowerCase().indexOf(note.term.toLowerCase()) }))
+      .sort((a, b) => a.at - b.at || b.term.length - a.term.length);
 
-    const order = new Map();
-    const marks = [];
+    const accepted = [];
     usable.forEach((note) => {
-      if (!order.has(note.term)) {
-        order.set(note.term, order.size + 1);
-        marks.push(note);
-      }
+      const endsBefore = note.at;
+      const endsAfter = note.at + note.term.length;
+      const overlaps = accepted.some((other) => !(endsAfter <= other.at || endsBefore >= other.at + other.term.length));
+      if (!overlaps) accepted.push(note);
     });
-    const pattern = usable.map((note) => note.term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
-    const regex = new RegExp(`(${pattern})`, "g");
+    if (!accepted.length) return { html: escapeParagraphs(source), marks: [] };
+
+    const order = new Map(accepted.map((note, index) => [note.term.toLowerCase(), index + 1]));
+    const marks = accepted.map((note, index) => ({ ...note, number: index + 1 }));
+    const pattern = accepted
+      .slice()
+      .sort((a, b) => b.term.length - a.term.length)
+      .map((note) => note.term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|");
+    const regex = new RegExp(`(${pattern})`, "gi");
     let index = 0;
     let html = "";
     let match;
-    const takeOverlap = new Map();
-    while ((match = regex.exec(text))) {
+    while ((match = regex.exec(source))) {
       const found = match[0];
-      const note = usable.find((item) => item.term === found);
-      html += escapeParagraphs(text.slice(index, match.index));
-      if (note) {
-        const number = order.get(note.term);
-        html += `<sup class="reader-anchor" data-note="${number}" title="${esc(note.inContextZh || "")}">${number}</sup><span class="reader-term">${esc(found)}</span>`;
-        takeOverlap.set(number, note);
+      const number = order.get(found.toLowerCase());
+      html += escapeParagraphs(source.slice(index, match.index));
+      if (number) {
+        const note = marks[number - 1];
+        html += `<span class="reader-term">${esc(found)}</span><sup class="reader-anchor" data-note="${number}" title="${esc(note.inContextZh || "")}">${number}</sup>`;
       } else {
         html += escapeParagraphs(found);
       }
       index = match.index + found.length;
-      if (regex.lastIndex === match.index) regex.lastIndex += 1;
     }
-    html += escapeParagraphs(text.slice(index));
-    return { html, marks: marks.filter((note) => takeOverlap.has(order.get(note.term))) };
+    html += escapeParagraphs(source.slice(index));
+    return { html, marks };
   }
 
   function escapeParagraphs(text) {
@@ -226,7 +245,42 @@
     const focus = raw.focusSentence && typeof raw.focusSentence === "object"
       ? { en: String(raw.focusSentence.en || "").trim(), why: String(raw.focusSentence.why || "").trim() }
       : null;
-    return { translation: String(raw.translation || "").trim(), focusSentence: focus && focus.en ? focus : null, notes };
+    const sentences = Array.isArray(raw.sentences)
+      ? raw.sentences
+          .map((item) => ({
+            en: String(item?.en || "").trim(),
+            zh: String(item?.zh || "").trim(),
+            role: String(item?.role || "").trim(),
+            reading: String(item?.reading || "").trim()
+          }))
+          .filter((item) => item.en && item.zh)
+      : [];
+    const chunks = Array.isArray(raw.chunks)
+      ? raw.chunks
+          .map((item) => ({
+            en: String(item?.en || "").trim(),
+            zh: String(item?.zh || "").trim(),
+            type: String(item?.type || "").trim()
+          }))
+          .filter((item) => item.en && item.zh)
+      : [];
+    const craft = raw.craft && typeof raw.craft === "object" && Array.isArray(raw.craft.devices)
+      ? raw.craft.devices
+          .map((item) => ({
+            name: String(item?.name || "").trim(),
+            en: String(item?.en || "").trim(),
+            effect: String(item?.effect || "").trim()
+          }))
+          .filter((item) => item.name && item.effect)
+      : [];
+    return {
+      translation: String(raw.translation || "").trim(),
+      focusSentence: focus && focus.en ? focus : null,
+      sentences,
+      chunks,
+      craft,
+      notes
+    };
   }
 
   /* ---------------- state helpers ---------------- */
@@ -326,11 +380,12 @@
           <label class="reader-format"><span>${t("纸型", "Paper")}</span><select data-reader-format aria-label="${t("纸张与比例", "Paper size")}">${Object.entries(FORMATS).map(([id, format]) => `<option value="${id}"${S.format === id ? " selected" : ""}>${format.label[window.TALK_LLM?.getLang?.() === "en" ? 1 : 0]}</option>`).join("")}</select></label>
           ${running ? `<button class="btn btn-ghost" type="button" data-reader-action="pause">${t("暂停", "Pause")}</button>` : ""}
           ${!running && p.done < p.total ? `<button class="btn btn-ghost" type="button" data-reader-action="resume">${t("继续", "Resume")}</button>` : ""}
+          ${!running ? `<button class="btn btn-ghost" type="button" data-reader-action="refresh">${t("重新精读", "Re-read")}</button>` : ""}
           <button class="btn btn-primary" type="button" data-reader-action="print">${t("打印 / PDF", "Print / PDF")}</button>
+          <p class="reader-print-hint">${t("打印时请勾选「背景图形」，以保留主题纸底与高亮。", "In the print dialog, enable “Background graphics” to keep the paper and highlights.")}</p>
         </div>
         <article class="reader-sheet${S.showCover ? "" : " hide-cover"}">
           ${cover}
-          <div class="reader-meta-line"><span>${doc.wordCount} ${t("词", "words")}</span><span>${p.done}/${p.total}</span><span>${t("按", "")} ${LEVEL_NAMES[doc.level] || doc.level} ${t("取词", "")}</span></div>
           <main class="reader-body" data-reader-body>${bodyHtml()}</main>
           ${S.showNotes ? appendixHtml() : ""}
         </article>
@@ -341,14 +396,25 @@
 
   function coverHtml() {
     const o = S.overview;
+    const theme = window.TALK_THEME?.current?.() || {};
+    const doc = S.doc;
     return `
       <header class="reader-cover">
+        <div class="pdf-brand">
+          <span class="pdf-logo">talk.</span>
+          <span class="pdf-plate mono">${esc((theme.label || "Paper").toUpperCase())} · ${t("精读本", "READER")}</span>
+        </div>
         <p class="reader-kicker">${esc(o.genre || t("精读", "CLOSE READING"))} · ${esc(o.tone || "")}</p>
         <h1 class="reader-title">${esc(o.titleZh)}</h1>
         ${o.subtitle ? `<p class="reader-subtitle">${esc(o.subtitle)}</p>` : ""}
-        <p class="reader-summary">${esc(o.summary)}</p>
-        ${o.readingTips.length ? `<ul class="reader-tips">${o.readingTips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>` : ""}
-        ${o.glossary.length ? `<div class="reader-glossary">${o.glossary.map((item) => `<span class="reader-gloss"><b>${esc(item.term)}</b>${esc(item.zh)}<i>${esc(item.note)}</i></span>`).join("")}</div>` : ""}
+        <div class="pdf-meta mono">${doc.wordCount} ${t("词", "words")} · ${doc.blocks.filter((b) => b.type === "passage").length} ${t("节", "sections")} · ${t("按", "level")} ${LEVEL_NAMES[doc.level] || doc.level} ${t("取词", "")}</div>
+        ${o.summary ? `<div class="pdf-card pdf-summary"><span class="pdf-card-label mono">${t("整篇主旨", "SUMMARY")}</span><p>${esc(o.summary)}</p></div>` : ""}
+        ${o.readingTips.length ? `<div class="pdf-block"><div class="pdf-head"><b class="pdf-num">01</b><h2>${t("阅读提示", "How to read")}</h2><i></i></div><ul class="reader-tips">${o.readingTips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul></div>` : ""}
+        ${o.glossary.length ? `<div class="pdf-block"><div class="pdf-head"><b class="pdf-num">02</b><h2>${t("核心术语", "Key terms")}</h2><i></i><span class="pdf-head-meta mono">${t("全篇统一", "consistent")}</span></div><div class="reader-glossary">${o.glossary.map((item) => `<span class="reader-gloss"><b>${esc(item.term)}</b>${esc(item.zh)}${item.note ? `<i>${esc(item.note)}</i>` : ""}</span>`).join("")}</div></div>` : ""}
+        <div class="pdf-signoff">
+          <span>${t("把词，看透。", "See a word through.")}</span>
+          <span class="mono">WUNDERMIKU.GITHUB.IO/TALK</span>
+        </div>
       </header>`;
   }
 
@@ -357,7 +423,7 @@
     let passageNo = 0;
     return (doc.blocks || []).map((block) => {
       if (block.type === "heading") {
-        return `<h2 class="reader-heading">${esc(block.text)}</h2>`;
+        return `<div class="pdf-head chapter level-${block.level}"><b class="pdf-num">§</b><h2>${esc(block.text)}</h2><i></i></div>`;
       }
       passageNo += 1;
       const key = blockId(doc.docHash, block.hash);
@@ -370,16 +436,46 @@
   function blockHtml(block, result, number) {
     const { html, marks } = annotate(block.text, result.notes);
     const notes = (result.notes || []).map((note, i) => {
-      const mark = marks.findIndex((item) => item.term === note.term) + 1;
-      return `<li class="reader-note-item" id="rn-${number}-${i + 1}">${mark ? `<sup>${mark}</sup>` : `<sup class="is-muted">·</sup>`}<b>${esc(note.term)}</b><span class="reader-pos">${esc(note.pos)}</span><span class="reader-zh">${esc(note.inContextZh)}</span>${note.nuance ? `<i>${esc(note.nuance)}</i>` : ""}${note.chunk ? `<code>${esc(note.chunk)}</code>` : ""}</li>`;
+      const hit = marks.find((item) => item.term.toLowerCase() === String(note.term).toLowerCase());
+      return `<li class="reader-note-item" id="rn-${number}-${i + 1}">${hit ? `<sup>${hit.number}</sup>` : `<sup class="is-muted">·</sup>`}<span class="reader-note-main"><b>${esc(note.term)}</b><span class="reader-pos">${esc(note.pos)}</span><span class="reader-zh">${esc(note.inContextZh)}</span></span>${note.nuance ? `<i>${esc(note.nuance)}</i>` : ""}${note.chunk ? `<code>${esc(note.chunk)}</code>` : ""}</li>`;
     }).join("");
+    const sentences = (result.sentences || []).map((item, i) => `
+      <li class="reader-sentence">
+        <span class="pdf-tick">${String(i + 1).padStart(2, "0")}</span>
+        <div class="reader-sentence-body">
+          <p class="reader-sentence-en">${esc(item.en)}</p>
+          <p class="reader-sentence-zh">${esc(item.zh)}</p>
+          ${item.role || item.reading ? `<p class="reader-sentence-note">${item.role ? `<b>${esc(item.role)}</b>` : ""}${item.reading ? ` ${esc(item.reading)}` : ""}</p>` : ""}
+        </div>
+      </li>`).join("");
+    const chunks = (result.chunks || []).map((item) => `
+      <li class="reader-chunk">
+        <span class="reader-chunk-type mono">${esc(item.type || "chunk")}</span>
+        <b>${esc(item.en)}</b>
+        <span>${esc(item.zh)}</span>
+      </li>`).join("");
+    const craft = (result.craft || []).map((item) => `
+      <li class="reader-craft-item">
+        <span class="reader-craft-name">${esc(item.name)}</span>
+        ${item.en ? `<cite>${esc(item.en)}</cite>` : ""}
+        <p>${esc(item.effect)}</p>
+      </li>`).join("");
+    const paragraphs = String(result.translation || "").split(/\n{2,}/).filter(Boolean);
     return `
       <article class="reader-block" data-reader-block="${number}">
-        <div class="reader-block-head"><span>${String(number).padStart(2, "0")}</span><i>${block.words} ${t("词", "words")}</i></div>
-        <div class="reader-en"><p>${html}</p></div>
-        ${result.translation ? `<div class="reader-translation"><p>${esc(result.translation)}</p></div>` : ""}
-        ${S.showFocus && result.focusSentence ? `<aside class="reader-focus"><cite>${esc(result.focusSentence.en)}</cite>${result.focusSentence.why ? `<p>${esc(result.focusSentence.why)}</p>` : ""}</aside>` : ""}
-        ${S.showNotes && notes ? `<ol class="reader-notes">${notes}</ol>` : ""}
+        <div class="pdf-head">
+          <b class="pdf-num">${String(number).padStart(2, "0")}</b>
+          <h2>${t("精读", "Passage")} ${String(number).padStart(2, "0")}</h2>
+          <i></i>
+          <span class="pdf-head-meta mono">${block.words} ${t("词", "words")}</span>
+        </div>
+        <div class="pdf-card reader-en"><span class="pdf-card-label mono">${t("原文", "TEXT")}</span><p>${html}</p></div>
+        ${paragraphs.length ? `<div class="pdf-card reader-translation"><span class="pdf-card-label mono">“ ${t("整段意译", "TRANSLATION")}</span>${paragraphs.map((para) => `<p>${esc(para)}</p>`).join("")}</div>` : ""}
+        ${sentences ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("句子解读", "Sentence by sentence")}</h3><i></i></div><ol class="reader-sentences">${sentences}</ol></div>` : ""}
+        ${chunks ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("意群分解", "Chunks")}</h3><i></i></div><ul class="reader-chunks">${chunks}</ul></div>` : ""}
+        ${craft ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("句子刻画", "Craft")}</h3><i></i></div><ul class="reader-craft">${craft}</ul></div>` : ""}
+        ${S.showFocus && result.focusSentence ? `<aside class="pdf-card reader-focus"><span class="pdf-card-label mono">${t("焦点难句", "FOCUS")}</span><cite>${esc(result.focusSentence.en)}</cite>${result.focusSentence.why ? `<p>${esc(result.focusSentence.why)}</p>` : ""}</aside>` : ""}
+        ${S.showNotes && notes ? `<div class="pdf-block"><div class="pdf-head sub"><h3>${t("语境词注", "Notes")}</h3><i></i></div><ol class="reader-notes">${notes}</ol></div>` : ""}
       </article>`;
   }
 
@@ -402,10 +498,14 @@
     const rows = [...seen.values()].sort((a, b) => a.note.term.toLowerCase().localeCompare(b.note.term.toLowerCase()));
     return `
       <section class="reader-appendix">
-        <h2>${t("词汇总表", "Glossary")}</h2>
+        <div class="pdf-head"><b class="pdf-num">§</b><h2>${t("词汇总表", "Glossary")}</h2><i></i><span class="pdf-head-meta mono">${rows.length} ${t("条", "terms")}</span></div>
         <ol class="reader-gloss-list">
-          ${rows.map(({ note, blocks }) => `<li><b>${esc(note.term)}</b><span class="reader-pos">${esc(note.pos)}</span><span>${esc(note.inContextZh)}</span><i>${esc(note.nuance)}</i><span class="reader-ref">${blocks.map((n) => `§${n}`).join(" ")}</span></li>`).join("")}
+          ${rows.map(({ note, blocks }) => `<li class="reader-gloss-row"><span class="reader-gloss-term"><b>${esc(note.term)}</b><span class="reader-pos">${esc(note.pos)}</span></span><span class="reader-gloss-zh">${esc(note.inContextZh)}</span><span class="reader-ref mono">${blocks.map((n) => `§${n}`).join(" ")}</span></li>`).join("")}
         </ol>
+        <div class="pdf-signoff">
+          <span>${t("把词，看透。", "See a word through.")}</span>
+          <span class="mono">WUNDERMIKU.GITHUB.IO/TALK</span>
+        </div>
       </section>`;
   }
 
@@ -566,6 +666,18 @@
 
   /* ---------------- events ---------------- */
 
+  async function refreshDoc() {
+    if (!S.doc) return;
+    S.blocks = new Map();
+    S.errors = [];
+    S.overview = null;
+    S.doc.overview = null;
+    await idbDeleteBlocks(S.doc.docHash);
+    await saveDoc({ status: "running" });
+    renderShell();
+    void runMissing();
+  }
+
   function pause() {
     S.runId += 1;
     S.controller?.abort();
@@ -605,6 +717,7 @@
     else if (action === "back") { S.runId += 1; S.controller?.abort(); S.doc = null; S.overview = null; S.blocks = new Map(); history.replaceState(history.state, "", "#/reader"); renderInput(); }
     else if (action === "pause") pause();
     else if (action === "resume") void runMissing();
+    else if (action === "refresh") void refreshDoc();
     else if (action === "print") { document.documentElement.classList.add("reader-printing"); window.print(); window.setTimeout(() => document.documentElement.classList.remove("reader-printing"), 800); }
   });
 
