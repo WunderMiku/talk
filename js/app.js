@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "260"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "262"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -659,7 +659,7 @@
   }
 
   function reverseIdFor(text) {
-    return `r${hashText(normalizeSentence(text))}`;
+    return `r${hashText(normalizeSentence(text))}${uiLang() === "en" ? "e" : ""}`;
   }
 
   function countWords(value) {
@@ -1135,7 +1135,7 @@
   }
 
   async function sentenceKey(text, level, detail) {
-    const raw = `${String(text).trim()}|${level}|${detail}`;
+    const raw = `${String(text).trim()}|${level}|${detail}|${uiLang()}`;
     try {
       const buffer = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(raw));
       return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
@@ -1181,7 +1181,7 @@
   }
 
   function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
-    const key = normalizeWord(word);
+    const key = normalizeWord(word) + langSuffix();
     const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
     if (Number(hit.schema || 0) < WORD_CACHE_MIN_SCHEMA) {
@@ -1266,7 +1266,7 @@
   }
 
   function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard", gen = null) {
-    const key = normalizeWord(word);
+    const key = normalizeWord(word) + langSuffix();
     if (!key || !data) return;
     const { context, ...clean } = data;
     const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, gen: gen || data.gen || null, data: clean };
@@ -2015,6 +2015,14 @@
   }
 
   function pageTitle(route) {
+    if (uiLang() === "en") {
+      if (route.name === "word") return `${titleCase(route.word)} — talk. dictionary`;
+      if (route.name === "sentence") return "Sentence analysis — talk.";
+      if (route.name === "translate" || route.name === "translator") return "Multi-style translation — talk.";
+      if (route.name === "reverse") return "Find the wording — talk.";
+      if (route.name === "chunk") return `${route.chunk || route.query || "Chunk"} — talk.`;
+      return "talk. — English, in context";
+    }
     if (route.name === "word") return `${titleCase(route.word)} — talk.`;
     if (route.name === "sentence") return "句子理解 — talk.";
     if (route.name === "translator") return "多风格翻译 — talk.";
@@ -2641,13 +2649,15 @@
     container.classList.add("is-swapping");
   }
 
-  const TRANSLATION_CACHE_KEY = "talk.translations.v3";
+  function translationCacheKey() {
+    return "talk.translations.v3" + (uiLang() === "en" ? ".en" : "");
+  }
   const TRANSLATION_CACHE_MAX = 40;
   const TRANSLATION_CACHE_TTL = 30 * 86400000;
 
   function translationCacheAll() {
     try {
-      const parsed = JSON.parse(localStorage.getItem(TRANSLATION_CACHE_KEY) || "{}");
+      const parsed = JSON.parse(localStorage.getItem(translationCacheKey()) || "{}");
       return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
     } catch (_) {
       return {};
@@ -2666,7 +2676,7 @@
     const entries = Object.entries(all)
       .sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0))
       .slice(0, TRANSLATION_CACHE_MAX);
-    try { localStorage.setItem(TRANSLATION_CACHE_KEY, JSON.stringify(Object.fromEntries(entries))); } catch (_) { /* no-op */ }
+    try { localStorage.setItem(translationCacheKey(), JSON.stringify(Object.fromEntries(entries))); } catch (_) { /* no-op */ }
   }
 
   function detectSourceLanguage(text) {
@@ -3046,7 +3056,7 @@
   async function requestTranslation(text, cfg, sourceLanguage, selectedStyles) {
     const endpoint = endpointFor(cfg.baseUrl, cfg);
     const messages = [
-      { role: "system", content: TRANSLATOR_SYSTEM_PROMPT },
+      { role: "system", content: TRANSLATOR_SYSTEM_PROMPT + englishDirective() },
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
@@ -4380,9 +4390,13 @@
      Reverse search (context → candidates)
      ============================================================ */
 
-  const REVERSE_THREADS_KEY = "talk.reverse.threads.v1";
+  function reverseThreadsKey() {
+    return "talk.reverse.threads.v1" + (uiLang() === "en" ? ".en" : "");
+  }
   const REVERSE_THREAD_LIMIT = 30;
-  const REVERSE_FIRST_KEY = "talk.reverse.v2";
+  function reverseFirstKey() {
+    return "talk.reverse.v2" + (uiLang() === "en" ? ".en" : "");
+  }
 
   function readLocalJson(key, fallback) {
     try {
@@ -4399,14 +4413,14 @@
   }
 
   function loadReverseThreads() {
-    return readLocalJson(REVERSE_THREADS_KEY, {});
+    return readLocalJson(reverseThreadsKey(), {});
   }
 
   function saveReverseThreads(map) {
     const entries = Object.values(map).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     const kept = {};
     entries.slice(0, REVERSE_THREAD_LIMIT).forEach((entry) => { kept[entry.id] = entry; });
-    writeLocalJson(REVERSE_THREADS_KEY, kept);
+    writeLocalJson(reverseThreadsKey(), kept);
   }
 
   function reverseThreadTitle(thread) {
@@ -4449,14 +4463,14 @@
   }
 
   function cacheGetReverseFirst(text) {
-    return readLocalJson(REVERSE_FIRST_KEY, {})[reverseIdFor(text)] || null;
+    return readLocalJson(reverseFirstKey(), {})[reverseIdFor(text)] || null;
   }
 
   function cachePutReverseFirst(text, data) {
-    const map = readLocalJson(REVERSE_FIRST_KEY, {});
+    const map = readLocalJson(reverseFirstKey(), {});
     map[reverseIdFor(text)] = { ...data, at: Date.now() };
     const entries = Object.entries(map).sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0));
-    writeLocalJson(REVERSE_FIRST_KEY, Object.fromEntries(entries.slice(0, 40)));
+    writeLocalJson(reverseFirstKey(), Object.fromEntries(entries.slice(0, 40)));
   }
 
   function reverseSuggestions() {
@@ -7092,14 +7106,28 @@
     return "editor";
   }
 
+  function uiLang() {
+    return window.TALK_I18N?.lang === "en" ? "en" : "zh";
+  }
+
+  function langSuffix() {
+    return uiLang() === "en" ? "::en" : "";
+  }
+
+  function englishDirective() {
+    if (uiLang() !== "en") return "";
+    return "\n\nIMPORTANT: The interface language is English. Write every human-readable string in English — translation, note, memory, zh, gloss, why, tag, summary, verdict, tone, structure, examples[].zh. Never contain Chinese characters. Keep JSON keys, English words, phonetics and pos abbreviations unchanged.";
+  }
+
   function systemPrompt(type, reverseStyle = "") {
-    if (type === "sentence") return SENTENCE_SYSTEM_PROMPT;
-    if (type === "chunk") return CHUNK_SYSTEM_PROMPT;
-    if (type === "reverse") {
+    let base = WORD_SYSTEM_PROMPT;
+    if (type === "sentence") base = SENTENCE_SYSTEM_PROMPT;
+    else if (type === "chunk") base = CHUNK_SYSTEM_PROMPT;
+    else if (type === "reverse") {
       const prompts = window.TALK_PROMPTS.reversePrompts;
-      return (reverseStyle && prompts?.[reverseStyle]) || REVERSE_SYSTEM_PROMPT;
+      base = (reverseStyle && prompts?.[reverseStyle]) || REVERSE_SYSTEM_PROMPT;
     }
-    return WORD_SYSTEM_PROMPT;
+    return base + englishDirective();
   }
 
   function themeBriefs() {

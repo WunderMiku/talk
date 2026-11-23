@@ -95,6 +95,74 @@
     "输入英文句子，或继续追问语气、搭配…": "Type a sentence, or ask about tone and collocation…",
     "输入一个单词，或一整句话…": "Type a word, or a whole sentence…",
     "只影响句子模式": "Affects sentence mode only",
+    "一本活的词典 · 交互原型 01": "A living dictionary · prototype 01",
+    "把词，": "Take a word,",
+    "看透。": "see through it.",
+    "握紧。": "hold it.",
+    "校准。": "calibrate it.",
+    "拆开。": "take it apart.",
+    "摊开。": "lay it out.",
+    "归档。": "file it.",
+    "最近": "Recent",
+    "近线": "Front line",
+    "近次记录": "Recent records",
+    "最近检票": "Recent tickets",
+    "最近调阅": "Recent files",
+    "输入目标": "Target",
+    "输入样本": "Sample",
+    "检索": "Search",
+    "查票": "Check a ticket",
+    "输入一个词，或一句要夺回的话…": "A word, or a sentence worth reclaiming…",
+    "输入一个词，或一句话…": "A word, or a sentence…",
+    "输入词，或一整句话…": "A word, or a whole sentence…",
+    "输入一个词，或一整句要查的话…": "A word, or a whole sentence to check…",
+    "输入一个词，或一整段记录…": "A word, or a passage to file…",
+    "词语就是武器": "Words are weapons",
+    "观察 / 记录 / 理解": "Observe / record / understand",
+    "现场记录": "Field record",
+    "每一张票，都有去处": "Every ticket goes somewhere",
+    "每一份记录，都可追溯": "Every record can be traced",
+    "词": "Word",
+    "句": "Sentence",
+    "段": "Passage",
+    "侦测": "Detect",
+    "派生词": "Derivatives",
+    "固定说法": "Set phrases",
+    "点击继续查": "Tap to look up",
+    "近义词": "Synonyms",
+    "反义词": "Antonyms",
+    "在设备内滚动": "Scroll inside the device",
+    "点击高亮词，继续往里看": "Tap a highlighted word to go deeper",
+    "常用": "Common",
+    "场景": "Scene",
+    "选一版": "Pick a version",
+    "再印一版": "Print another",
+    "本地版": "Local edition",
+    "每日一条": "One a day",
+    "每日一词": "Word of the day",
+    "每日票根": "Ticket of the day",
+    "今日样本": "Today’s sample",
+    "词源": "Origin",
+    "记忆钩子": "Memory hook",
+    "文化背景": "Culture",
+    "常见错误": "Common mistakes",
+    "变体": "Variants",
+    "用法": "Usage",
+    "收藏": "Bookmark",
+    "已收藏": "Saved",
+    "更多": "More",
+    "换一批": "Another batch",
+    "重试": "Retry",
+    "在线": "Online",
+    "离线": "Offline",
+    "生成失败": "Generation failed",
+    "连接模型": "Connect a model",
+    "极简口语": "Plain talk",
+    "地道习语": "Idiomatic",
+    "书面正式": "Formal writing",
+    "网络流行": "Internet slang",
+    "优雅文句": "Literary",
+    "今日": "Today",
     "英语 · 在语境中理解": "ENGLISH · IN CONTEXT",
     "自动 · 单词": "Auto · Word",
     "自动 · 意群": "Auto · Chunk",
@@ -119,12 +187,31 @@
     return lang === "en" ? DICT : EN_TO_ZH;
   }
 
+  const PATTERNS = [
+    [/^(\d+) 个义项$/, "$1 senses"],
+    [/^(\d+) 条例句$/, "$1 examples"],
+    [/^(\d+) 条$/, "$1 entries"],
+    [/^(\d+) 个字?$/, "$1 chars"],
+    [/^(\d+) 句$/, "$1 sentences"],
+    [/^刚刚$/, "just now"],
+    [/^(\d+) 分钟前$/, "$1 min ago"],
+    [/^(\d+) 小时前$/, "$1 h ago"],
+    [/^(\d+) 天前$/, "$1 d ago"],
+    [/^(\d+) · 日常$/, "$1 · everyday"],
+    [/^主题词展 · No\. (\d+) \/ (\d+)$/, "Theme salon · No. $1 / $2"]
+  ];
+
   function swap(text) {
     const trimmed = text.trim();
     if (!trimmed) return text;
     const hit = table()[trimmed];
-    if (!hit) return text;
-    return text.replace(trimmed, hit);
+    if (hit) return text.replace(trimmed, hit);
+    if (lang !== "en") return text;
+    for (const [pattern, replacement] of PATTERNS) {
+      const match = trimmed.match(pattern);
+      if (match) return text.replace(trimmed, trimmed.replace(pattern, replacement));
+    }
+    return text;
   }
 
   function translateNode(node) {
