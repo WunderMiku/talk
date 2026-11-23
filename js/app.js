@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "264"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "265"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1584,6 +1584,7 @@
     if (route.name === "chunk") return `#/chunk/${encodeURIComponent(chunkSlug(route.query || route.result?.chunk || ""))}`;
     if (route.name === "reverse") return `#/reverse/${encodeURIComponent(route.id || route.result?.id || "")}`;
     if (route.name === "translator") return "#/translate";
+    if (route.name === "reader") return route.hash ? `#/reader/${encodeURIComponent(route.hash)}` : "#/reader";
     if (route.name === "loading") return "#/search";
     if (route.name === "miss" || route.name === "error") {
       return `#/search?q=${encodeURIComponent(route.query || "")}&type=${encodeURIComponent(route.type || "auto")}`;
@@ -1616,6 +1617,11 @@
         if (id) return { name: "reverse", id };
       }
       if (decoded === "translate" || decoded === "translator") return { name: "translator" };
+      if (decoded === "reader") return { name: "reader" };
+      if (decoded.startsWith("reader/")) {
+        const hash = decoded.slice(7).trim();
+        if (hash) return { name: "reader", hash };
+      }
     } catch (_) {
       return { name: "home" };
     }
@@ -1909,7 +1915,7 @@
     const apply = () => {
       state.route = route;
       screen.dataset.page = route.name;
-      state.module = route.name === "translator" ? "translator" : "dictionary";
+      state.module = route.name === "translator" ? "translator" : route.name === "reader" ? "reader" : "dictionary";
       updateModuleBar();
       closeTranslationWorkspace({ immediate: true });
       closeSheet({ immediate: true });
@@ -2061,6 +2067,11 @@
       }
       case "translator":
         return translatorPage();
+
+      case "reader": {
+        window.setTimeout(() => window.TALK_DOC_READER?.render(route), 0);
+        return `<section class="reader-page" data-reader-root><div class="reader-loading"><span class="live-dot"></span> 正在准备精读…</div></section>`;
+      }
       case "loading":
         return loadingPage(route.query, route.type);
       case "miss":
@@ -7749,6 +7760,61 @@
     }
   }
 
+  /* ------------------------------------------------------------
+     Model bridge for add-on modules (the reader calls only this).
+     ------------------------------------------------------------ */
+
+  async function completeJSON({ system, user, maxTokens = 1800, signal } = {}) {
+    const cfg = state.settings;
+    if (!hasModelConfig(cfg)) throw new Error("还没有可用的模型，请先在设置里添加。");
+    const messages = [
+      { role: "system", content: String(system || "") },
+      { role: "user", content: JSON.stringify(user ?? {}) }
+    ];
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
+    const abort = () => controller.abort();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener("abort", abort, { once: true });
+    }
+    try {
+      const endpoint = endpointFor(cfg.baseUrl, cfg);
+      const response = await postChat(endpoint, cfg, messages, controller.signal, true, maxTokens);
+      if (!response.ok) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(`接口返回 HTTP ${response.status}${detail ? `：${detail.slice(0, 140)}` : ""}`);
+      }
+      const payload = await readJsonResponse(response, "接口");
+      const content = payload?.choices?.[0]?.message?.content
+        ?? (payload?.candidates?.[0]?.content?.parts || []).map((part) => part.text).join("")
+        ?? "";
+      if (!String(content).trim()) throw new Error("模型返回了空内容，请重试。");
+      let text = String(content).trim();
+      text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+      try {
+        return JSON.parse(text);
+      } catch (_) {
+        const start = text.indexOf("{");
+        const end = text.lastIndexOf("}");
+        if (start !== -1 && end > start) {
+          try { return JSON.parse(text.slice(start, end + 1)); } catch (_) { /* fall through */ }
+        }
+        throw new Error(`模型返回的 JSON 无法解析：${text.slice(0, 120)}`);
+      }
+    } finally {
+      window.clearTimeout(timer);
+      if (signal) signal.removeEventListener("abort", abort);
+    }
+  }
+
+  window.TALK_LLM = {
+    completeJSON,
+    getLevel: () => state.settings?.sentenceLevel || "gaokao",
+    getLang: () => uiLang(),
+    englishDirective: () => englishDirective()
+  };
+
   function unwrapModel(raw) {
     if (!raw || typeof raw !== "object") return {};
     if (raw.data && typeof raw.data === "object") return raw.data;
@@ -8091,12 +8157,14 @@
 
       case "module": {
         event.preventDefault();
-        const module = target.dataset.module === "translator" ? "translator" : "dictionary";
+        const requested = target.dataset.module;
+        const module = requested === "translator" ? "translator" : requested === "reader" ? "reader" : "dictionary";
         if (module === state.module) break;
         state.module = module;
         tapFeedback();
         closeAllWordLayers({ immediate: true });
         if (module === "translator") navigate({ name: "translator" }, { replace: false });
+        else if (module === "reader") navigate({ name: "reader" }, { replace: false });
         else navigate({ name: "home" }, { replace: false });
         break;
       }
