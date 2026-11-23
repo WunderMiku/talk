@@ -105,7 +105,7 @@
   };
 
   const EN_TO_ZH = Object.fromEntries(Object.entries(DICT).map(([zh, en]) => [en, zh]));
-  const SKIP = ".reverse-markdown, .sentence-stage, .translation-text, .example-zh, .word-gloss, .word-short, .meaning-card, .example-card, .hero-note, .insight, .summary-card, .word-title, .chunk-title, .model-raw, input, textarea, select, script, style";
+  const SKIP = ".reverse-markdown, .sentence-stage, .translation-text, .example-zh, .word-gloss, .word-short, .meaning-card, .example-card, .hero-note, .insight, .summary-card, .word-title, .chunk-title, .model-raw";
 
   let lang = DEFAULT_LANG;
   let observer = null;
@@ -131,10 +131,12 @@
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
-    if (node.closest(SKIP)) return;
+    if (node.closest("script, style")) return;
     ["placeholder", "title", "aria-label"].forEach((name) => {
       const value = node.getAttribute(name);
-      if (value) node.setAttribute(name, swap(value));
+      if (!value) return;
+      const next = swap(value);
+      if (next !== value) node.setAttribute(name, next);
     });
   }
 
@@ -162,7 +164,13 @@
       window.clearTimeout(timer);
       timer = window.setTimeout(() => apply(document.body), 60);
     });
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["placeholder", "title", "aria-label"]
+    });
   }
 
   function set(next) {
