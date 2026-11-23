@@ -49,10 +49,19 @@
 .reader-progress { font: 11px/1 var(--font-mono, monospace); color: var(--muted); margin-right: auto; }
 .reader-toggle { display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; color: var(--muted); }
 .reader-toggle input { accent-color: var(--accent); }
+.reader-format { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--muted); }
+.reader-format select {
+  font: 11px/1.4 var(--font-mono, monospace); color: var(--ink);
+  background: var(--field); border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 8px;
+}
 
 /* ---------- sheet ---------- */
 
 .reader-sheet {
+  max-width: var(--reader-page-width, 794px);
+  min-height: var(--reader-page-height, 0);
+  margin-inline: auto;
   background: var(--surface-card, var(--card)); color: var(--ink);
   border: 1px solid var(--border); border-radius: var(--radius-md, 16px);
   padding: 34px clamp(18px, 4vw, 46px) 40px;
@@ -138,10 +147,10 @@
   .module-bar, .stage-hint, .topbar, .cache-corner, .grain, .toast,
   .reader-toolbar, .reader-loading, .reader-input, .live-preview, .reader-skeleton { display: none !important; }
   .reader-doc { padding: 0 !important; }
-  .reader-sheet { padding: 0 !important; }
+  .reader-sheet { padding: 0 !important; max-width: none !important; min-height: 0 !important; }
   .reader-cover { break-after: page; page-break-after: always; padding-bottom: 14mm; border-bottom: 0; }
   .reader-sheet.hide-cover .reader-cover { display: none !important; }
-  .reader-body { column-count: 2; column-gap: 8mm; }
+  .reader-body { column-count: var(--reader-columns, 2); column-gap: 8mm; }
   .reader-block, .reader-heading, .reader-focus, .reader-notes { break-inside: avoid; page-break-inside: avoid; }
   .reader-block { margin-bottom: 7mm; }
   .reader-heading { margin-top: 8mm; }

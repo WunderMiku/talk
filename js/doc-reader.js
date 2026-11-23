@@ -11,6 +11,13 @@
   const CONCURRENCY = 3;
   const RETRIES = 1;
   const LEVELS = ["gaokao", "cet4", "cet6", "kaoyan", "ielts", "toefl", "advanced"];
+  const FORMATS = {
+    a4: { label: ["A4 竖版", "A4 portrait"], size: "A4 portrait", width: "210mm", height: "297mm", columns: 2, margin: "18mm 16mm 16mm" },
+    a4l: { label: ["A4 横版", "A4 landscape"], size: "A4 landscape", width: "297mm", height: "210mm", columns: 3, margin: "14mm 14mm 12mm" },
+    a5: { label: ["A5 小册", "A5 booklet"], size: "A5 portrait", width: "148mm", height: "210mm", columns: 2, margin: "14mm 12mm 12mm" },
+    letter: { label: ["Letter", "Letter"], size: "Letter portrait", width: "216mm", height: "279mm", columns: 2, margin: "18mm 16mm 16mm" }
+  };
+  const FORMAT_KEY = "talk.reader.format.v1";
   const LEVEL_NAMES = {
     gaokao: "高考", cet4: "CET-4", cet6: "CET-6", kaoyan: "考研",
     ielts: "雅思", toefl: "托福", advanced: "精翻"
@@ -28,10 +35,41 @@
     showCover: true,
     showFocus: true,
     showNotes: true,
+    format: "a4",
     lastError: ""
   };
 
   let dbPromise = null;
+
+  function formatOf() {
+    return FORMATS[S.format] || FORMATS.a4;
+  }
+
+  function applyFormat() {
+    const format = formatOf();
+    document.documentElement.dataset.readerPaper = S.format;
+    let style = document.getElementById("reader-page-style");
+    if (!style) {
+      style = document.createElement("style");
+      style.id = "reader-page-style";
+      document.head.appendChild(style);
+    }
+    style.textContent = `@media print { @page { size: ${format.size}; margin: ${format.margin}; } }`;
+    const sheet = document.querySelector(".reader-sheet");
+    if (sheet) {
+      sheet.style.setProperty("--reader-page-width", format.width);
+      sheet.style.setProperty("--reader-page-height", format.height);
+      sheet.style.setProperty("--reader-columns", String(format.columns));
+    }
+  }
+
+  function setFormat(next) {
+    if (!FORMATS[next]) return;
+    S.format = next;
+    try { localStorage.setItem(FORMAT_KEY, next); } catch (_) { /* no-op */ }
+    applyFormat();
+    renderShell();
+  }
 
   function t(zh, en) {
     return window.TALK_LLM?.getLang?.() === "en" ? en : zh;
@@ -285,6 +323,7 @@
           <label class="reader-toggle"><input type="checkbox" data-reader-toggle="cover" ${S.showCover ? "checked" : ""}> ${t("封面", "Cover")}</label>
           <label class="reader-toggle"><input type="checkbox" data-reader-toggle="focus" ${S.showFocus ? "checked" : ""}> ${t("长难句", "Hard sentences")}</label>
           <label class="reader-toggle"><input type="checkbox" data-reader-toggle="notes" ${S.showNotes ? "checked" : ""}> ${t("词注", "Notes")}</label>
+          <label class="reader-format"><span>${t("纸型", "Paper")}</span><select data-reader-format aria-label="${t("纸张与比例", "Paper size")}">${Object.entries(FORMATS).map(([id, format]) => `<option value="${id}"${S.format === id ? " selected" : ""}>${format.label[window.TALK_LLM?.getLang?.() === "en" ? 1 : 0]}</option>`).join("")}</select></label>
           ${running ? `<button class="btn btn-ghost" type="button" data-reader-action="pause">${t("暂停", "Pause")}</button>` : ""}
           ${!running && p.done < p.total ? `<button class="btn btn-ghost" type="button" data-reader-action="resume">${t("继续", "Resume")}</button>` : ""}
           <button class="btn btn-primary" type="button" data-reader-action="print">${t("打印 / PDF", "Print / PDF")}</button>
@@ -297,6 +336,7 @@
         </article>
         ${S.errors.length ? `<p class="reader-error">${esc(S.errors.slice(-2).join("；"))}</p>` : ""}
       </div>`;
+    applyFormat();
   }
 
   function coverHtml() {
@@ -571,6 +611,7 @@
   document.addEventListener("change", (event) => {
     const target = event.target;
     if (target?.id === "reader-file") void openFile(target.files?.[0]);
+    if (target?.dataset?.readerFormat !== undefined && target?.tagName === "SELECT") setFormat(target.value);
     const toggle = target?.dataset?.readerToggle;
     if (toggle) {
       if (toggle === "cover") { S.showCover = target.checked; }
@@ -595,6 +636,11 @@
     const file = event.dataTransfer?.files?.[0];
     if (file) void openFile(file);
   });
+
+  try {
+    const saved = localStorage.getItem(FORMAT_KEY);
+    if (saved && FORMATS[saved]) S.format = saved;
+  } catch (_) { /* no-op */ }
 
   window.TALK_DOC_READER = { render, start, state: S };
 })();
