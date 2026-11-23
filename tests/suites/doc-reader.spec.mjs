@@ -30,7 +30,7 @@ suite("reader · long text", { timeout: 90_000 }, (s) => {
     t.expect(await page.locator(".cover-title-zh").innerText()).toBe("条约的静默掏空");
     t.expect(await page.locator("[data-reader-block]").count()).toBeGreaterThan(0);
     t.expect(await page.locator(".sidenote-item").count()).toBeGreaterThan(0);
-    t.expect(await page.locator(".reader-anchor").count()).toBeGreaterThan(0);
+    t.expect(await page.locator(".term-sup").count()).toBeGreaterThan(0);
     t.expect(await page.evaluate(() => location.hash.startsWith("#/reader/"))).toBe(true);
 
     const calls = state.env.server.mock.requestsOf("docBlock").length;

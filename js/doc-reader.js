@@ -200,7 +200,7 @@
       html += escapeParagraphs(source.slice(index, match.index));
       if (number) {
         const note = marks[number - 1];
-        html += `<span class="reader-term term-mark">${esc(found)}</span><sup class="reader-anchor" data-note="${number}" title="${esc(note.inContextZh || "")}">${number}</sup>`;
+        html += `<span class="term-mark" data-note="${number}" title="${esc(note.inContextZh || "")}">${esc(found)}<sup class="term-sup">${number}</sup></span>`;
       } else {
         html += escapeParagraphs(found);
       }
@@ -375,31 +375,40 @@
       </div>`;
   }
 
+  function pendingSheet() {
+    return `<article class="rb-sheet"><header class="masthead"><span class="brand-mark">talk.</span><span class="masthead-meta">${t("正在写导读", "WRITING")}</span></header><div class="reader-skeleton"></div></article>`;
+  }
+
   function renderShell() {
     const root = S.root;
     if (!root) return;
     if (!S.doc) { renderInput(); return; }
     const p = progress();
     const running = S.status === "running";
-    const lang = window.TALK_LLM?.getLang?.() === "en" ? 1 : 0;
-    const cover = S.overview ? coverHtml() : `<div class="reader-cover is-pending"><div class="reader-skeleton"></div><p>${t("正在写导读…", "Writing the guide…")}</p></div>`;
     const chip = (key, label) => `<button class="level-chip${S[key] ? " active" : ""}" type="button" data-reader-action="option" data-key="${key}" aria-pressed="${!!S[key]}">${label}</button>`;
+    const percent = p.total ? Math.round((p.done / p.total) * 100) : 0;
     root.innerHTML = `
-      <div class="reader-doc${S.focusEn ? " reader-focus-en" : ""}" id="reader-doc">
-        <header class="reader-bar">
-          <span class="reader-brand">talk<i>.</i></span>
-          <button class="reader-bar-back" type="button" data-reader-action="back">← ${t("换一篇", "New text")}</button>
-          <span class="reader-bar-progress mono">${p.done}/${p.total}</span>
-          <button class="btn btn-primary reader-bar-export" type="button" data-reader-action="options">${t("导出 PDF", "Export PDF")}</button>
-        </header>
-        <div class="reader-progress" role="progressbar" aria-valuemin="0" aria-valuemax="${p.total}" aria-valuenow="${p.done}"><i style="width:${p.total ? Math.round((p.done / p.total) * 100) : 0}%"></i><span class="reader-progress-label mono">${p.done}/${p.total} · ${p.total ? Math.round((p.done / p.total) * 100) : 0}%</span></div>
-        ${running ? `<div class="reader-running"><span class="reader-typing"><i></i><i></i><i></i></span>${t("正在精读", "Reading")} ${p.done}/${p.total}${p.done < p.total ? ` · <button class="reader-inline-action" type="button" data-reader-action="pause">${t("暂停", "Pause")}</button>` : ""}</div>` : ""}
-        ${!running && p.done < p.total ? `<div class="reader-running is-paused">${t("还有", "Still")} ${p.total - p.done} ${t("段没读", "passages left")} · <button class="reader-inline-action" type="button" data-reader-action="resume">${t("继续", "Resume")}</button></div>` : ""}
-        <article class="reader-sheet${S.showCover ? "" : " hide-cover"}">
-          ${cover}
-          <main class="reader-body" data-reader-body>${bodyHtml()}</main>
+      <div class="reader-book${S.focusEn ? " reader-focus-en" : ""}" id="reader-root">
+        <div class="control-bar">
+          <div class="ctrl-left">
+            <button type="button" class="ctrl-back" data-reader-action="back" aria-label="${t("换一篇", "New text")}">←</button>
+            <span class="ctrl-brand">talk. <span class="ctrl-sub">${t("精读本样刊", "Reader folio")}</span></span>
+            <span class="ctrl-progress">${p.done}/${p.total}</span>
+            <div class="ctrl-pill-group" role="group" aria-label="${t("切换出版主题", "Theme")}">${themePills()}</div>
+          </div>
+          <div class="ctrl-right">
+            <button type="button" class="ctrl-toggle${S.focusEn ? " active" : ""}" data-reader-action="focus-en" aria-pressed="${!!S.focusEn}">${t("专注英文", "English only")}</button>
+            <button type="button" class="ctrl-print" data-reader-action="print">${t("打印 / PDF", "Print / PDF")}</button>
+            ${running ? `<span class="ctrl-progress">${t("精读中", "reading")} ${percent}%</span>` : ""}
+            <button type="button" class="ctrl-theme-btn" data-reader-action="options">${t("更多", "More")}</button>
+          </div>
+        </div>
+        <div class="book-stack" id="book-stack">
+          ${S.overview ? coverHtml() : pendingSheet()}
+          ${bodyHtml()}
+          ${selfTestHtml()}
           ${S.showAppendix ? appendixHtml() : ""}
-        </article>
+        </div>
         ${S.errors.length ? `<p class="reader-error">${esc(S.errors.slice(-2).join("；"))}</p>` : ""}
         <div class="reader-options" data-reader-options hidden>
           <div class="reader-options-backdrop" data-reader-action="close-options"></div>
@@ -413,14 +422,7 @@
               ${chip("showFocus", t("长难句", "Hard sentence"))}
               ${chip("showNotes", t("词注", "Notes"))}
               ${chip("showAppendix", t("词汇总表", "Glossary"))}
-              ${chip("focusEn", t("专注英文", "English only"))}
             </div>
-            <label class="reader-format">
-              <span>${t("纸型", "Paper")}</span>
-              <select data-reader-format aria-label="${t("纸张与比例", "Paper size")}">
-                ${Object.entries(FORMATS).map(([id, format]) => `<option value="${id}"${S.format === id ? " selected" : ""}>${format.label[lang]}</option>`).join("")}
-              </select>
-            </label>
             <button class="btn btn-primary reader-options-print" type="button" data-reader-action="print">${t("开始打印 / 存为 PDF", "Start printing / Save as PDF")}</button>
             <button class="btn btn-ghost reader-options-refresh" type="button" data-reader-action="refresh">${t("重新精读", "Re-read this text")}</button>
             <p class="reader-print-hint">${t("打印时请勾选「背景图形」，以保留主题纸底与高亮。", "In the print dialog, enable “Background graphics” to keep the paper and highlights.")}</p>
@@ -430,21 +432,31 @@
     applyFormat();
   }
 
+  function themePills() {
+    const list = window.TALK_THEME?.list?.() || [];
+    const current = window.TALK_THEME?.current?.()?.id || "paper";
+    return `<select class="ctrl-theme-select" data-reader-theme aria-label="${t("切换出版主题", "Theme")}">${list.map((theme) => `<option value="${attr(theme.id)}"${theme.id === current ? " selected" : ""}>${esc(theme.label)}</option>`).join("")}</select>`;
+  }
+
   function sheetMasthead() {
     const theme = window.TALK_THEME?.current?.() || {};
-    return `<header class="masthead"><span class="brand-mark">talk.</span><span class="masthead-meta mono">${esc((theme.label || "Paper").toUpperCase())} · ${t("精读本", "READER")}</span></header>`;
+    return `<header class="masthead"><span class="brand-mark">talk.</span><span class="masthead-meta" data-masthead-label>${esc((theme.label || "Paper").toUpperCase())} · ${t("精读本", "READER")}</span></header>`;
   }
 
   function sheetFoot(page) {
-    return `<footer class="sheet-foot"><span>${t("把词，看透。", "See a word through.")}</span><span class="sheet-foot-mono mono">WUNDERMIKU.GITHUB.IO/TALK · P.${String(page).padStart(2, "0")}</span></footer>`;
+    return `<footer class="sheet-foot"><span>${t("把词，看透。", "See a word through.")}</span><span class="sheet-foot-mono">WUNDERMIKU.GITHUB.IO/TALK · P.${String(page).padStart(2, "0")}</span></footer>`;
   }
 
   function secBar(num, title, sub) {
-    return `<div class="sec-bar"><span class="sec-num">${esc(num)}</span><span class="sec-title">${esc(title)}</span><span class="sec-rule"></span><span class="sec-sub mono">${esc(sub)}</span></div>`;
+    return `<div class="sec-bar"><span class="sec-num">${esc(num)}</span><span class="sec-title">${esc(title)}</span><span class="sec-rule"></span><span class="sec-sub">${esc(sub)}</span></div>`;
   }
 
   function paragraphs(text) {
     return String(text || "").split(/\n{2,}/).map((chunk) => `<p>${esc(chunk.trim())}</p>`).join("");
+  }
+
+  function minutesOf(doc) {
+    return Math.max(2, Math.round((doc.wordCount || 0) / 180));
   }
 
   function coverHtml() {
@@ -452,142 +464,146 @@
     const doc = S.doc;
     const count = doc.blocks.filter((b) => b.type === "passage").length;
     return `
-      <article class="rv-sheet">
+      <article class="rb-sheet">
         ${sheetMasthead()}
-        <div class="cover-genre">${esc(o.genre || t("精读", "Close reading"))} · ${esc(o.tone || "")}</div>
+        <div class="cover-genre">${esc(o.genre || t("精读", "Close reading"))}${o.tone ? ` · ${esc(o.tone)}` : ""}</div>
         <h1 class="cover-title-zh">${esc(o.titleZh)}</h1>
         ${doc.title ? `<p class="cover-title-en">${esc(doc.title)}</p>` : ""}
         ${o.subtitle ? `<p class="cover-subtitle">${esc(o.subtitle)}</p>` : ""}
-        <div class="cover-stats mono">${doc.wordCount} ${t("词", "WORDS")} · ${count} ${t("节", "SECTIONS")} · ${t("按", "LEVEL")} ${esc(LEVEL_NAMES[doc.level] || doc.level)} ${t("取词", "")}</div>
-        ${o.summary ? `${secBar("01", t("导读概览", "Overview"), t("PRE-READING", "PRE-READING"))}<div class="t-card"><span class="card-kicker">“ ${t("整篇主旨", "SUMMARY")}</span><p class="summary-prose">${esc(o.summary)}</p></div>` : ""}
-        ${o.readingTips.length ? `${secBar("02", t("精读前提示", "Noticing cues"), t("NOTICING CUES", "NOTICING CUES"))}<ul class="tips-list">${o.readingTips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>` : ""}
-        ${o.glossary.length ? `${secBar("03", t("全篇统一术语锚点", "Global glossary"), t("GLOBAL GLOSSARY", "GLOBAL GLOSSARY"))}<div class="glossary-grid">${o.glossary.map((item) => `<div class="gloss-item"><div class="gloss-head"><span class="gloss-en">${esc(item.term)}</span><span class="gloss-zh">${esc(item.zh)}</span></div>${item.note ? `<p class="gloss-note">${esc(item.note)}</p>` : ""}</div>`).join("")}</div>` : ""}
+        <div class="cover-stats"><span>${doc.wordCount} ${t("WORDS", "WORDS")}</span><span>${count} ${t("SECTIONS", "SECTIONS")}</span><span>${t("约", "about")} ${minutesOf(doc)} ${t("分钟精读", "min")}</span><span>TUFTE ${t("眉批", "notes")} + ${t("康奈尔自测", "Cornell review")}</span></div>
+        ${o.summary ? `${secBar("01", t("导读概览", "Overview"), "PRE-READING")}<div class="t-card"><span class="card-kicker">“ ${t("整篇主旨", "SUMMARY")}</span><p class="summary-prose">${esc(o.summary)}</p></div>` : ""}
+        ${o.readingTips.length ? `${secBar("02", t("精读前提示", "Noticing cues"), "NOTICING CUES")}<ul class="tips-list">${o.readingTips.map((tip) => `<li>${esc(tip)}</li>`).join("")}</ul>` : ""}
+        ${o.glossary.length ? `${secBar("03", t("全篇统一术语锚点", "Global glossary"), "GLOBAL GLOSSARY")}<div class="glossary-grid">${o.glossary.map((item) => `<div class="gloss-item"><div class="gloss-head"><span class="gloss-en">${esc(item.term)}</span><span class="gloss-zh">${esc(item.zh)}</span></div>${item.note ? `<p class="gloss-note">${esc(item.note)}</p>` : ""}</div>`).join("")}</div>` : ""}
         ${sheetFoot(1)}
       </article>`;
   }
 
-  function bodyHtml() {
-    const doc = S.doc;
-    const sheets = [];
-    let current = null;
-    (doc.blocks || []).forEach((block) => {
+  function sectionGroups() {
+    const groups = [];
+    let cur = null;
+    (S.doc.blocks || []).forEach((block) => {
       if (block.type === "heading") {
-        if (current && current.parts.length) sheets.push(current);
-        current = { heading: block.text, parts: [] };
-        return;
+        if (cur && cur.parts.length) groups.push(cur);
+        cur = { heading: block.text, parts: [] };
+      } else {
+        if (!cur) cur = { heading: "", parts: [] };
+        cur.parts.push(block);
       }
-      if (!current) current = { heading: "", parts: [] };
-      current.parts.push(block);
     });
-    if (current && current.parts.length) sheets.push(current);
-    return sheets.map((sheet, index) => sectionSheetHtml(sheet, index + 1)).join("");
+    if (cur) groups.push(cur);
+    return groups;
   }
 
-  function sectionSheetHtml(sheet, sectionNo) {
-    const words = sheet.parts.reduce((sum, block) => sum + (block.words || wordsOf(block.text)), 0);
-    const title = sheet.heading || `${t("精读", "Reading")} ${String(sectionNo).padStart(2, "0")}`;
-    const main = sheet.parts.map((block, partNo) => passageBodyHtml(block, partNo)).join("");
-    const notes = sheet.parts.map((block, partNo) => notesColumnHtml(block, partNo)).join("");
+  function bodyHtml() {
+    return sectionGroups().map((group, index) => sectionSheetHtml(group, index + 1)).join("");
+  }
+
+  function sectionSheetHtml(group, sectionNo) {
+    const words = group.parts.reduce((sum, block) => sum + wordsOf(block.text), 0);
+    const main = group.parts.map((block) => `<div class="reader-part" data-reader-block="${passageNumber(block)}">${passageBodyHtml(block)}</div>`).join("");
+    const notes = group.parts.map((block) => notesColumnHtml(block)).join("");
+    const title = group.heading || t("精读", "Close reading") + " " + sectionNo;
     return `
-      <article class="rv-sheet">
+      <article class="rb-sheet">
         ${sheetMasthead()}
-        ${secBar(`§${sectionNo}`, title, `${words} WORDS`)}
+        ${secBar("§" + sectionNo, title, words + " WORDS")}
         <div class="spread-grid">
-          <div class="spread-main">
-            ${sheet.heading && sheet.heading !== title ? `<h2 class="chapter-heading-en">${esc(sheet.heading)}</h2>` : ""}
+          <div>
+            ${group.heading ? `<h2 class="chapter-heading-en">${esc(group.heading)}</h2>` : ""}
             ${main}
           </div>
-          ${notes ? `<aside class="sidenotes-col" aria-label="${attr(t("本节语境眉批", "Context notes"))}">${notes}</aside>` : ""}
+          <aside class="sidenotes-col" aria-label="${t("本节语境眉批", "Sidenotes")}">${notes}</aside>
         </div>
         ${sheetFoot(sectionNo + 1)}
       </article>`;
   }
 
-  function passageBodyHtml(block, partNo) {
+  function passageBodyHtml(block) {
     const key = blockId(S.doc.docHash, block.hash);
     const result = S.blocks.get(key);
-    const number = passageNumber(block);
-    if (!result) {
-      return `<div class="reader-part is-pending" data-reader-block="${number}"><div class="reader-skeleton"></div><p class="reader-pending-note">${t("这一节正在精读…", "Reading this section…")}</p></div>`;
+    if (!result || result.pending) {
+      return `<div class="en-prose is-pending"><div class="reader-skeleton"></div></div>`;
     }
-    if (result.error) {
-      return `<div class="reader-part" data-reader-block="${number}"><p class="reader-error-line">${esc(result.error)}</p></div>`;
-    }
-    const sentences = Array.isArray(result.sentences) ? result.sentences : [];
-    const chunks = Array.isArray(result.chunks) ? result.chunks : [];
-    const craft = Array.isArray(result.craft) ? result.craft : [];
-    return `
-      <div class="reader-part" data-reader-block="${number}">
-        <div class="en-prose">${String(annotate(block.text, result.notes || []).html || "").split(/\n{2,}/).filter(Boolean).map((para) => `<p>${para}</p>`).join("")}</div>
-        ${result.translation ? `<div class="zh-trans-card"><span class="card-kicker">“ ${t("整段意译", "Translation")}</span><div class="zh-body">${paragraphs(result.translation)}</div></div>` : ""}
-        ${sentences.length ? `<div class="pdf-block"><div class="pdf-head small"><b class="pdf-num">01</b><h2>${t("句子解读", "Sentence by sentence")}</h2><i></i></div><ol class="reader-sentences">${sentences.map((row, i) => `<li class="reader-sentence"><span class="pdf-tick mono">${String(i + 1).padStart(2, "0")}</span><p class="rs-en">${esc(row.en)}</p>${row.zh ? `<p class="rs-zh">${esc(row.zh)}</p>` : ""}${row.role ? `<p class="rs-role mono">${esc(row.role)}${row.reading ? ` · ${esc(row.reading)}` : ""}</p>` : ""}</li>`).join("")}</ol></div>` : ""}
-        ${chunks.length ? `<div class="pdf-block"><div class="pdf-head small"><b class="pdf-num">02</b><h2>${t("意群分解", "Chunks")}</h2><i></i></div><div class="reader-chunks">${chunks.map((row) => `<div class="reader-chunk"><span class="rc-type mono">${esc(row.type)}</span><p class="rc-en">${esc(row.en)}</p>${row.zh ? `<p class="rc-zh">${esc(row.zh)}</p>` : ""}</div>`).join("")}</div></div>` : ""}
-        ${craft.length ? `<div class="pdf-block"><div class="pdf-head small"><b class="pdf-num">03</b><h2>${t("句子刻画", "Craft")}</h2><i></i></div><div class="reader-craft">${craft.map((row) => `<div class="reader-craft-item"><span class="pdf-craft-name mono">${esc(row.name)}</span><p class="pdf-craft-en">${esc(row.en)}</p>${row.effect ? `<p class="pdf-craft-effect">${esc(row.effect)}</p>` : ""}</div>`).join("")}</div></div>` : ""}
-        ${result.focusSentence?.en ? `<div class="focus-card"><span class="card-kicker">${t("焦点难句", "Hard sentence")}</span><p class="focus-en">${esc(result.focusSentence.en)}</p>${result.focusSentence.why ? `<p class="focus-why">${esc(result.focusSentence.why)}</p>` : ""}</div>` : ""}
-      </div>`;
+    const marked = annotate(block.text, result.notes || []);
+    const english = String(marked.html || "").split(/\n{2,}/).filter(Boolean).map((para) => `<p>${para}</p>`).join("");
+    const focus = result.focusSentence && S.showFocus
+      ? `<div class="focus-card"><span class="card-kicker">${t("焦点难句 · 信息结构", "FOCUS SENTENCE")}</span><p class="focus-en">${esc(result.focusSentence.en)}</p>${result.focusSentence.why ? `<p class="focus-why">${esc(result.focusSentence.why)}</p>` : ""}</div>`
+      : "";
+    const trans = result.translation
+      ? `<div class="zh-trans-card"><span class="card-kicker">“ ${t("整段意译（可点顶部「专注英文」遮蔽）", "TRANSLATION")}</span><div class="zh-body">${paragraphs(result.translation)}</div></div>`
+      : "";
+    return `<div class="en-prose">${english}</div>${trans}${focus}`;
   }
 
-  function notesColumnHtml(block, partNo) {
+  function notesColumnHtml(block) {
     const key = blockId(S.doc.docHash, block.hash);
     const result = S.blocks.get(key);
-    if (!result || !result.notes?.length) return "";
+    if (!result || !result.notes?.length || !S.showNotes) return "";
     const source = String(block.text || "").toLowerCase();
     const notes = (result.notes || [])
       .filter((note) => source.includes(String(note.term || "").toLowerCase()))
       .slice()
       .sort((a, b) => source.indexOf(String(a.term).toLowerCase()) - source.indexOf(String(b.term).toLowerCase()));
-    return notes.map((note, i) => `
-      <div class="sidenote-item" data-note="${attr(note.term)}">
-        <span class="sn-num">${i + 1}</span>
-        <div>
-          <div class="sn-head"><span class="sn-term">${esc(note.term)}</span>${note.pos ? `<span class="sn-pos">${esc(note.pos)}</span>` : ""}${note.inContextZh ? `<span class="sn-zh">${esc(note.inContextZh)}</span>` : ""}</div>
-          ${note.nuance ? `<p class="sn-nuance">${esc(note.nuance)}</p>` : ""}
-          ${note.chunk ? `<span class="sn-chunk">${esc(note.chunk)}</span>` : ""}
-        </div>
+    return notes.map((note, index) => `
+      <div class="sidenote-item">
+        <span class="sn-num">${index + 1}</span>
+        <div class="sn-head"><span class="sn-term">${esc(note.term)}</span><span class="sn-pos">${esc(note.pos || "")}</span><span class="sn-zh">${esc(note.inContextZh)}</span></div>
+        ${note.nuance ? `<p class="sn-nuance">${esc(note.nuance)}</p>` : ""}
+        ${note.chunk ? `<span class="sn-chunk">${esc(note.chunk)}</span>` : ""}
       </div>`).join("");
   }
 
-  function appendixHtml() {
-    const seen = new Map();
-    let passageNo = 0;
-    (S.doc.blocks || []).forEach((block) => {
-      if (block.type !== "passage") return;
-      passageNo += 1;
-      const result = S.blocks.get(blockId(S.doc.docHash, block.hash));
-      if (!result) return;
-      (result.notes || []).forEach((note) => {
-        const key = note.term.toLowerCase();
-        if (!seen.has(key)) seen.set(key, { note, blocks: [] });
-        const row = seen.get(key);
-        if (!row.blocks.includes(passageNo)) row.blocks.push(passageNo);
+  function clozeItems() {
+    const items = [];
+    sectionGroups().forEach((group, sectionNo) => {
+      group.parts.forEach((block) => {
+        const result = S.blocks.get(blockId(S.doc.docHash, block.hash));
+        (result?.notes || []).slice(0, 2).forEach((note) => {
+          if (items.some((item) => item.term.toLowerCase() === note.term.toLowerCase())) return;
+          items.push({ section: sectionNo + 1, term: note.term, zh: note.inContextZh });
+        });
       });
     });
-    if (!seen.size) return "";
-    const rows = [...seen.values()].sort((a, b) => a.note.term.toLowerCase().localeCompare(b.note.term.toLowerCase()));
+    return items.slice(0, 8);
+  }
+
+  function selfTestHtml() {
+    const items = clozeItems();
+    if (!items.length) return "";
     return `
-      <article class="rv-sheet reader-appendix">
+      <article class="rb-sheet">
         ${sheetMasthead()}
-        ${secBar("§", t("词汇总表", "Glossary"), `${rows.length} ${t("条", "TERMS")}`)}
-        <div class="glossary-grid">
-          ${rows.map(({ note, blocks }) => `<div class="gloss-item"><div class="gloss-head"><span class="gloss-en">${esc(note.term)}</span>${note.pos ? `<span class="gloss-pos mono">${esc(note.pos)}</span>` : ""}<span class="gloss-zh">${esc(note.inContextZh)}</span><span class="gloss-ref mono">${blocks.map((n) => `§${n}`).join(" ")}</span></div>${note.nuance ? `<p class="gloss-note">${esc(note.nuance)}</p>` : ""}</div>`).join("")}
+        ${secBar("04", t("遮住答案自测", "Self-test"), "RETRIEVAL PRACTICE")}
+        <div class="cloze-list">
+          ${items.map((item, index) => `<div class="cloze-item"><span class="cloze-num">${index + 1}</span><p class="cloze-line"><strong>${esc(item.term)}</strong><span class="cloze-zh">${esc(item.zh)}</span><span class="cloze-blank">（${t("回忆", "recall")}）</span></p></div>`).join("")}
         </div>
-        ${sheetFoot(99)}
+        ${secBar("05", t("康奈尔笔记", "Cornell notes"), "REFLECTION")}
+        <div class="cornell-lines">${Array.from({ length: 5 }).map(() => `<div class="cornell-line"></div>`).join("")}</div>
+        <div class="print-answer-key">${items.map((item, index) => `${index + 1}. ${esc(item.term)} — ${esc(item.zh)}`).join("　　")}</div>
+        ${sheetFoot(sectionGroups().length + 2)}
       </article>`;
   }
 
-  function updateBlock(block, result, number) {
-    const doc = S.doc;
-    const body = document.querySelector("[data-reader-body]");
-    if (!body) return;
-    const holder = document.createElement("div");
-    holder.innerHTML = blockHtml(block, result, number);
-    const next = holder.firstElementChild;
-    const old = body.querySelector(`[data-reader-block="${number}"]`);
-    if (old && old.parentNode) old.replaceWith(next);
-    else body.appendChild(next);
+  function appendixHtml() {
+    const o = S.overview;
+    if (!o?.glossary?.length) return "";
+    return `
+      <article class="rb-sheet">
+        ${sheetMasthead()}
+        ${secBar("A", t("词汇总表", "Glossary"), "APPENDIX")}
+        <div class="appendix-grid">
+          ${o.glossary.map((item) => `<div class="app-item"><div class="app-head"><span class="app-en">${esc(item.term)}</span><span class="app-zh">${esc(item.zh)}</span></div>${item.note ? `<p class="app-zh">${esc(item.note)}</p>` : ""}</div>`).join("")}
+        </div>
+        ${sheetFoot(sectionGroups().length + 3)}
+      </article>`;
   }
 
-  /* ---------------- pipeline ---------------- */
+  function updateBlock() {
+    const screen = document.querySelector(".screen");
+    const top = screen ? screen.scrollTop : 0;
+    renderShell();
+    if (screen) screen.scrollTop = top;
+  }
 
   async function start(text, filename = "") {
     const root = S.root;
@@ -812,12 +828,18 @@
     }
     else if (action === "refresh") { closeOptions(); void refreshDoc(); }
     else if (action === "print") { document.documentElement.classList.add("reader-printing"); window.print(); window.setTimeout(() => document.documentElement.classList.remove("reader-printing"), 800); }
+    else if (action === "focus-en") { S.focusEn = !S.focusEn; renderShell(); }
+
   });
 
   document.addEventListener("change", (event) => {
     const target = event.target;
     if (target?.id === "reader-file") void openFile(target.files?.[0]);
     if (target?.dataset?.readerFormat !== undefined && target?.tagName === "SELECT") setFormat(target.value);
+    if (target?.dataset?.readerTheme !== undefined && target?.tagName === "SELECT") {
+      window.TALK_THEME?.apply?.(target.value);
+      renderShell();
+    }
   });
 
   document.addEventListener("dragover", (event) => {

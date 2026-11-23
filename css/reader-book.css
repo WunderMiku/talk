@@ -1,0 +1,886 @@
+/* Reader book — ported from the sample sheet, themed by the app's tokens. */
+.reader-book {
+  --paper-deep: color-mix(in srgb, var(--paper) 84%, var(--ink));
+  --card-soft: color-mix(in srgb, var(--card) 84%, var(--paper));
+  --ink-soft: color-mix(in srgb, var(--ink) 78%, var(--paper));
+  --line-strong: var(--ink);
+  --badge-bg: var(--ink);
+  --badge-fg: var(--paper);
+  --accent-wash: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-ink: color-mix(in srgb, var(--accent) 65%, var(--ink));
+  --cut-clip: none;
+  --grid-bg: none;
+  --grid-size: auto;
+  --font-en: 'Newsreader', Georgia, serif;
+  --font-zh-display: 'Noto Serif SC', Georgia, serif;
+  --font-ui: 'Plus Jakarta Sans', 'Noto Sans SC', sans-serif;
+  --font-body: 'Noto Sans SC', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  background: color-mix(in srgb, var(--ink) 5%, var(--paper));
+  min-height: 100%;
+}
+
+/* The app already has a .sheet modal; keep the book sheets out of its rules. */
+.reader-book .rb-sheet { position: relative; display: block; }
+
+    .control-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      background: rgba(29, 26, 22, 0.92);
+      backdrop-filter: blur(8px);
+      color: #F5F1E8;
+      padding: 10px clamp(14px, 4vw, 32px);
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13px;
+    }
+
+    .ctrl-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-brand {
+      font-family: var(--font-ui);
+      font-weight: 800;
+      font-size: 15px;
+      letter-spacing: -0.02em;
+    }
+
+    .ctrl-pill-group {
+      display: inline-flex;
+      background: rgba(255,255,255,0.1);
+      padding: 2px;
+      border-radius: 999px;
+      gap: 2px;
+    }
+
+    .ctrl-theme-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      color: rgba(255,255,255,0.72);
+      transition: all 0.14s ease;
+    }
+
+    .ctrl-theme-btn.active {
+      background: #FFFFFF;
+      color: #161616;
+      font-weight: 600;
+    }
+
+    .ctrl-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .ctrl-toggle {
+      padding: 5px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,0.28);
+      font-size: 12px;
+      color: #F5F1E8;
+      transition: all 0.14s ease;
+    }
+
+    .ctrl-toggle.active {
+      background: #FFFA00;
+      color: #161616;
+      border-color: #FFFA00;
+      font-weight: 600;
+    }
+
+    .ctrl-print {
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: #FFFFFF;
+      color: #161616;
+      font-size: 12px;
+      font-weight: 700;
+      transition: opacity 0.14s ease;
+    }
+
+    .ctrl-print:hover { opacity: 0.9; }
+
+    /* Publication Sheet Stack (A4 Proportions on Desktop) */
+    .book-stack {
+      max-width: 900px;
+      margin: 28px auto 0;
+      padding: 0 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+    }
+
+    .rb-sheet {
+      background-color: var(--paper);
+      background-image: var(--grid-bg);
+      background-size: var(--grid-size);
+      padding: clamp(24px, 5vw, 52px) clamp(20px, 5vw, 54px);
+      box-shadow: 0 20px 50px -30px rgba(23, 20, 15, 0.35);
+      border: 1px solid var(--line);
+      position: relative;
+    }
+
+    /* Masthead & Footer (talk. Signature) */
+    .masthead {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      padding-bottom: 14px;
+      border-bottom: 1.5px solid var(--line-strong);
+      margin-bottom: 28px;
+    }
+
+    .brand-mark {
+      font-family: var(--font-ui);
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--ink);
+    }
+
+    .masthead-meta {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .sheet-foot {
+      margin-top: 38px;
+      padding-top: 14px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .sheet-foot-mono {
+      font-family: var(--font-mono);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    /* Section Header Bar: [01] Title ————— SUB */
+    .sec-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 28px 0 16px;
+    }
+
+    .sec-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      background: var(--badge-bg);
+      color: var(--badge-fg);
+      border-radius: calc(var(--radius) * 0.4);
+      flex-shrink: 0;
+    }
+
+    .sec-title {
+      font-family: var(--font-zh-display);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .sec-rule {
+      flex: 1;
+      height: 1px;
+      background: var(--line-strong);
+      opacity: 0.45;
+    }
+
+    .sec-sub {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    /* Cover Typography */
+    .cover-genre {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--accent-ink);
+      letter-spacing: 0.06em;
+      margin-bottom: 10px;
+    }
+
+    .cover-title-zh {
+      font-family: var(--font-zh-display);
+      font-size: clamp(28px, 4.2vw, 40px);
+      font-weight: 900;
+      line-height: 1.24;
+      color: var(--ink);
+      letter-spacing: -0.015em;
+    }
+
+    .cover-title-en {
+      margin-top: 8px;
+      font-family: var(--font-en);
+      font-size: clamp(17px, 2.1vw, 21px);
+      font-style: italic;
+      color: var(--ink-soft);
+    }
+
+    .cover-subtitle {
+      margin-top: 12px;
+      font-size: 15px;
+      color: var(--muted);
+    }
+
+    .cover-stats {
+      margin-top: 16px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    /* Themed Card (Notched in Retro Stub / Topo Acid, Rounded in Paper) */
+    .t-card {
+      background: var(--card);
+      border: 1.2px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      clip-path: var(--cut-clip);
+      position: relative;
+    }
+
+    [data-theme="paper"] .t-card {
+      border-color: var(--line);
+    }
+
+    .card-kicker {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--accent-ink);
+      margin-bottom: 8px;
+      display: block;
+      letter-spacing: 0.04em;
+    }
+
+    .summary-prose {
+      font-size: 15px;
+      line-height: 1.82;
+      color: var(--ink);
+    }
+
+    .tips-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--ink-soft);
+    }
+
+    .tips-list li {
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .tips-list li::before {
+      content: "▪";
+      position: absolute;
+      left: 0;
+      color: var(--accent-ink);
+    }
+
+    /* Glossary 2-Column Open Strip */
+    .glossary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 28px;
+      row-gap: 14px;
+    }
+
+    .gloss-item {
+      padding-bottom: 10px;
+      border-bottom: 1px dashed var(--line);
+    }
+
+    .gloss-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 3px;
+    }
+
+    .gloss-en {
+      font-family: var(--font-en);
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .gloss-zh {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-ink);
+    }
+
+    .gloss-note {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    /* ============================================================
+       WHILE-READING: TUFTE 60/40 SPREAD LAYOUT
+       ============================================================ */
+    .spread-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.48fr) minmax(0, 1fr);
+      column-gap: 34px;
+      align-items: start;
+    }
+
+    .chapter-heading-en {
+      font-family: var(--font-en);
+      font-size: 21px;
+      font-weight: 600;
+      color: var(--ink);
+      margin-bottom: 14px;
+      line-height: 1.35;
+    }
+
+    /* English Text Sits Directly on Paper (Zero Box!) */
+    .en-prose p {
+      font-family: var(--font-en);
+      font-size: 18px;
+      line-height: 1.78;
+      color: var(--ink);
+      margin-bottom: 16px;
+    }
+
+    .en-prose em {
+      font-style: italic;
+    }
+
+    /* Subtle Textual Enhancement (Schmidt Noticing Hypothesis) */
+    .term-mark {
+      display: inline;
+      border-bottom: 1.8px solid var(--accent-ink);
+      background: var(--accent-wash);
+      padding: 0 2px 1px;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    .term-mark:hover,
+    .term-mark.linked {
+      background: var(--accent);
+      color: var(--badge-fg);
+    }
+
+    [data-theme="paper"] .term-mark:hover,
+    [data-theme="paper"] .term-mark.linked,
+    [data-theme="topo-acid"] .term-mark:hover,
+    [data-theme="topo-acid"] .term-mark.linked {
+      color: var(--ink);
+    }
+
+    .term-sup {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent-ink);
+      margin-left: 2px;
+      vertical-align: super;
+      line-height: 0;
+    }
+
+    .term-mark.linked .term-sup {
+      color: inherit;
+    }
+
+    /* Visually De-noised Chinese Translation Card */
+    .zh-trans-card {
+      margin-top: 20px;
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-left: 2.5px solid var(--line-strong);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      clip-path: var(--cut-clip);
+      transition: filter 0.2s ease, opacity 0.2s ease;
+    }
+
+    .zh-trans-card p {
+      font-size: 13.5px;
+      line-height: 1.78;
+      color: var(--ink-soft);
+    }
+
+    .zh-trans-card p + p {
+      margin-top: 10px;
+    }
+
+    /* Focus Mode: Blur Chinese translation until hovered/tapped */
+    body.focus-en .zh-trans-card .zh-body {
+      filter: blur(4.5px);
+      opacity: 0.45;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    body.focus-en .zh-trans-card:hover .zh-body,
+    body.focus-en .zh-trans-card.revealed .zh-body {
+      filter: none;
+      opacity: 1;
+    }
+
+    /* Focus Sentence Spotlight */
+    .focus-card {
+      margin-top: 14px;
+      padding: 13px 16px;
+      background: var(--card-soft);
+      border: 1px dashed var(--line-strong);
+      border-radius: var(--radius);
+    }
+
+    .focus-en {
+      font-family: var(--font-en);
+      font-size: 15px;
+      font-weight: 500;
+      line-height: 1.55;
+      color: var(--ink);
+      margin-bottom: 6px;
+    }
+
+    .focus-why {
+      font-size: 12.5px;
+      line-height: 1.65;
+      color: var(--muted);
+    }
+
+    /* Right Column: Vertical Stem Sidenotes (Retro Stub Timeline DNA) */
+    .sidenotes-col {
+      padding-top: 4px;
+    }
+
+    .sidenote-item {
+      position: relative;
+      padding-left: 28px;
+      padding-bottom: 18px;
+      border-left: 1px solid var(--line-strong);
+      margin-left: 10px;
+      transition: background-color 0.15s ease;
+    }
+
+    .sidenote-item:last-child {
+      border-left-color: transparent;
+      padding-bottom: 0;
+    }
+
+    .sidenote-item.linked {
+      background: var(--accent-wash);
+      margin-right: -8px;
+      padding-right: 8px;
+      padding-top: 6px;
+      margin-top: -6px;
+    }
+
+    .sn-num {
+      position: absolute;
+      left: -11px;
+      top: 0;
+      width: 21px;
+      height: 21px;
+      background: var(--paper);
+      border: 1px solid var(--line-strong);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--ink);
+    }
+
+    .sidenote-item.linked .sn-num {
+      background: var(--badge-bg);
+      color: var(--badge-fg);
+    }
+
+    .sn-head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .sn-term {
+      font-family: var(--font-en);
+      font-size: 15.5px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .sn-pos {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      padding: 0 5px;
+      border: 1px solid var(--line-strong);
+      color: var(--ink-soft);
+      line-height: 1.5;
+    }
+
+    .sn-zh {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--accent-ink);
+    }
+
+    .sn-nuance {
+      font-size: 12.5px;
+      line-height: 1.62;
+      color: var(--ink-soft);
+    }
+
+    .sn-chunk {
+      margin-top: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      background: var(--card-soft);
+      padding: 2px 6px;
+      display: inline-block;
+      border-left: 2px solid var(--accent-ink);
+    }
+
+    /* ============================================================
+       POST-READING: ACTIVE RECALL CLOZE + 2-COL INDEX + CORNELL LINES
+       ============================================================ */
+    .cloze-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .cloze-item {
+      background: var(--card);
+      border: 1px solid var(--line-strong);
+      padding: 14px 16px;
+      border-radius: var(--radius);
+    }
+
+    .cloze-en {
+      font-family: var(--font-en);
+      font-size: 16px;
+      line-height: 1.65;
+      color: var(--ink);
+    }
+
+    .cloze-blank {
+      display: inline-block;
+      min-width: 118px;
+      border-bottom: 1.5px solid var(--line-strong);
+      padding: 0 6px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent-ink);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .cloze-hint {
+      margin-top: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .cloze-reveal-btn {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 9px;
+      border: 1px solid var(--line-strong);
+      color: var(--ink);
+    }
+
+    .cloze-reveal-btn:hover {
+      background: var(--accent-wash);
+    }
+
+    /* Compact 2-Column Appendix Index */
+    .appendix-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      column-gap: 28px;
+      row-gap: 12px;
+    }
+
+    .app-item {
+      padding-bottom: 9px;
+      border-bottom: 1px solid var(--line);
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
+
+    .app-top {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .app-term {
+      font-family: var(--font-en);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .app-sec {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: var(--muted);
+    }
+
+    .app-zh {
+      font-size: 12.5px;
+      color: var(--accent-ink);
+      font-weight: 500;
+      margin-top: 2px;
+    }
+
+    .app-chunk {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Cornell Pen-and-Paper Reflection Lines */
+    .cornell-lines {
+      margin-top: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      padding-top: 14px;
+    }
+
+    .cornell-line {
+      height: 1px;
+      border-bottom: 1px dashed var(--line-strong);
+      opacity: 0.45;
+    }
+
+    .print-answer-key {
+      display: none;
+      margin-top: 14px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--muted);
+      transform: rotate(180deg);
+      text-align: right;
+    }
+
+    @media (max-width: 760px) {
+      .spread-grid, .glossary-grid, .appendix-grid {
+        grid-template-columns: 1fr;
+        row-gap: 22px;
+      }
+      .book-stack { margin-top: 14px; gap: 18px; }
+    }
+
+    /* ============================================================
+       TRUE FULL-BLEED VECTOR PRINT CSS (@media print)
+       ============================================================ */
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    @media print {
+      html, body {
+        background: var(--paper) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .control-bar, .cloze-reveal-btn {
+        display: none !important;
+      }
+      .book-stack {
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        gap: 0 !important;
+      }
+      .rb-sheet {
+        width: 210mm !important;
+        min-height: 297mm !important;
+        padding: 15mm 14mm 16mm !important;
+        margin: 0 !important;
+        border: none !important;
+        box-shadow: none !important;
+        break-after: page;
+        page-break-after: always;
+      }
+      .rb-sheet:last-child {
+        break-after: auto;
+        page-break-after: auto;
+      }
+      .spread-grid {
+        grid-template-columns: minmax(0, 1.42fr) minmax(0, 1fr) !important;
+        column-gap: 24px !important;
+      }
+      .glossary-grid, .appendix-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+      }
+      .sidenote-item, .zh-trans-card, .focus-card, .cloze-item, .app-item {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+      }
+      body.focus-en .zh-trans-card .zh-body {
+        filter: none !important;
+        opacity: 1 !important;
+      }
+      .print-answer-key {
+        display: block !important;
+      }
+    }
+  
+
+/* App chrome inside the preview */
+.reader-book .reader-status {
+  position: sticky; top: 0; z-index: 60;
+  display: flex; align-items: center; gap: 10px;
+  padding: 6px 14px; font-family: var(--font-mono); font-size: 11px;
+  background: color-mix(in srgb, var(--paper) 92%, transparent);
+  border-bottom: 1px solid var(--line); color: var(--muted);
+}
+.reader-book .reader-status b { color: var(--accent-ink); }
+
+@media print {
+  .reader-status { display: none !important; }
+  .module-bar, .topbar { display: none !important; }
+  .screen { position: static !important; overflow: visible !important; }
+  .reader-book { background: var(--paper) !important; }
+  .reader-book .book-stack { max-width: none !important; margin: 0 !important; padding: 0 !important; gap: 0 !important; }
+  .reader-book .rb-sheet { width: 210mm !important; min-height: 297mm !important; padding: 15mm 14mm 16mm !important; margin: 0 !important; border: none !important; box-shadow: none !important; break-after: page; page-break-after: always; }
+  .reader-book .rb-sheet:last-child { break-after: auto; page-break-after: auto; }
+}
+
+/* The app styles bare buttons; normalise them inside the reader chrome. */
+.reader-book .control-bar button,
+.reader-book .reader-status button {
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 4px 10px;
+  height: auto;
+  min-height: 0;
+}
+.reader-book .control-bar { flex-wrap: nowrap; align-items: center; }
+.reader-book .ctrl-pill-group {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: 100%;
+}
+.reader-book .ctrl-pill-group::-webkit-scrollbar { display: none; }
+.reader-book .ctrl-theme-btn { white-space: nowrap; }
+.reader-book .ctrl-theme-btn.active { background: #fff; color: #161616; font-weight: 600; }
+.reader-book .ctrl-print { background: #fff; color: #161616; font-weight: 700; white-space: nowrap; }
+.reader-book .ctrl-toggle { white-space: nowrap; }
+.reader-book .reader-status { color: var(--muted); }
+
+.reader-book .control-bar { flex-wrap: wrap; row-gap: 8px; }
+.reader-book .ctrl-left { flex: 1 1 auto; min-width: 0; }
+.reader-book .ctrl-right { flex: 0 0 auto; justify-content: flex-end; }
+.reader-book .cover-stats { display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 760px) {
+  .reader-book .ctrl-right { width: 100%; justify-content: flex-end; }
+}
+
+.reader-book .ctrl-toggle,
+.reader-book .ctrl-print { padding: 5px 11px; font-size: 11.5px; }
+.reader-book .rb-sheet { scroll-margin-top: 150px; }
+@media print { .reader-book .rb-sheet { scroll-margin-top: 0; } }
+
+/* Full-bleed pages: no side gap between the sheet and the viewport. */
+.reader-book .reader-doc { padding: 0; max-width: none; }
+.reader-book .book-stack { padding: 0; max-width: none; }
+.reader-book .rb-sheet { width: 100%; border-left: 0; border-right: 0; }
+@media (min-width: 900px) {
+  .reader-book .book-stack { max-width: 900px; margin: 20px auto 0; }
+}
+
+.reader-book .ctrl-progress { color: rgba(255,255,255,0.62); font-size: 11px; }
+.reader-book .control-bar { background: color-mix(in srgb, var(--ink) 94%, transparent); }
+
+.reader-book .ctrl-theme-select {
+  appearance: none;
+  background: rgba(255,255,255,0.12);
+  color: #F5F1E8;
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: 600 11.5px/1 var(--font-mono);
+  max-width: 150px;
+}
+
+.reader-book .ctrl-right { gap: 6px; }
+.reader-book .ctrl-toggle,
+.reader-book .ctrl-print,
+.reader-book .ctrl-back { padding: 5px 9px; font-size: 11px; }
+
+.reader-book .ctrl-sub { font-weight: 500; opacity: 0.72; margin-left: 4px; }
+@media (max-width: 560px) { .reader-book .ctrl-sub { display: none; } }
+
+/* Control bar follows the current theme instead of the sample's fixed ink bar. */
+.reader-book .control-bar {
+  background: var(--paper);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: none;
+}
+.reader-book .ctrl-theme-select {
+  background: color-mix(in srgb, var(--ink) 7%, transparent);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+.reader-book .ctrl-toggle { border: 1px solid var(--line); color: var(--ink); }
+.reader-book .ctrl-toggle.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.reader-book .ctrl-print { background: var(--ink); color: var(--paper); }
+.reader-book .ctrl-progress, .reader-book .ctrl-sub { color: var(--muted); opacity: 1; }
+.reader-book .ctrl-back, .reader-book .ctrl-theme-btn { color: var(--ink); }
+
+.reader-book .control-bar .ctrl-print { background: var(--ink); color: var(--paper); padding: 6px 12px; font-weight: 700; }
+.reader-book .control-bar .ctrl-toggle { border: 1px solid var(--line); color: var(--ink); background: transparent; padding: 5px 10px; }
+.reader-book .control-bar .ctrl-toggle.active { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.reader-book .control-bar .ctrl-theme-btn { background: transparent; color: var(--ink); }
