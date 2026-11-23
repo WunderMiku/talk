@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "257"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "258"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1940,6 +1940,7 @@
       screen.classList.add("is-entering");
       window.setTimeout(() => screen.classList.remove("is-entering"), 1300);
       document.title = pageTitle(route);
+      window.TALK_I18N?.apply(document.body);
       if (route.name === "reverse" && Number.isFinite(state.restoreScroll) && state.restoreScroll >= 0) {
         const target = state.restoreScroll;
         state.restoreScroll = -1;
@@ -6479,7 +6480,15 @@
 
   function dataSettingsHtml(draft) {
     const stats = wordCacheStats();
+    const lang = window.TALK_I18N?.lang || "zh";
     return `
+      <div class="setting-group">
+        <span class="settings-subhead">界面语言</span>
+        <div class="level-row">
+          <button class="level-chip${lang === "zh" ? " active" : ""}" type="button" data-action="lang" data-lang="zh" aria-pressed="${lang === "zh"}">中文</button>
+          <button class="level-chip${lang === "en" ? " active" : ""}" type="button" data-action="lang" data-lang="en" aria-pressed="${lang === "en"}">English</button>
+        </div>
+      </div>
       <div class="theme-setting">
         <span class="settings-subhead">外观主题</span>
         <div class="theme-list" role="list" aria-label="外观主题">
@@ -6609,6 +6618,7 @@
   }
 
   function renderSettingsContent() {
+    window.setTimeout(() => window.TALK_I18N?.apply(document.body), 0);
     const holder = $("#sheet-scroll");
     if (!holder || !state.draft) return;
     const draft = state.draft;
@@ -8475,6 +8485,17 @@
         });
         row.classList.toggle("open", willOpen);
         target.setAttribute("aria-expanded", String(willOpen));
+        break;
+      }
+
+      case "lang": {
+        event.preventDefault();
+        const next = target.dataset.lang === "en" ? "en" : "zh";
+        window.TALK_I18N?.set(next);
+        if (state.draft) state.draft.lang = next;
+        renderSettingsContent();
+        window.TALK_I18N?.apply(document.body);
+        toast(next === "en" ? "Interface set to English" : "界面已切换为中文");
         break;
       }
 
