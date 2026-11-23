@@ -12,7 +12,9 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  # Rapid pushes used to cancel a run between upload and deploy, which leaves
+  # the deploy job with "Found 0 artifact(s)". Queue them instead.
+  cancel-in-progress: false
 
 jobs:
   deploy:
@@ -37,6 +39,9 @@ jobs:
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+
+      - name: List the artifact contents
+        run: find dist -maxdepth 2 -type f | head -20
 
       - name: Deploy to GitHub Pages
         id: deployment
