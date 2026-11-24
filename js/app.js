@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "273"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "274"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1584,6 +1584,7 @@
     if (route.name === "chunk") return `#/chunk/${encodeURIComponent(chunkSlug(route.query || route.result?.chunk || ""))}`;
     if (route.name === "reverse") return `#/reverse/${encodeURIComponent(route.id || route.result?.id || "")}`;
     if (route.name === "translator") return "#/translate";
+    if (route.name === "reader") return "#/reader";
     if (route.name === "loading") return "#/search";
     if (route.name === "miss" || route.name === "error") {
       return `#/search?q=${encodeURIComponent(route.query || "")}&type=${encodeURIComponent(route.type || "auto")}`;
@@ -1616,6 +1617,7 @@
         if (id) return { name: "reverse", id };
       }
       if (decoded === "translate" || decoded === "translator") return { name: "translator" };
+      if (decoded === "reader") return { name: "reader" };
     } catch (_) {
       return { name: "home" };
     }
@@ -1909,7 +1911,7 @@
     const apply = () => {
       state.route = route;
       screen.dataset.page = route.name;
-      state.module = route.name === "translator" ? "translator" : "dictionary";
+      state.module = route.name === "translator" ? "translator" : route.name === "reader" ? "reader" : "dictionary";
       updateModuleBar();
       closeTranslationWorkspace({ immediate: true });
       closeSheet({ immediate: true });
@@ -1945,6 +1947,9 @@
         const target = state.restoreScroll;
         state.restoreScroll = -1;
         window.requestAnimationFrame(() => { screen.scrollTop = target; });
+      }
+      if (route.name === "reader") {
+        window.TALK_READER?.onMount?.(screen);
       }
       if (route.name === "translator") {
         updateTranslatorLanguage();
@@ -2019,6 +2024,7 @@
       if (route.name === "word") return `${titleCase(route.word)} — talk. dictionary`;
       if (route.name === "sentence") return "Sentence analysis — talk.";
       if (route.name === "translate" || route.name === "translator") return "Multi-style translation — talk.";
+      if (route.name === "reader") return "Intensive Reader — talk.";
       if (route.name === "reverse") return "Find the wording — talk.";
       if (route.name === "chunk") return `${route.chunk || route.query || "Chunk"} — talk.`;
       return "talk. — English, in context";
@@ -2026,6 +2032,7 @@
     if (route.name === "word") return `${titleCase(route.word)} — talk.`;
     if (route.name === "sentence") return "句子理解 — talk.";
     if (route.name === "translator") return "多风格翻译 — talk.";
+    if (route.name === "reader") return "长文精读 — talk.";
     return "talk. — 英语，在语境中理解";
   }
 
@@ -2061,6 +2068,8 @@
       }
       case "translator":
         return translatorPage();
+      case "reader":
+        return window.TALK_READER ? window.TALK_READER.pageHtml() : "";
       case "loading":
         return loadingPage(route.query, route.type);
       case "miss":
@@ -6738,11 +6747,20 @@
       </div>`;
   }
 
-  function openHistorySheet() {
+  let historySheetTab = "recent";
+
+  function openHistorySheet(defaultTab) {
     const translating = state.module === "translator";
+    if (defaultTab === "saved" || defaultTab === "recent") {
+      historySheetTab = defaultTab;
+    } else if (state.module === "reader" && state.saved.length) {
+      historySheetTab = "saved";
+    } else {
+      historySheetTab = "recent";
+    }
     openSheetShell({
-      kicker: translating ? "翻译足迹" : "查询足迹",
-      title: translating ? "最近翻译" : "最近查询"
+      kicker: translating ? "翻译足迹" : "足迹与词册",
+      title: translating ? "最近翻译" : "最近与收藏"
     });
     renderHistoryContent();
   }
@@ -6759,23 +6777,58 @@
     if (!holder) return;
     const items = historyForCurrentModule();
     const translating = state.module === "translator";
+    const saved = Array.isArray(state.saved) ? state.saved : [];
+    const activeTab = historySheetTab === "saved" ? "saved" : "recent";
+
+    const tabsHtml = `
+      <div class="history-tabs" role="tablist">
+        <button class="history-tab ${activeTab === "recent" ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === "recent"}" data-action="history-tab" data-tab="recent">${translating ? "最近翻译" : "最近查询"} (${items.length})</button>
+        <button class="history-tab ${activeTab === "saved" ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === "saved"}" data-action="history-tab" data-tab="saved">收藏词册 (${saved.length})</button>
+      </div>`;
+
+    const recentBody = items.length ? `
+      <div class="history-list">
+        ${items.map((item) => `
+          <button class="history-item" type="button" data-action="history-item" data-query="${attr(item.query)}" data-type="${attr(item.type)}">
+            <span class="history-icon ${item.type === "sentence" ? "sentence" : item.type === "translation" ? "translation" : ""}">${item.type === "sentence" ? icon("sentence") : item.type === "translation" ? icon("sparkle") : icon("book")}</span>
+            <span class="history-copy">
+              <strong>${esc(shorten(item.query, 44))}</strong>
+              <span>${item.type === "sentence" ? "句子" : item.type === "translation" ? "翻译" : "单词"} · ${esc(timeAgo(item.at))}</span>
+            </span>
+          </button>`).join("")}
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-secondary" type="button" data-action="clear-history" data-scope="${translating ? "translation" : "dictionary"}">${icon("trash")} ${translating ? "清空翻译记录" : "清空词典记录"}</button>
+      </div>` : `
+      <div class="history-empty">${translating ? "还没有翻译记录。<br />译一句，它会在这里等你。" : "还没有查询记录。<br />查一个词，它会在这里等你。"}</div>`;
+
+    const savedBody = saved.length ? `
+      <div class="history-list">
+        ${saved.map((term) => {
+          const isPhrase = String(term).trim().includes(" ");
+          return `
+            <div class="saved-row">
+              <button class="history-item saved-item-btn" type="button" data-action="saved-item" data-term="${attr(term)}">
+                <span class="history-icon">${icon("bookmark")}</span>
+                <span class="history-copy">
+                  <strong class="notranslate" translate="no" lang="en">${esc(shorten(term, 48))}</strong>
+                  <span>${isPhrase ? "意群 / 搭配" : "单词"} · 点击深入解析</span>
+                </span>
+              </button>
+              <button class="saved-remove-btn" type="button" data-action="remove-saved" data-term="${attr(term)}" aria-label="移出收藏" title="移出收藏">×</button>
+            </div>`;
+        }).join("")}
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-secondary" type="button" data-action="export-saved">导出词表 (.txt)</button>
+        <button class="btn btn-secondary" type="button" data-action="clear-saved">${icon("trash")} 清空收藏</button>
+      </div>` : `
+      <div class="history-empty">还没有收藏词条。<br />在单词页点书签，或在精读页点「+ 词册」，都会统一收在这里。</div>`;
+
     holder.innerHTML = `
       <div class="sheet-content">
-        ${items.length ? `
-          <div class="history-list">
-            ${items.map((item) => `
-              <button class="history-item" type="button" data-action="history-item" data-query="${attr(item.query)}" data-type="${attr(item.type)}">
-                <span class="history-icon ${item.type === "sentence" ? "sentence" : item.type === "translation" ? "translation" : ""}">${item.type === "sentence" ? icon("sentence") : item.type === "translation" ? icon("sparkle") : icon("book")}</span>
-                <span class="history-copy">
-                  <strong>${esc(shorten(item.query, 44))}</strong>
-                  <span>${item.type === "sentence" ? "句子" : item.type === "translation" ? "翻译" : "单词"} · ${esc(timeAgo(item.at))}</span>
-                </span>
-              </button>`).join("")}
-          </div>
-          <div class="settings-actions">
-            <button class="btn btn-secondary" type="button" data-action="clear-history" data-scope="${translating ? "translation" : "dictionary"}">${icon("trash")} ${translating ? "清空翻译记录" : "清空词典记录"}</button>
-          </div>` : `
-          <div class="history-empty">${translating ? "还没有翻译记录。<br />译一句，它会在这里等你。" : "还没有查询记录。<br />查一个词，它会在这里等你。"}</div>`}
+        ${tabsHtml}
+        ${activeTab === "saved" ? savedBody : recentBody}
       </div>`;
   }
 
@@ -8091,12 +8144,14 @@
 
       case "module": {
         event.preventDefault();
-        const module = target.dataset.module === "translator" ? "translator" : "dictionary";
+        const rawMod = target.dataset.module;
+        const module = rawMod === "translator" ? "translator" : rawMod === "reader" ? "reader" : "dictionary";
         if (module === state.module) break;
         state.module = module;
         tapFeedback();
         closeAllWordLayers({ immediate: true });
         if (module === "translator") navigate({ name: "translator" }, { replace: false });
+        else if (module === "reader") navigate({ name: "reader" }, { replace: false });
         else navigate({ name: "home" }, { replace: false });
         break;
       }
@@ -8865,6 +8920,67 @@
         }
         runSearch(target.dataset.query || "", target.dataset.type || "auto");
         break;
+
+      case "history-tab": {
+        event.preventDefault();
+        historySheetTab = target.dataset.tab === "saved" ? "saved" : "recent";
+        renderHistoryContent();
+        break;
+      }
+
+      case "saved-item": {
+        event.preventDefault();
+        const term = String(target.dataset.term || "").trim();
+        if (!term) break;
+        closeSheet({ immediate: true });
+        if (term.includes(" ")) runSearch(term, "chunk");
+        else openWordLayer(term, { relation: "收藏词册", origin: "收藏" });
+        break;
+      }
+
+      case "remove-saved": {
+        event.preventDefault();
+        const term = String(target.dataset.term || "").trim().toLowerCase();
+        state.saved = state.saved.filter((w) => w.toLowerCase() !== term);
+        persistSaved();
+        renderHistoryContent();
+        if (state.route.name === "reader" && window.TALK_READER?.refreshTheme) {
+          window.TALK_READER.refreshTheme();
+        }
+        toast("已移出收藏词册");
+        break;
+      }
+
+      case "export-saved": {
+        event.preventDefault();
+        if (!state.saved.length) {
+          toast("收藏词册为空");
+          break;
+        }
+        const blob = new Blob([state.saved.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "talk-saved-words.txt";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast(`已导出 ${state.saved.length} 条收藏`);
+        break;
+      }
+
+      case "clear-saved": {
+        event.preventDefault();
+        state.saved = [];
+        persistSaved();
+        renderHistoryContent();
+        if (state.route.name === "reader" && window.TALK_READER?.refreshTheme) {
+          window.TALK_READER.refreshTheme();
+        }
+        toast("收藏词册已清空");
+        break;
+      }
 
       case "clear-history": {
         event.preventDefault();
@@ -9829,6 +9945,71 @@
       state
     };
   }
+
+
+  window.__TALK_BRIDGE__ = {
+    hasModelConfig: () => hasModelConfig(),
+    homeTopbar: () => homeTopbar(),
+    toast: (msg) => toast(msg),
+    isWordSaved: (term) => {
+      const clean = String(term || "").trim().toLowerCase();
+      return Boolean(clean && state.saved.some((w) => w.toLowerCase() === clean));
+    },
+    toggleSaveWord: (term) => {
+      const clean = String(term || "").trim();
+      if (!clean) return false;
+      const lower = clean.toLowerCase();
+      const exists = state.saved.some((w) => w.toLowerCase() === lower);
+      if (exists) {
+        state.saved = state.saved.filter((w) => w.toLowerCase() !== lower);
+        persistSaved();
+        return false;
+      }
+      state.saved = [clean, ...state.saved];
+      persistSaved();
+      return true;
+    },
+    openWord: (word, opts = {}) => openWordLayer(word, { relation: "精读词眼", origin: "精读本", ...opts }),
+    openChunk: (phrase) => runSearch(phrase, "chunk"),
+    openSentence: (sentence) => runSearch(sentence, "sentence"),
+    openTranslator: (text) => navigate({ name: "translator", text }),
+    getSentenceLevel: () => state.settings?.sentenceLevel || "cet6",
+    getSentenceLevelLabel: () => {
+      const lv = state.settings?.sentenceLevel || "cet6";
+      const found = typeof SENTENCE_LEVELS !== "undefined" ? SENTENCE_LEVELS.find((x) => x.id === lv) : null;
+      return found ? found.label : lv.toUpperCase();
+    },
+    callModelJSON: async (systemPrompt, userPayload, { signal, maxTokens = 4096 } = {}) => {
+      const cfg = state.settings;
+      const endpoint = endpointFor(cfg.baseUrl, cfg);
+      const messages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: JSON.stringify(userPayload) }
+      ];
+      let lastErr = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          const response = await postChat(endpoint, cfg, messages, signal, true, maxTokens);
+          if (!response.ok) {
+            const raw = await response.text().catch(() => "");
+            throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 180)}` : ""}`);
+          }
+          const json = await readJsonResponse(response, "模型接口");
+          const msg = json?.choices?.[0]?.message;
+          const content = msg?.content || json?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
+          if (!content || !String(content).trim()) {
+            throw new Error("模型返回了空内容（可能是输出上限不足或网关波动）。");
+          }
+          return parseJsonObject(content);
+        } catch (err) {
+          if (err?.name === "AbortError") throw err;
+          lastErr = err;
+          if (attempt === 0) continue;
+        }
+      }
+      throw lastErr;
+    }
+  };
 
   init().catch((error) => {
     console.error("Talk failed to initialise.", error);

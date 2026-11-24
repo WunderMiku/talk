@@ -2,7 +2,8 @@
 window.TALK_CONTENT = {
   modules: {
     dictionary: "词典",
-    translator: "翻译"
+    translator: "翻译",
+      reader: "精读"
   },
   home: {
     eyebrow: "英语 · 在语境中理解",
@@ -98,7 +99,8 @@ window.TALK_CONTENT.themeCopy = {
   constructivist: {
     modules: {
       dictionary: "词库",
-      translator: "译场"
+      translator: "译场",
+      reader: "精读"
     },
     home: {
       eyebrow: "ЯЗЫК · 语言前线",
@@ -234,7 +236,8 @@ window.TALK_CONTENT.themeDecks = [
 window.TALK_CONTENT.themeCopy["swiss-lab"] = {
   modules: {
     dictionary: "索引",
-    translator: "转译"
+    translator: "转译",
+      reader: "精读"
   },
   home: {
     eyebrow: "LEXICON LAB · 语言观察站",
@@ -305,7 +308,8 @@ window.TALK_CONTENT.themeCopy["swiss-lab"] = {
 window.TALK_CONTENT.themeCopy["topo-acid"] = {
   modules: {
     dictionary: "词条",
-    translator: "转译"
+    translator: "转译",
+      reader: "精读"
   },
   home: {
     eyebrow: "FIELD TERMINAL · 语言终端",
@@ -375,7 +379,8 @@ window.TALK_CONTENT.themeCopy["topo-acid"] = {
 window.TALK_CONTENT.themeCopy["retro-stub"] = {
   modules: {
     dictionary: "词册",
-    translator: "译站"
+    translator: "译站",
+      reader: "精读"
   },
   home: {
     eyebrow: "LEXICON STUB · 词义票根",
@@ -445,7 +450,8 @@ window.TALK_CONTENT.themeCopy["retro-stub"] = {
 window.TALK_CONTENT.themeCopy["archive-grid"] = {
   modules: {
     dictionary: "档案",
-    translator: "转译"
+    translator: "转译",
+      reader: "精读"
   },
   home: {
     eyebrow: "CORPUS LAB · ANALYSIS OS",

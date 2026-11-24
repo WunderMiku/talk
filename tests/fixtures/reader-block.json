@@ -1,0 +1,32 @@
+{
+  "kind": "docBlock",
+  "translation": "多年来，人工智能领域的正统观念认为前沿能力只能维持在专有壁垒之后。然而开放权重开发者的崛起彻底颠覆了这一假设。",
+  "focusSentence": {
+    "en": "However, the rapid ascent of open-weight model developers has fundamentally disrupted this assumption.",
+    "why": "转折副词 However 领起主句，disrupted 一词强化对既有格局的冲击感。"
+  },
+  "notes": [
+    {
+      "term": "orthodoxy",
+      "pos": "n.",
+      "inContextZh": "正统观念",
+      "nuance": "暗含被广泛接受但趋于僵化的教条。",
+      "chunk": "prevailing orthodoxy"
+    },
+    {
+      "term": "disrupted",
+      "pos": "v.",
+      "inContextZh": "颠覆",
+      "nuance": "强调对既有格局的破坏性重塑。",
+      "chunk": "fundamentally disrupted"
+    }
+  ],
+  "simplifiedText": "For years, the common belief in artificial intelligence held that frontier capabilities could only survive behind private walls. However, the rapid rise of open-weight model developers has fundamentally disrupted this assumption.",
+  "replacements": [
+    {
+      "simplified": "common belief",
+      "original": "prevailing orthodoxy",
+      "note": "原词 orthodoxy 带僵化教条意味"
+    }
+  ]
+}
