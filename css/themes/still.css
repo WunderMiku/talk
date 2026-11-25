@@ -218,3 +218,11 @@
   box-shadow: none;
 }
 [data-theme="still"] .meaning-card + .meaning-card { margin-top: 10px; }
+
+/* Keep the highlight flush with the glyphs it marks. */
+[data-theme="still"] .home-title em {
+  padding: 0;
+  background: linear-gradient(transparent 68%, var(--lime) 68%);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}

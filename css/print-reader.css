@@ -1616,6 +1616,42 @@
   box-shadow: 0 -2px 8px rgba(20, 20, 20, 0.04), 0 -16px 36px -22px rgba(20, 20, 20, 0.22);
 }
 
+
+/* Screen-only section TTS button (reuses talk. native speakText) */
+.pdf-speak-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-soft, var(--line));
+  background: var(--surface-page, var(--paper));
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+
+.pdf-speak-btn:hover,
+.pdf-speak-btn.is-speaking,
+.pdf-speak-btn.speaking {
+  border-color: var(--accent-ink, var(--border-strong));
+  color: var(--accent-ink, var(--text-primary));
+  background: var(--accent-wash, rgba(0, 0, 0, 0.05));
+}
+
+[data-theme="retro-stub"] .pdf-speak-btn,
+[data-theme="constructivist"] .pdf-speak-btn {
+  border-radius: 0 !important;
+}
+
+[data-theme="still"] .pdf-speak-btn {
+  border-radius: 8px !important;
+  border-color: var(--line) !important;
+}
+
 /* ============================================================
    FULL-BLEED VECTOR A4 PRINT RULES (@media print)
    ============================================================ */
@@ -1628,7 +1664,7 @@
   /* Whitelist isolation: hide every app shell, floating bar, decorative stamp, and modal */
   .stage-meta, .stage-hint, .statusbar, .ambient, .grain,
   .topbar, .home-topbar, .reader-chrome, .module-bar, .cache-corner, .toast, .reader-topbar, .reader-progress-bar,
-  .reader-page, .reader-modal-backdrop, .reader-retry-btn, .pdf-cloze-reveal, .pdf-note-save, .pdf-jump-btn, .reader-lookup-dock, .pdf-focus-actions {
+  .reader-page, .reader-modal-backdrop, .reader-retry-btn, .pdf-cloze-reveal, .pdf-note-save, .pdf-jump-btn, .reader-lookup-dock, .pdf-focus-actions, .pdf-speak-btn {
     display: none !important;
   }
 

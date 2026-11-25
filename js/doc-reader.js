@@ -667,6 +667,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
             <span class="pdf-sec-num">§${sec.secNum}</span>
             <span class="pdf-sec-title">${esc(sec.heading || `第 ${sec.secNum} 节`)}</span>
             <span class="pdf-sec-rule"></span>
+            <button type="button" class="pdf-speak-btn" data-reader-action="speak-section" data-block-index="${sec.block.index}" aria-label="朗读本段英文" title="朗读本段英文">🔊 朗读</button>
             <span class="pdf-sec-sub">${sec.block.wordCount} WORDS</span>
           </div>
           ${spreadHtml}
@@ -1440,6 +1441,17 @@ A more mature generation of tools will learn when to get out of the way—and wh
         target.textContent = saved ? "✓ 已收" : "+ 词册";
         target.title = saved ? "移出词册" : "收入 talk. 词册";
         bridge()?.toast?.(saved ? `已收入词册：${term}` : `已移出词册：${term}`);
+      } else if (act === "speak-section") {
+        const idx = Number(target.dataset.blockIndex);
+        const blk = readerState.doc?.blocks?.find((x) => x.index === idx);
+        if (blk) {
+          const res = readerState.blockResults.get(idx);
+          const useSimp = readerState.showSimplified && isValidEnglishSimplified(res?.data?.simplifiedText);
+          const speakContent = (useSimp ? res.data.simplifiedText : blk.text || "").replace(/\s+/g, " ").trim();
+          if (speakContent) {
+            bridge()?.speakText?.(speakContent, target);
+          }
+        }
       } else if (act === "jump-sheet") {
         const key = target.dataset.jumpTarget || "";
         const [kind, idx] = key.split("-");

@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "276"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "277"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -4268,6 +4268,7 @@
         ${reclassifyRow("word")}
         <div class="page-actions reveal" style="--d:3.2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
+          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="word" data-subject="${attr(word.word)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
           ${word.source !== "demo" ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-word-cache" data-word="${attr(word.word)}">${icon("trash")} 删除缓存</button>` : ""}
@@ -4425,6 +4426,7 @@
         ${reclassifyRow("chunk", chunk.chunk)}
         <div class="page-actions reveal" style="--d:3">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} ${esc(copy.bookmark || "收藏")}</button>
+          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="chunk" data-subject="${attr(chunk.chunk)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} ${esc(copy.copy || "复制")}</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-chunk">${icon("refresh")} 重新生成意群</button>` : ""}
           ${chunk.cached ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-chunk-cache">${icon("trash")} 删除缓存</button>` : ""}
@@ -4618,6 +4620,41 @@
     const pending = body.closest(".is-pending");
     if (pending) pending.classList.add("has-text");
     reverseScrollToEnd();
+  }
+
+  function openReverseForSubject(kind, rawSubject) {
+    const subject = String(rawSubject || "").trim();
+    if (!subject) return;
+    const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    state.reverseBudget = reverseBudget();
+    state.reverseStyle = reverseStyleName(state.reverseBudget);
+    state.reverseThreadId = id;
+
+    const kindLabel = kind === "chunk" ? "意群" : kind === "sentence" ? "句子" : "单词";
+    const seedUser = kind === "sentence"
+      ? `我想围绕这句英文向你提问：\n"${subject}"`
+      : `我想围绕英文${kindLabel}「${subject}」向你提问。`;
+    const seedAssistant = kind === "sentence"
+      ? `已载入这句英文语境。你可以直接问我它的语气潜台词、长难句逻辑，或让我给出更地道的改写方案。`
+      : `已载入 ${kindLabel} [[${subject}]]。你可以直接追问它的近义词区别、真实外刊造句、搭配限制或常见误用。`;
+
+    state.reverseTitle = shorten(subject, 28);
+    state.reverseThread = [
+      { role: "user", content: seedUser },
+      { role: "assistant", content: seedAssistant }
+    ];
+    persistReverseThread();
+    closeAllWordLayers({ immediate: true });
+    navigate({ name: "reverse", id });
+    window.requestAnimationFrame(() => {
+      const inp = document.querySelector("#reverse-input");
+      if (inp) {
+        inp.placeholder = kind === "sentence"
+          ? "追问这句的语法、语气或更地道改写…"
+          : `追问「${shorten(subject, 18)}」的用法、近义词或造句…`;
+        inp.focus();
+      }
+    });
   }
 
   async function startReverse(query) {
@@ -5344,6 +5381,7 @@
         ${reclassifyRow("sentence")}
         <div class="page-actions reveal" style="--d:2">
           <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏句子</button>
+          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="sentence" data-subject="${attr(sentence.text)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-sentence">${icon("refresh")} 重新生成分析</button>` : ""}
           <button class="btn btn-secondary" type="button" data-action="forget-sentence">删除缓存</button>
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
@@ -8248,6 +8286,13 @@
         void regenerateReverse();
         break;
       }
+      case "ask-ai-about": {
+        event.preventDefault();
+        tapFeedback();
+        openReverseForSubject(target.dataset.kind || "word", target.dataset.subject || "");
+        break;
+      }
+
       case "reverse-follow": {
         event.preventDefault();
         void askReverseFollowUp(target.dataset.prompt || "");
@@ -10023,6 +10068,7 @@
     openChunk: (phrase) => runSearch(phrase, "chunk"),
     openSentence: (sentence) => runSearch(sentence, "sentence"),
     openTranslator: (text) => navigate({ name: "translator", text }),
+    speakText: (text, btn) => speakText(text, btn),
     getSentenceLevel: () => state.settings?.sentenceLevel || "cet6",
     getSentenceLevelLabel: () => {
       const lv = state.settings?.sentenceLevel || "cet6";
