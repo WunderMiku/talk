@@ -62,6 +62,7 @@ bottom corner as a multiply-blended watermark.
 | `constructivist` | Constructivist | red/black poster, diagonal blocks | hard cuts, stamps |
 | `swiss-lab` | Swiss Lab | lab index, cool and clinical | hairlines, ticks, numbering |
 | `topo-acid` | Topo Acid | industrial field terminal | square, cut corners, one signal yellow |
+| `still` | Still | minimal modern: whitespace, one ink, soft shadows | hairline cards, 14-20px radii, press-scale feedback |
 | `retro-stub` | Retro Stub | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
 | `archive-grid` | Archive Grid | analysis OS windows, paper + one acid green | square windows, mono labels, scan line |
 

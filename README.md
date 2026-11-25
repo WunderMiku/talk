@@ -39,7 +39,7 @@
 | **语境寻词** | 描述场景，得到 3–5 个行内标注的英文说法；点开看语气与判断，可继续追问 |
 | **翻译** | 极简口语 / 地道习语 / 书面正式 / 网络流行 / 优雅文句，五选多，一次调用 |
 | **主题沙龙** | AI 策展：一个场景、五个词，像一期小展览 |
-| **六套主题** | Paper、Constructivist、Swiss Lab、Topo Acid、Archive Grid、Retro Stub，各有自己的语气和版式细节 |
+| **七套主题** | Paper、Still、Constructivist、Swiss Lab、Topo Acid、Archive Grid、Retro Stub，各有自己的语气和版式细节 |
 | **离线可用** | PWA 外壳 + 词条缓存，断网也能翻查过的词 |
 | **两套发音** | 设备原生语音（默认、离线）或 Qwen 语音（可缓存音频） |
 | **模型模板** | 从供应商模板新建自己的配置，支持获取模型列表与连通性测试 |
@@ -86,7 +86,7 @@
 
 ## 主题
 
-六套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
+七套主题不是换配色，是换一整套语气：标题文案、圆角、边框、动效都跟着变。
 
 <img src="docs/screenshots/home-paper.jpg" width="330" alt="首页 Paper 主题"> <img src="docs/screenshots/home-topo-acid.jpg" width="330" alt="首页 Topo Acid 主题">
 
@@ -235,6 +235,6 @@ npm test
 
 **talk.** is a static, backend-free English–Chinese dictionary and translator that runs entirely in the browser. It renders a word as a living entry — IPA, multiple parts of speech, etymology timeline, word family, synonyms, collocations, examples, mnemonics — parses whole sentences into key words, tone, and structure, and turns a described scene into a short list of annotated English expressions with a tone verdict for each. A multi-style translator turns one sentence into five English registers in a single model call.
 
-There is no build step and no bundled model: the site is plain HTML/CSS/JS (about 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and six visual themes (Paper, Constructivist, Swiss Lab, Topo Acid, Archive Grid, Retro Stub) share one token contract. Model channels are created from provider templates, fetched model lists, and a connectivity test; they are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
+There is no build step and no bundled model: the site is plain HTML/CSS/JS (about 1 MB) and talks directly to a model API the user configures. Entries are cached in IndexedDB, the app shell is pre-cached by a service worker, and seven visual themes (Paper, Still, Constructivist, Swiss Lab, Topo Acid, Archive Grid, Retro Stub) share one token contract. Model channels are created from provider templates, fetched model lists, and a connectivity test; they are stored locally, with API keys sealed by AES-GCM (non-extractable key in IndexedDB) before they touch storage; nothing leaves the browser.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the request pipeline, prompt structure, cache layout, and deployment details.

@@ -1,0 +1,207 @@
+/* ============================================================
+   Still — 极简现代：留白、单一墨色、柔和阴影。
+   Based on Emil Kowalski's design-engineering rules: shadows over
+   borders, one accent, short custom easings, press feedback, hover
+   only on fine pointers.
+   ============================================================ */
+
+[data-theme="still"] {
+  --paper: #fafaf9;
+  --paper-deep: #f1f1ef;
+  --card: #ffffff;
+  --ink: #141414;
+  --ink-soft: #2b2b2b;
+  --muted: #6e6e6b;
+  --muted-2: #9b9b97;
+  --line: rgba(20, 20, 20, 0.09);
+  --line-strong: rgba(20, 20, 20, 0.18);
+
+  /* One ink accent; colour is reserved for meaning, not decoration. */
+  --lime: #e7e7e2;
+  --lime-deep: #d9d9d4;
+  --lime-wash: rgba(20, 20, 20, 0.05);
+  --coral: #b45309;
+  --coral-wash: rgba(180, 83, 9, 0.09);
+  --lavender: #2563eb;
+  --lavender-wash: rgba(37, 99, 235, 0.08);
+  --sky: #2563eb;
+  --sky-wash: rgba(37, 99, 235, 0.08);
+
+  --surface-raised: #ffffff;
+  --surface-soft: rgba(255, 255, 255, 0.72);
+  --surface-veil: rgba(250, 250, 249, 0.94);
+
+  --accent: #141414;
+  --accent-strong: #000000;
+  --accent-wash: rgba(20, 20, 20, 0.06);
+  --accent-ink: #141414;
+  --label-accent: #6e6e6b;
+  --text-on-accent: #ffffff;
+  --focus-ring: rgba(20, 20, 20, 0.16);
+
+  --shadow-card: 0 1px 2px rgba(20, 20, 20, 0.04), 0 14px 34px -22px rgba(20, 20, 20, 0.22);
+  --shadow-float: 0 2px 6px rgba(20, 20, 20, 0.05), 0 32px 70px -30px rgba(20, 20, 20, 0.28);
+
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-card: 20px;
+  --radius-sheet: 26px;
+
+  --motion-fast: 0.18s;
+  --motion-slow: 0.4s;
+  --ease-theme: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ---------- Chrome ---------- */
+[data-theme="still"] .topbar {
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+[data-theme="still"] .module-bar { background: transparent; }
+[data-theme="still"] .module-btn {
+  border: 0;
+  border-radius: 10px;
+  color: var(--muted);
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.16s var(--ease-out);
+}
+[data-theme="still"] .module-btn.active {
+  background: var(--ink);
+  color: var(--paper);
+}
+[data-theme="still"] .module-btn:active { transform: scale(0.97); }
+[data-theme="still"] .module-version { color: var(--muted-2); }
+
+/* ---------- Surfaces: shadow instead of a hard border ---------- */
+[data-theme="still"] .search-card,
+[data-theme="still"] .meaning-card,
+[data-theme="still"] .family-card,
+[data-theme="still"] .theme-row,
+[data-theme="still"] .provider-row,
+[data-theme="still"] .translation-card,
+[data-theme="still"] .sentence-part,
+[data-theme="still"] .block {
+  border-color: transparent;
+  border-radius: var(--radius-card);
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+}
+[data-theme="still"] .search-card { border-radius: var(--radius-sheet); }
+[data-theme="still"] .meaning-card::before { opacity: 0; }
+[data-theme="still"] .block-index,
+[data-theme="still"] .sec-num {
+  background: transparent;
+  color: var(--muted-2);
+  border: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Buttons ---------- */
+[data-theme="still"] .btn,
+[data-theme="still"] .search-submit,
+[data-theme="still"] .daily-arrow,
+[data-theme="still"] .provider-btn,
+[data-theme="still"] .level-chip,
+[data-theme="still"] .chip {
+  border-radius: 12px;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease,
+    transform 0.16s var(--ease-out);
+}
+[data-theme="still"] .btn:active,
+[data-theme="still"] .search-submit:active,
+[data-theme="still"] .daily-arrow:active,
+[data-theme="still"] .provider-btn:active,
+[data-theme="still"] .chip:active { transform: scale(0.97); }
+
+[data-theme="still"] .search-submit {
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 0 6px 16px -10px rgba(20, 20, 20, 0.6);
+}
+[data-theme="still"] .btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: transparent;
+}
+[data-theme="still"] .btn-secondary,
+[data-theme="still"] .level-chip,
+[data-theme="still"] .chip {
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+[data-theme="still"] .chip:hover,
+[data-theme="still"] .level-chip:hover { background: var(--accent-wash); }
+
+/* ---------- Fields ---------- */
+[data-theme="still"] .search-input,
+[data-theme="still"] .provider-field input,
+[data-theme="still"] textarea {
+  color: var(--ink);
+  caret-color: var(--ink);
+}
+[data-theme="still"] .search-input::placeholder,
+[data-theme="still"] textarea::placeholder { color: var(--muted-2); }
+[data-theme="still"] :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+/* ---------- Daily card: the one dark surface ---------- */
+[data-theme="still"] .daily {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: var(--radius-sheet);
+  box-shadow: var(--shadow-card);
+}
+[data-theme="still"] .daily-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+/* ---------- Sheets ---------- */
+[data-theme="still"] .sheet {
+  border-radius: var(--radius-sheet);
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+}
+
+/* ---------- Motion: only on fine pointers, short and interruptible ---------- */
+@media (hover: hover) and (pointer: fine) {
+  [data-theme="still"] .family-card:hover,
+  [data-theme="still"] .theme-row:hover,
+  [data-theme="still"] .provider-row:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(20, 20, 20, 0.04), 0 20px 40px -26px rgba(20, 20, 20, 0.26);
+  }
+  [data-theme="still"] .btn:hover { background: var(--accent-wash); }
+  [data-theme="still"] .btn-primary:hover { background: #000; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="still"] * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
+
+/* Typography: one sans family everywhere, tight display tracking. */
+[data-theme="still"] .word-title,
+[data-theme="still"] .chunk-title,
+[data-theme="still"] .sentence-title,
+[data-theme="still"] .translator-title {
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: -0.045em;
+}
+
+/* Notes and definition cards: hairline + radius, no dashed boxes. */
+[data-theme="still"] .hero-note {
+  border: 1px solid var(--line);
+  background: var(--card);
+  border-radius: var(--radius-card);
+  box-shadow: none;
+}
+[data-theme="still"] .meaning-card,
+[data-theme="still"] .example-card,
+[data-theme="still"] .insight,
+[data-theme="still"] .summary-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: none;
+}
+[data-theme="still"] .meaning-card + .meaning-card { margin-top: 10px; }

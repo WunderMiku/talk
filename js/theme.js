@@ -15,6 +15,17 @@
   const DEFAULT_THEME = "paper";
 
   const themes = {
+    still: {
+      id: "still",
+      label: "Still",
+      themeColor: "#fafaf9",
+      accent: "#141414",
+      accentFill: "#141414",
+      css: "css/themes/still.css",
+      copyKey: null,
+      description: "极简现代：留白、单一墨色与柔和阴影",
+      exampleStyle: "简洁克制的现代书面英语"
+    },
     paper: {
       id: "paper",
       label: "Paper",
