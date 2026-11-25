@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "275"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "276"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2130,13 +2130,50 @@
     });
   }
 
+  function syncModuleIndicator({ instant = false } = {}) {
+    const sw = $(".module-switch", app);
+    if (!sw) return;
+    let ind = $(".module-indicator", sw);
+    if (!ind) {
+      ind = document.createElement("span");
+      ind.className = "module-indicator";
+      ind.setAttribute("aria-hidden", "true");
+      sw.prepend(ind);
+    }
+    const activeBtn = $(".module-btn.active", sw);
+    if (!activeBtn) return;
+    const swRect = sw.getBoundingClientRect();
+    const btnRect = activeBtn.getBoundingClientRect();
+    if (!swRect.width || !btnRect.width) return;
+    const x = btnRect.left - swRect.left;
+    const y = btnRect.top - swRect.top;
+    if (instant) {
+      const prev = ind.style.transition;
+      ind.style.transition = "none";
+      ind.style.width = `${btnRect.width}px`;
+      ind.style.height = `${btnRect.height}px`;
+      ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      void ind.offsetWidth;
+      ind.style.transition = prev;
+    } else {
+      ind.style.width = `${btnRect.width}px`;
+      ind.style.height = `${btnRect.height}px`;
+      ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    }
+    sw.classList.add("has-indicator");
+  }
+
   function updateModuleBar() {
     $$(".module-btn", app).forEach((button) => {
       const active = button.dataset.module === state.module;
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     });
+    window.requestAnimationFrame(() => syncModuleIndicator({ instant: !app.dataset.modIndReady }));
+    app.dataset.modIndReady = "1";
   }
+
+  window.addEventListener("resize", () => syncModuleIndicator({ instant: true }));
 
   function homeTopbar() {
     return `
@@ -8147,12 +8184,25 @@
         const rawMod = target.dataset.module;
         const module = rawMod === "translator" ? "translator" : rawMod === "reader" ? "reader" : "dictionary";
         if (module === state.module) break;
+        const modOrder = { dictionary: 0, translator: 1, reader: 2 };
+        const dir = (modOrder[module] ?? 0) >= (modOrder[state.module] ?? 0) ? "next" : "prev";
+        document.documentElement.dataset.moduleDir = dir;
         state.module = module;
+        updateModuleBar();
         tapFeedback();
         closeAllWordLayers({ immediate: true });
         if (module === "translator") navigate({ name: "translator" }, { replace: false });
         else if (module === "reader") navigate({ name: "reader" }, { replace: false });
         else navigate({ name: "home" }, { replace: false });
+        if (!document.startViewTransition) {
+          screen.classList.remove("is-module-glide");
+          void screen.offsetWidth;
+          screen.classList.add("is-module-glide");
+        }
+        window.setTimeout(() => {
+          delete document.documentElement.dataset.moduleDir;
+          screen.classList.remove("is-module-glide");
+        }, 360);
         break;
       }
 

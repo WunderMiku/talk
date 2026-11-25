@@ -80,11 +80,24 @@
 [data-theme="still"] .provider-row,
 [data-theme="still"] .translation-card,
 [data-theme="still"] .sentence-part,
-[data-theme="still"] .block {
+[data-theme="still"] .sense-card,
+[data-theme="still"] .chunk-example {
   border-color: transparent;
   border-radius: var(--radius-card);
   background: var(--card);
   box-shadow: var(--shadow-card);
+}
+
+[data-theme="still"] .block {
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+[data-theme="still"] .keyeye {
+  background: var(--card);
+  border-color: var(--line);
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.04), 0 8px 20px -14px rgba(20, 20, 20, 0.22);
 }
 [data-theme="still"] .search-card { border-radius: var(--radius-sheet); }
 [data-theme="still"] .meaning-card::before { opacity: 0; }

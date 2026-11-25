@@ -63,3 +63,129 @@
   --motion-slow: 0.48s;
   --ease-theme: var(--ease-out);
 }
+
+/* ============================================================
+   Surface roles (M + N contract for modular blocks & themes)
+   ============================================================ */
+[data-surface="naked"] { background: transparent; border: 0; box-shadow: none; padding: 0; }
+[data-surface="elevated"] { background: var(--surface-raised, var(--card)); border: 1px solid var(--line); border-radius: var(--radius-card, 14px); box-shadow: var(--shadow-card, none); }
+[data-surface="inset"] { background: var(--paper-deep, var(--surface-soft, var(--paper))); border: 1px solid var(--line); border-radius: var(--radius-sm, 10px); box-shadow: none; }
+[data-surface="stamp"] { background: var(--accent-wash, rgba(20, 20, 20, 0.05)); border: 0; border-left: 3px solid var(--accent-ink, var(--accent)); border-radius: var(--radius-xs, 6px); box-shadow: none; }
+[data-theme="still"] [data-surface="elevated"] { border-color: transparent; box-shadow: var(--shadow-card); }
+[data-theme="retro-stub"] [data-surface="elevated"], [data-theme="constructivist"] [data-surface="elevated"],
+[data-theme="retro-stub"] [data-surface="inset"], [data-theme="constructivist"] [data-surface="inset"],
+[data-theme="retro-stub"] [data-surface="stamp"], [data-theme="constructivist"] [data-surface="stamp"] { border-radius: 0; }
+[data-theme="retro-stub"] [data-surface="elevated"] { border: 1.5px solid var(--ink); box-shadow: var(--shadow-sm); }
+[data-theme="constructivist"] [data-surface="elevated"] { border: 2px solid var(--ink); box-shadow: none; }
+
+/* ============================================================
+   Silky 3-Mode Switch: Sliding Indicator + Directional Glide
+   ============================================================ */
+.module-switch {
+  position: relative;
+}
+
+.module-switch .module-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border-radius: 6px;
+  background: var(--ink);
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    transform 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    height 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease;
+  will-change: transform, width, height;
+}
+
+.module-switch.has-indicator .module-indicator {
+  opacity: 1;
+}
+
+.module-switch .module-btn {
+  position: relative;
+  z-index: 1;
+  transition: color 0.22s ease, transform 0.14s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.module-switch.has-indicator .module-btn.active {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+[data-theme="still"] .module-switch .module-indicator {
+  border-radius: 10px;
+}
+
+[data-theme="retro-stub"] .module-switch .module-indicator,
+[data-theme="constructivist"] .module-switch .module-indicator {
+  border-radius: 0;
+}
+
+[data-theme="constructivist"] .module-switch .module-indicator {
+  background: var(--accent, #c72c1c);
+}
+
+/* Zero-overlap sequential glide: outgoing page clears completely (0-90ms) BEFORE incoming page enters (90-270ms) -> ZERO ghosting! */
+@keyframes module-slide-in-next {
+  from { opacity: 0; transform: translate3d(0, 8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes module-slide-in-prev {
+  from { opacity: 0; transform: translate3d(0, -8px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes module-fade-out-next {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(0, -5px, 0); }
+}
+
+@keyframes module-fade-out-prev {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(0, 5px, 0); }
+}
+
+html[data-module-dir]::view-transition-image-pair(screen) {
+  isolation: auto;
+}
+
+html[data-module-dir="next"]::view-transition-old(screen) {
+  animation: module-fade-out-next 0.09s cubic-bezier(0.4, 0, 1, 1) both;
+  mix-blend-mode: normal;
+}
+
+html[data-module-dir="next"]::view-transition-new(screen) {
+  animation: module-slide-in-next 0.19s cubic-bezier(0.22, 1, 0.36, 1) 0.09s both;
+  mix-blend-mode: normal;
+}
+
+html[data-module-dir="prev"]::view-transition-old(screen) {
+  animation: module-fade-out-prev 0.09s cubic-bezier(0.4, 0, 1, 1) both;
+  mix-blend-mode: normal;
+}
+
+html[data-module-dir="prev"]::view-transition-new(screen) {
+  animation: module-slide-in-prev 0.19s cubic-bezier(0.22, 1, 0.36, 1) 0.09s both;
+  mix-blend-mode: normal;
+}
+
+html[data-module-dir="next"] .screen.is-module-glide {
+  animation: module-slide-in-next 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+html[data-module-dir="prev"] .screen.is-module-glide {
+  animation: module-slide-in-prev 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .module-switch .module-indicator { transition: none !important; }
+  html[data-module-dir]::view-transition-old(screen),
+  html[data-module-dir]::view-transition-new(screen),
+  .screen.is-module-glide { animation: none !important; }
+}

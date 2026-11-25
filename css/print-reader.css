@@ -1588,6 +1588,34 @@
   display: none;
 }
 
+
+/* Still theme: shadows over hard borders across Reader chrome, sheets & lookup dock */
+[data-theme="still"] .reader-chrome {
+  background: var(--surface-veil, rgba(250, 250, 249, 0.94));
+  border-bottom: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(20, 20, 20, 0.04);
+}
+[data-theme="still"] .reader-back-btn,
+[data-theme="still"] .reader-mini-btn,
+[data-theme="still"] .reader-export-btn,
+[data-theme="still"] .reader-dock-btn,
+[data-theme="still"] .reader-dock-step,
+[data-theme="still"] .pdf-link-chip {
+  border-radius: 10px !important;
+  border-color: var(--line) !important;
+}
+[data-theme="still"] .pdf-sheet {
+  background: var(--card);
+  border: 1px solid transparent;
+  border-radius: var(--radius-card, 20px);
+  box-shadow: var(--shadow-card);
+}
+[data-theme="still"] .reader-lookup-dock {
+  background: var(--card);
+  border-top: 1px solid var(--line);
+  box-shadow: 0 -2px 8px rgba(20, 20, 20, 0.04), 0 -16px 36px -22px rgba(20, 20, 20, 0.22);
+}
+
 /* ============================================================
    FULL-BLEED VECTOR A4 PRINT RULES (@media print)
    ============================================================ */

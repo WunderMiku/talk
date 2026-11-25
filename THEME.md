@@ -134,3 +134,18 @@ copy at all.
 `js/prompts.js` is theme-independent on purpose: the model answers the same
 dictionary question no matter which poster is around it. The theme salon prompt
 is also static; only the title exclusion list is appended to the user message.
+
+## Surface roles (for blocks & future modules)
+
+Avoid styling layout wrappers (like `.block`) as bordered/shadowed cards—those
+containers carry zero inner padding and will trap child cards in double boxes.
+Instead, new modular blocks and views declare one of four semantic surface roles
+defined in `css/theme.css`:
+
+- `data-surface="naked"` — unboxed typography directly on `--paper` (lead lines, timelines, headings).
+- `data-surface="elevated"` — the theme's signature card surface (shadow-only in Still, ticket border in Retro Stub, heavy ink rule in Constructivist).
+- `data-surface="inset"` — softly recessed sub-surface for contrast columns, patterns, or dialogue lines.
+- `data-surface="stamp"` — accent-washed marginalia or editorial callout with a left rule.
+
+A new theme only needs to tune these four roles (plus its core tokens) so every
+existing and future block inherits the theme's voice without `M × N` overrides.
