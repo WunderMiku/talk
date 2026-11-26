@@ -1316,6 +1316,18 @@ A more mature generation of tools will learn when to get out of the way—and wh
     }
   }
 
+  let lastHapticAt = 0;
+  // A short tick whenever the selection grows or shrinks by a word.
+  function hapticTick(ms = 8) {
+    const now = Date.now();
+    if (now - lastHapticAt < 35) return;
+    lastHapticAt = now;
+    try {
+      if (window.TalkHaptics?.tick) window.TalkHaptics.tick(ms);
+      else navigator.vibrate?.(ms);
+    } catch (_) { /* ignore */ }
+  }
+
   function applyWordRangeSelection(root) {
     clearPickedWords(root);
     if (!dockState.paraEl || dockState.startIdx < 0) return;
@@ -1405,10 +1417,12 @@ A more mature generation of tools will learn when to get out of the way—and wh
       const nextStart = Math.min(swipeAnchorIdx, wi);
       const nextEnd = Math.max(swipeAnchorIdx, wi);
       if (nextStart !== dockState.startIdx || nextEnd !== dockState.endIdx) {
+        const grew = nextEnd - nextStart !== dockState.endIdx - dockState.startIdx;
         dockState.paraEl = swipeParaEl;
         dockState.startIdx = nextStart;
         dockState.endIdx = nextEnd;
         applyWordRangeSelection(root);
+        if (grew) hapticTick();
       }
     }
 
@@ -1757,6 +1771,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
         if (dockState.paraEl && dockState.startIdx > 0 && (dockState.endIdx - dockState.startIdx) < 6) {
           dockState.startIdx -= 1;
           applyWordRangeSelection(root);
+          hapticTick();
         }
       } else if (act === "dock-expand-right") {
         if (dockState.paraEl && (dockState.endIdx - dockState.startIdx) < 6) {
@@ -1765,6 +1780,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
           if (dockState.endIdx < maxIdx) {
             dockState.endIdx += 1;
             applyWordRangeSelection(root);
+            hapticTick();
           }
         }
       } else if (act === "dock-word") {

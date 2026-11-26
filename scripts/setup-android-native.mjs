@@ -22,6 +22,12 @@ if (!existsSync(ANDROID)) {
 // 1. AndroidManifest.xml — allow cleartext local LAN API endpoints
 const manifestPath = path.join(ANDROID, "app/src/main/AndroidManifest.xml");
 let manifest = await readFile(manifestPath, "utf8");
+if (!manifest.includes("android.permission.VIBRATE")) {
+  manifest = manifest.replace(/<manifest[^>]*>/, (tag) => `${tag}\n    <uses-permission android:name="android.permission.VIBRATE" />`);
+  await writeFile(manifestPath, manifest, "utf8");
+  console.log("Patched AndroidManifest.xml (VIBRATE permission)");
+}
+
 if (!manifest.includes("usesCleartextTraffic")) {
   manifest = manifest.replace("<application", '<application\n        android:usesCleartextTraffic="true"');
   await writeFile(manifestPath, manifest, "utf8");
@@ -37,6 +43,8 @@ import android.content.Context;
 import android.graphics.Color;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
@@ -85,6 +93,7 @@ public class MainActivity extends BridgeActivity {
             WebView wv = this.bridge.getWebView();
             wv.addJavascriptInterface(new TalkPrintBridge(), "TalkPrintBridge");
             wv.addJavascriptInterface(new TalkSystemBars(), "TalkSystemBars");
+            wv.addJavascriptInterface(new TalkHaptics(), "TalkHaptics");
         }
     }
 
@@ -117,6 +126,29 @@ public class MainActivity extends BridgeActivity {
         if (webView == null) return;
         final String js = "document.documentElement.style.setProperty('--native-safe-bottom','" + lastBottomDp + "px');";
         webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    private class TalkHaptics {
+        @JavascriptInterface
+        public void tick() {
+            tick(9);
+        }
+
+        @JavascriptInterface
+        public void tick(final int ms) {
+            runOnUiThread(() -> {
+                try {
+                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                    if (v == null || !v.hasVibrator()) return;
+                    int duration = Math.max(4, Math.min(ms, 24));
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        v.vibrate(VibrationEffect.createOneShot(duration, VibrationEffect.DEFAULT_AMPLITUDE));
+                    } else {
+                        v.vibrate(duration);
+                    }
+                } catch (Exception ignored) { }
+            });
+        }
     }
 
     private class TalkSystemBars {
