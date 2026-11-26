@@ -1554,7 +1554,9 @@ A more mature generation of tools will learn when to get out of the way—and wh
       try {
         const res = await bridge()?.lookupFullEntry?.(phrase, mode);
         if (exp.dataset.loadedKey !== loadKey) return;
-        exp.innerHTML = renderExpandedEntryHtml(res?.kind || mode, res?.data || null);
+        const realHtml = res?.data ? bridge()?.renderEntryBodyHtml?.(res.kind || mode, res.data) : "";
+        exp.innerHTML = realHtml || renderExpandedEntryHtml(res?.kind || mode, res?.data || null);
+        if (realHtml) bridge()?.enhanceEntryDom?.(exp);
       } catch (err) {
         if (exp.dataset.loadedKey !== loadKey) return;
         exp.innerHTML = `<p class="reader-exp-empty">${esc(err?.message || "完整词条加载失败")}</p>`;

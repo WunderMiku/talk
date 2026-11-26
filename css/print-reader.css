@@ -2135,3 +2135,18 @@
     padding-right: 16px !important;
   }
 }
+
+/* Real talk. wordPage/chunkPage embedded inside expanded reader bottom sheet */
+.reader-dock-expanded .result-page {
+  padding: 6px 2px 20px !important;
+  min-height: 0 !important;
+}
+
+.reader-dock-expanded .result-hero {
+  padding-top: 4px;
+}
+
+.reader-dock-expanded .reclassify,
+.reader-dock-expanded .page-actions {
+  display: none;
+}

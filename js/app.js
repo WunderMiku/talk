@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "286"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "287"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2206,7 +2206,7 @@
   function sharePageData() {
     const route = state.route;
     const theme = window.TALK_THEME?.current?.() || { label: "Talk" };
-    if (route.name === "word") {
+    if (state.wordLayers.length || route.name === "word") {
       const word = activeWordData();
       if (!word?.word) return null;
       const example = exampleForTheme(word) || word.examples?.[0] || null;
@@ -2435,9 +2435,16 @@
 
   let shareCard = null;
 
+  function activeShareScope() {
+    if (state.wordLayers.length) return state.wordLayers[state.wordLayers.length - 1].el;
+    return screen || document;
+  }
+
   function shareHeroNode() {
+    const scope = activeShareScope();
+    if (state.wordLayers.length) return scope.querySelector(".result-hero");
     const route = state.route;
-    const pick = (selector) => document.querySelector(selector);
+    const pick = (selector) => scope.querySelector(selector);
     if (route.name === "word") return pick(".result-hero");
     if (route.name === "chunk") return pick(".chunk-hero");
     if (route.name === "sentence") return pick(".sentence-stage") || pick(".sentence-line");
@@ -2446,7 +2453,8 @@
 
   // Every block on the page can go into the image; the reader decides which.
   function shareSections() {
-    return Array.from(document.querySelectorAll(".result-page .block"))
+    const scope = activeShareScope();
+    return Array.from(scope.querySelectorAll(".result-page .block"))
       .filter((block) => block.querySelector(".block-head, .sentence-part-head"))
       .map((block, index) => {
         const head = block.querySelector(".block-head, .sentence-part-head");
@@ -2469,10 +2477,11 @@
     const paper = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#f6f1e7";
     const theme = window.TALK_THEME?.current?.() || {};
     const stage = document.createElement("div");
-    const scope = route.name === "chunk" ? "chunk-page" : route.name === "sentence" ? "sentence-page" : "result-page";
+    const inLayer = state.wordLayers.length > 0;
+    const scope = inLayer ? "result-page" : route.name === "chunk" ? "chunk-page" : route.name === "sentence" ? "sentence-page" : "result-page";
     stage.className = `share-compose ${scope}`;
     stage.setAttribute("data-theme", theme.id || "");
-    if (route.name === "sentence") stage.setAttribute("data-view", "original");
+    if (!inLayer && route.name === "sentence") stage.setAttribute("data-view", "original");
     stage.innerHTML = `
       <div class="share-compose-brand">
         <span class="share-compose-logo">talk.</span>
@@ -2656,6 +2665,7 @@
         </div>
         <div class="top-actions">
           ${bookmark ? `<button class="icon-btn ${saved ? "is-saved" : ""}" type="button" data-action="save" aria-label="${saved ? "取消收藏" : "收藏"}" aria-pressed="${saved}" title="${saved ? "已收藏" : "收藏"}">${icon("bookmark")}</button>` : ""}
+          <button class="icon-btn" type="button" data-action="share-page" aria-label="分享这一页" title="分享这一页">${icon("share")}</button>
           <button class="icon-btn" type="button" data-action="settings" aria-label="连接模型" title="连接模型">${icon("settings")}</button>
         </div>
       </header>`;
@@ -10201,6 +10211,17 @@
 
   window.__TALK_BRIDGE__ = {
     hasModelConfig: () => hasModelConfig(),
+    renderEntryBodyHtml: (kind, data) => {
+      if (!data) return "";
+      const full = kind === "chunk" ? chunkPage(ensureChunk(data)) : wordPage(ensureWord(data));
+      return full.replace(/^\s*<header class="topbar">[\s\S]*?<\/header>/i, "");
+    },
+    enhanceEntryDom: (container) => {
+      if (!container) return;
+      enhanceWordColumns(container);
+      container.querySelectorAll(".reveal, .reveal-item").forEach((el) => el.classList.add("is-in"));
+      refreshCacheBorders(container);
+    },
     lookupFullEntry: async (phrase, mode = "word") => {
       const clean = String(phrase || "").trim();
       if (!clean) return null;
