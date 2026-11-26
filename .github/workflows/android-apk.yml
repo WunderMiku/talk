@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-apk-${{ github.ref }}
@@ -81,6 +81,24 @@ jobs:
         if: env.KEYSTORE_B64 == ''
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
+
+      - name: Publish the APK to a GitHub Release
+        if: env.KEYSTORE_B64 != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            TAG="${GITHUB_REF_NAME}"
+            TITLE="talk. ${GITHUB_REF_NAME}"
+            NOTES="Built from ${GITHUB_SHA:0:7} · build ${TALK_BUILD}."
+          else
+            TAG="apk-latest"
+            TITLE="talk. APK (latest)"
+            NOTES="Built from ${GITHUB_SHA:0:7} · build ${TALK_BUILD} · $(date -u +%FT%TZ)"
+          fi
+          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
+          gh release upload "$TAG" "talk-${TALK_BUILD}-release.apk" --clobber
+          gh release edit "$TAG" --notes "$NOTES"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
