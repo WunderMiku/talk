@@ -97,6 +97,10 @@ if (existsSync(srcIcon)) {
     await copyFile(legacy, path.join(dir, "ic_launcher.png"));
     await copyFile(legacy, path.join(dir, "ic_launcher_round.png"));
     await copyFile(foreground, path.join(dir, "ic_launcher_foreground.png"));
+    const background = existsSync(path.join(set, "ic_launcher_background.png"))
+      ? path.join(set, "ic_launcher_background.png")
+      : null;
+    if (background) await copyFile(background, path.join(dir, "ic_launcher_background.png"));
   }
 
   // Remove any default Capacitor vector foreground/background XMLs that could shadow our PNGs
@@ -126,7 +130,7 @@ if (existsSync(srcIcon)) {
   await mkdir(anydpiDir, { recursive: true });
   const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
 <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
-    <background android:drawable="@color/ic_launcher_background"/>
+    <background android:drawable="@mipmap/ic_launcher_background"/>
     <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
 </adaptive-icon>
 `;
