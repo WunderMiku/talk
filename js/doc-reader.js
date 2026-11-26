@@ -1540,7 +1540,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
         };
         window.addEventListener("afterprint", restoreTitle, { once: true });
         window.setTimeout(() => {
-          try { window.print(); } finally {
+          try { if (!window.TALK_NATIVE_PRINT?.(safePdfTitle)) window.print(); } finally {
             window.setTimeout(() => {
               printingLock = false;
               restoreTitle();
