@@ -98,6 +98,12 @@ jobs:
           fi
           gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
           gh release upload "$TAG" "talk-${TALK_BUILD}-release.apk" --clobber
+          # Keep only the newest APK attached to the rolling release.
+          gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r asset; do
+            if [ "$asset" != "talk-${TALK_BUILD}-release.apk" ]; then
+              gh release delete-asset "$TAG" "$asset" -y || true
+            fi
+          done
           gh release edit "$TAG" --notes "$NOTES"
 
       - name: Upload APK
