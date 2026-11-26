@@ -1863,14 +1863,160 @@
   display: none !important;
 }
 
+.reader-lookup-dock[data-detent="compact"] .reader-dock-body {
+  display: none !important;
+}
+
 .reader-lookup-dock[data-detent="half"] {
   height: auto;
-  max-height: 38vh;
+  max-height: 42vh;
 }
 
 .reader-lookup-dock[data-detent="expanded"] {
   height: 72vh;
   max-height: 78vh;
+}
+
+.reader-dock-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reader-dock-expanded {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border-soft, var(--line));
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reader-dock-expanded[hidden] {
+  display: none !important;
+}
+
+.reader-exp-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reader-exp-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reader-exp-head strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.reader-exp-ipa {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-secondary, var(--muted));
+}
+
+.reader-exp-tag {
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--paper-deep, rgba(20, 20, 20, 0.06));
+  color: var(--text-secondary, var(--muted));
+}
+
+.reader-exp-zh {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+  line-height: 1.5;
+}
+
+.reader-exp-en {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-secondary, var(--muted));
+  line-height: 1.5;
+}
+
+.reader-exp-lbl {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--text-tertiary, var(--muted));
+}
+
+.reader-exp-list {
+  margin: 0;
+  padding-left: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.reader-exp-pos {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--accent-ink, var(--muted));
+}
+
+.reader-exp-sub {
+  font-size: 12.5px;
+  color: var(--text-secondary, var(--muted));
+}
+
+.reader-exp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.reader-exp-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--paper-deep, rgba(20, 20, 20, 0.05));
+  border: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.reader-exp-ex {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--paper-deep, rgba(20, 20, 20, 0.04));
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.reader-exp-ex p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.reader-exp-ex .reader-exp-ex-zh {
+  font-size: 12.5px;
+  color: var(--text-secondary, var(--muted));
+}
+
+.reader-exp-note,
+.reader-exp-empty {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-secondary, var(--muted));
 }
 
 .reader-dock-handle {
@@ -1940,8 +2086,6 @@
   .pdf-sheet {
     margin-left: 0;
     margin-right: 0;
-    border-left: 0 !important;
-    border-right: 0 !important;
     border-radius: 0 !important;
     padding: 16px 16px 20px !important;
   }

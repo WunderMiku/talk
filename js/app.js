@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "284"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "285"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -2628,7 +2628,7 @@
   }
 
   function backTopbar({ label, title, bookmark = null, share = false, actions = "" }) {
-    const saved = bookmark ? state.saved.includes(bookmark) : false;
+    const saved = bookmark ? isSavedKey(bookmark) : false;
     return `
       <header class="topbar">
         <button class="icon-btn" type="button" data-action="back" aria-label="返回">${icon("arrowLeft")}</button>
@@ -2646,7 +2646,7 @@
   }
 
   function layerTopbar({ label, title, bookmark = null, origin = "", relation = "", depth = 1 }) {
-    const saved = bookmark ? state.saved.includes(bookmark) : false;
+    const saved = bookmark ? isSavedKey(bookmark) : false;
     return `
       <header class="topbar">
         <button class="icon-btn" type="button" data-action="layer-back" aria-label="返回上一层">${icon("arrowLeft")}</button>
@@ -4279,7 +4279,7 @@
 
         ${reclassifyRow("word")}
         <div class="page-actions reveal" style="--d:3.2">
-          <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏单词</button>
+          <button class="btn btn-primary${isSavedKey(bookmark) ? " is-saved" : ""}" type="button" data-action="save" data-save-label="收藏单词" aria-pressed="${isSavedKey(bookmark)}">${icon("bookmark")} ${isSavedKey(bookmark) ? "已收藏" : "收藏单词"}</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="word" data-subject="${attr(word.word)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
@@ -4437,7 +4437,7 @@
 
         ${reclassifyRow("chunk", chunk.chunk)}
         <div class="page-actions reveal" style="--d:3">
-          <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} ${esc(copy.bookmark || "收藏")}</button>
+          <button class="btn btn-primary${isSavedKey(bookmark) ? " is-saved" : ""}" type="button" data-action="save" data-save-label="${attr(copy.bookmark || "收藏意群")}" aria-pressed="${isSavedKey(bookmark)}">${icon("bookmark")} ${isSavedKey(bookmark) ? "已收藏" : esc(copy.bookmark || "收藏意群")}</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="chunk" data-subject="${attr(chunk.chunk)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
           <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} ${esc(copy.copy || "复制")}</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-chunk">${icon("refresh")} 重新生成意群</button>` : ""}
@@ -5410,7 +5410,7 @@
 
         ${reclassifyRow("sentence")}
         <div class="page-actions reveal" style="--d:2">
-          <button class="btn btn-primary" type="button" data-action="save">${icon("bookmark")} 收藏句子</button>
+          <button class="btn btn-primary${isSavedKey(bookmark) ? " is-saved" : ""}" type="button" data-action="save" data-save-label="收藏句子" aria-pressed="${isSavedKey(bookmark)}">${icon("bookmark")} ${isSavedKey(bookmark) ? "已收藏" : "收藏句子"}</button>
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="sentence" data-subject="${attr(sentence.text)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
           ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-sentence">${icon("refresh")} 重新生成分析</button>` : ""}
           <button class="btn btn-secondary" type="button" data-action="forget-sentence">删除缓存</button>
@@ -6934,18 +6934,19 @@
 
     const savedBody = saved.length ? `
       <div class="history-list">
-        ${saved.map((term) => {
-          const isPhrase = String(term).trim().includes(" ");
+        ${saved.map((raw) => {
+          const entry = parseSavedEntry(raw);
+          const typeLabel = entry.kind === "sentence" ? "句子" : entry.kind === "chunk" ? "意群 / 搭配" : "单词";
           return `
             <div class="saved-row">
-              <button class="history-item saved-item-btn" type="button" data-action="saved-item" data-term="${attr(term)}">
-                <span class="history-icon">${icon("bookmark")}</span>
+              <button class="history-item saved-item-btn" type="button" data-action="saved-item" data-term="${attr(raw)}">
+                <span class="history-icon">${icon(entry.kind === "sentence" ? "sentence" : "bookmark")}</span>
                 <span class="history-copy">
-                  <strong class="notranslate" translate="no" lang="en">${esc(shorten(term, 48))}</strong>
-                  <span>${isPhrase ? "意群 / 搭配" : "单词"} · 点击深入解析</span>
+                  <strong class="notranslate" translate="no" lang="en">${esc(shorten(entry.label, 48))}</strong>
+                  <span>${typeLabel} · 点击打开</span>
                 </span>
               </button>
-              <button class="saved-remove-btn" type="button" data-action="remove-saved" data-term="${attr(term)}" aria-label="移出收藏" title="移出收藏">×</button>
+              <button class="saved-remove-btn" type="button" data-action="remove-saved" data-term="${attr(raw)}" aria-label="移出收藏" title="移出收藏">×</button>
             </div>`;
         }).join("")}
       </div>
@@ -9126,18 +9127,27 @@
 
       case "saved-item": {
         event.preventDefault();
-        const term = String(target.dataset.term || "").trim();
-        if (!term) break;
+        const raw = String(target.dataset.term || "").trim();
+        if (!raw) break;
+        const entry = parseSavedEntry(raw);
+        if (!entry.text) break;
         closeSheet({ immediate: true });
-        if (term.includes(" ")) runSearch(term, "chunk");
-        else openWordLayer(term, { relation: "收藏词册", origin: "收藏" });
+        if (entry.kind === "sentence") runSearch(entry.text, "sentence");
+        else if (entry.kind === "chunk") runSearch(entry.text, "chunk");
+        else openWordLayer(entry.text, { relation: "收藏词册", origin: "收藏" });
         break;
       }
 
       case "remove-saved": {
         event.preventDefault();
-        const term = String(target.dataset.term || "").trim().toLowerCase();
-        state.saved = state.saved.filter((w) => w.toLowerCase() !== term);
+        const raw = String(target.dataset.term || "").trim();
+        const idx = findSavedIndex(raw);
+        if (idx >= 0) {
+          state.saved.splice(idx, 1);
+        } else {
+          const lower = raw.toLowerCase();
+          state.saved = state.saved.filter((w) => String(w).toLowerCase() !== lower);
+        }
         persistSaved();
         renderHistoryContent();
         if (state.route.name === "reader" && window.TALK_READER?.refreshTheme) {
@@ -9153,7 +9163,7 @@
           toast("收藏词册为空");
           break;
         }
-        const blob = new Blob([state.saved.join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
+        const blob = new Blob([state.saved.map((item) => parseSavedEntry(item).label).join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
@@ -9482,40 +9492,85 @@
     return null;
   }
 
+  function parseSavedEntry(raw) {
+    const str = String(raw || "").trim();
+    if (str.startsWith("word:")) {
+      const text = str.slice(5).trim();
+      return { kind: "word", text, label: text };
+    }
+    if (str.startsWith("chunk:")) {
+      const text = str.slice(6).replace(/-/g, " ").trim();
+      return { kind: "chunk", text, label: text };
+    }
+    if (str.startsWith("sentence:")) {
+      const rest = str.slice(9).trim();
+      const hit = DATA.sentences?.find((item) => item.id === rest);
+      const text = hit?.text || rest;
+      return { kind: "sentence", text, label: text };
+    }
+    const kind = str.includes(" ") ? "chunk" : "word";
+    return { kind, text: str, label: str };
+  }
+
+  function normalizeSavedKey(raw) {
+    const entry = parseSavedEntry(raw);
+    if (!entry.text) return "";
+    if (entry.kind === "sentence") return `sentence:${entry.text.toLowerCase()}`;
+    return entry.text.toLowerCase();
+  }
+
+  function findSavedIndex(key) {
+    const target = normalizeSavedKey(key);
+    if (!target) return -1;
+    return state.saved.findIndex((item) => normalizeSavedKey(item) === target);
+  }
+
+  function isSavedKey(key) {
+    return findSavedIndex(key) >= 0;
+  }
+
   function bookmarkKey() {
     const active = activeWordData();
-    if (active?.word) return `word:${normalizeWord(active.word)}`;
-    if (state.route.name === "sentence") return `sentence:${state.route.result?.id || state.route.id}`;
-    if (state.route.name === "chunk") return `chunk:${chunkSlug(state.route.query || "")}`;
+    if (active?.word) return normalizeWord(active.word);
+    if (state.route.name === "sentence") {
+      const text = String(state.route.result?.text || state.route.query || "").trim();
+      return text ? `sentence:${text}` : null;
+    }
+    if (state.route.name === "chunk") {
+      const text = String(state.route.result?.chunk || state.route.query || "").trim().toLowerCase();
+      return text || null;
+    }
     return null;
+  }
+
+  function syncSaveButton(item, saved) {
+    if (!item) return;
+    item.classList.toggle("is-saved", saved);
+    item.setAttribute("aria-pressed", String(saved));
+    item.setAttribute("aria-label", saved ? "取消收藏" : "收藏");
+    item.setAttribute("title", saved ? "已收藏" : "收藏");
+    const baseLabel = item.dataset.saveLabel;
+    if (baseLabel) {
+      item.innerHTML = `${icon("bookmark")} ${saved ? "已收藏" : esc(baseLabel)}`;
+    }
   }
 
   function toggleSaved(button) {
     const key = bookmarkKey();
     if (!key) return;
-    const index = state.saved.indexOf(key);
+    const index = findSavedIndex(key);
     if (index >= 0) {
       state.saved.splice(index, 1);
       toast("已取消收藏");
     } else {
-      state.saved.push(key);
-      toast("已收藏，稍后再看");
+      state.saved.unshift(key);
+      toast("已收藏到词册");
     }
     persistSaved();
-    const saved = state.saved.includes(key);
-    if (button) {
-      button.classList.toggle("is-saved", saved);
-      button.setAttribute("aria-pressed", String(saved));
-      button.setAttribute("aria-label", saved ? "取消收藏" : "收藏");
-      button.setAttribute("title", saved ? "已收藏" : "收藏");
-    }
+    const saved = isSavedKey(key);
+    syncSaveButton(button, saved);
     const scope = state.wordLayers.length ? state.wordLayers[state.wordLayers.length - 1].el : screen;
-    $$('[data-action="save"]', scope).forEach((item) => {
-      item.classList.toggle("is-saved", saved);
-      item.setAttribute("aria-pressed", String(saved));
-      item.setAttribute("aria-label", saved ? "取消收藏" : "收藏");
-      item.setAttribute("title", saved ? "已收藏" : "收藏");
-    });
+    $$('[data-action="save"]', scope).forEach((item) => syncSaveButton(item, saved));
   }
 
   function primeAudio() {
@@ -10146,23 +10201,41 @@
 
   window.__TALK_BRIDGE__ = {
     hasModelConfig: () => hasModelConfig(),
+    lookupFullEntry: async (phrase, mode = "word") => {
+      const clean = String(phrase || "").trim();
+      if (!clean) return null;
+      const isChunk = mode === "chunk" || clean.includes(" ");
+      if (isChunk) {
+        const cached = cacheGetChunk(clean);
+        if (cached) return { kind: "chunk", data: cached };
+        const demo = DATA.chunks?.[chunkSlug(clean)];
+        if (demo) return { kind: "chunk", data: ensureChunk(demo) };
+        if (!hasModelConfig()) return null;
+        const res = await modelLookup(clean, "chunk", state.settings);
+        return res?.data ? { kind: "chunk", data: res.data } : null;
+      }
+      const key = normalizeWord(clean);
+      const cached = cacheGetWord(key);
+      if (cached) return { kind: "word", data: ensureWord(cached) };
+      const demo = DATA.words?.[key];
+      if (demo) return { kind: "word", data: ensureWord(demo) };
+      if (!hasModelConfig()) return null;
+      const res = await lookupWordDeduped(key);
+      return res?.data ? { kind: "word", data: ensureWord(res.data) } : null;
+    },
     homeTopbar: () => homeTopbar(),
     toast: (msg) => toast(msg),
-    isWordSaved: (term) => {
-      const clean = String(term || "").trim().toLowerCase();
-      return Boolean(clean && state.saved.some((w) => w.toLowerCase() === clean));
-    },
+    isWordSaved: (term) => isSavedKey(term),
     toggleSaveWord: (term) => {
       const clean = String(term || "").trim();
       if (!clean) return false;
-      const lower = clean.toLowerCase();
-      const exists = state.saved.some((w) => w.toLowerCase() === lower);
-      if (exists) {
-        state.saved = state.saved.filter((w) => w.toLowerCase() !== lower);
+      const idx = findSavedIndex(clean);
+      if (idx >= 0) {
+        state.saved.splice(idx, 1);
         persistSaved();
         return false;
       }
-      state.saved = [clean, ...state.saved];
+      state.saved.unshift(clean);
       persistSaved();
       return true;
     },
