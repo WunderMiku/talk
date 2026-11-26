@@ -76,20 +76,27 @@ public class MainActivity extends BridgeActivity {
 }
 
 // 3. Replace ALL Android launcher icons (including API 26+ Adaptive Icons)
+//    Per-density assets live in icons/android/<density>/ and are regenerated
+//    offline; copying one 512px bitmap into every bucket makes the launcher
+//    scale it by density and shows a different crop than the app info page.
 const srcIcon = path.join(ROOT, "icons/icon-512.png");
-const srcMaskable = existsSync(path.join(ROOT, "icons/maskable-512.png"))
-  ? path.join(ROOT, "icons/maskable-512.png")
-  : srcIcon;
+const iconDensities = ["mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"];
 const resDir = path.join(ANDROID, "app/src/main/res");
 
 if (existsSync(srcIcon)) {
-  // Replace legacy & adaptive foreground PNGs across all densities
-  for (const density of ["mipmap-mdpi", "mipmap-hdpi", "mipmap-xhdpi", "mipmap-xxhdpi", "mipmap-xxxhdpi"]) {
-    const dir = path.join(resDir, density);
+  for (const density of iconDensities) {
+    const dir = path.join(resDir, `mipmap-${density}`);
     await mkdir(dir, { recursive: true });
-    await copyFile(srcIcon, path.join(dir, "ic_launcher.png"));
-    await copyFile(srcIcon, path.join(dir, "ic_launcher_round.png"));
-    await copyFile(srcMaskable, path.join(dir, "ic_launcher_foreground.png"));
+    const set = path.join(ROOT, "icons", "android", density);
+    const legacy = existsSync(path.join(set, "ic_launcher.png"))
+      ? path.join(set, "ic_launcher.png")
+      : srcIcon;
+    const foreground = existsSync(path.join(set, "ic_launcher_foreground.png"))
+      ? path.join(set, "ic_launcher_foreground.png")
+      : legacy;
+    await copyFile(legacy, path.join(dir, "ic_launcher.png"));
+    await copyFile(legacy, path.join(dir, "ic_launcher_round.png"));
+    await copyFile(foreground, path.join(dir, "ic_launcher_foreground.png"));
   }
 
   // Remove any default Capacitor vector foreground/background XMLs that could shadow our PNGs
@@ -101,20 +108,20 @@ if (existsSync(srcIcon)) {
     await rm(path.join(resDir, stale), { force: true });
   }
 
-  // Set Adaptive Icon background color to match talk.'s Paper theme (#F3F0E7)
+  // Adaptive background must be the icon's own ink, not the paper colour.
   const valuesDir = path.join(resDir, "values");
   await mkdir(valuesDir, { recursive: true });
   await writeFile(
     path.join(valuesDir, "ic_launcher_background.xml"),
     `<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="ic_launcher_background">#F3F0E7</color>
+    <color name="ic_launcher_background">#141414</color>
 </resources>
 `,
     "utf8"
   );
 
-  // Point API 26+ Adaptive Icons explicitly to @mipmap/ic_launcher_foreground + @color/ic_launcher_background
+  // Point API 26+ Adaptive Icons at the transparent foreground + ink background.
   const anydpiDir = path.join(resDir, "mipmap-anydpi-v26");
   await mkdir(anydpiDir, { recursive: true });
   const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
