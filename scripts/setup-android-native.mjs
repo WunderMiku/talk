@@ -88,6 +88,30 @@ public class MainActivity extends BridgeActivity {
         }
     }
 
+    @Override
+    public void onResume() {
+        super.onResume();
+        View content = findViewById(android.R.id.content);
+        if (content != null) {
+            ViewCompat.requestApplyInsets(content);
+            content.invalidate();
+        }
+        WebView webView = bridge != null ? bridge.getWebView() : null;
+        if (webView != null) {
+            webView.onResume();
+            webView.resumeTimers();
+            webView.post(() -> {
+                webView.invalidate();
+                webView.requestLayout();
+                webView.evaluateJavascript(
+                    "window.dispatchEvent(new Event('talk:native-resume'));",
+                    null
+                );
+            });
+            pushSafeBottom();
+        }
+    }
+
     private void pushSafeBottom() {
         WebView webView = bridge != null ? bridge.getWebView() : null;
         if (webView == null) return;

@@ -939,7 +939,10 @@ A more mature generation of tools will learn when to get out of the way—and wh
         </footer>
         ${modalHtml}
       </section>
-      <div class="reader-lookup-dock" id="reader-lookup-dock" hidden role="region" aria-label="划词与点词联动栏">
+      <div class="reader-lookup-dock" id="reader-lookup-dock" hidden role="region" aria-label="划词与点词联动栏" data-detent="compact">
+        <div class="reader-dock-handle" id="reader-dock-handle" role="separator" aria-orientation="horizontal" aria-label="上下拖动缩放查询栏高度" title="上下拖动调整高度，双击展开/收起">
+          <span class="reader-dock-grip" aria-hidden="true"></span>
+        </div>
         <div class="reader-dock-gloss" id="reader-dock-gloss" hidden></div>
         <div class="reader-dock-bar">
           <div class="reader-dock-left">
@@ -1150,7 +1153,12 @@ A more mature generation of tools will learn when to get out of the way—and wh
     const dock = root.querySelector("#reader-lookup-dock");
     const gloss = root.querySelector("#reader-dock-gloss");
     if (gloss) { gloss.hidden = true; gloss.innerHTML = ""; }
-    if (dock) dock.hidden = true;
+    if (dock) {
+      dock.hidden = true;
+      dock.dataset.detent = "compact";
+      dock.style.height = "";
+      dock.classList.remove("is-dragging");
+    }
   }
 
   function findLocalContextualGloss(phrase) {
@@ -1178,6 +1186,11 @@ A more mature generation of tools will learn when to get out of the way—and wh
     if (!box) return;
     if (status === "loading") {
       box.hidden = false;
+    const dockEl = root.querySelector("#reader-lookup-dock");
+    if (dockEl && dockEl.dataset.detent === "compact") {
+      dockEl.dataset.detent = "half";
+      dockEl.style.height = "";
+    }
       box.innerHTML = `<div class="reader-dock-gloss-loading">正在结合本句语境速查「${esc(phrase)}」…</div>`;
       syncDockGeometry(root);
       return;
@@ -1351,6 +1364,175 @@ A more mature generation of tools will learn when to get out of the way—and wh
 
     if (root.dataset.readerClickBound === "1") return;
     root.dataset.readerClickBound = "1";
+
+    /* --- 1. Long-press (220ms) + Slide-to-Select across .pdf-en-prose .pdf-w --- */
+    let swipeTimer = 0;
+    let swiping = false;
+    let swipeAnchorEl = null;
+    let swipeParaEl = null;
+    let swipeAnchorIdx = -1;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    let lastSwipeEndAt = 0;
+
+    function cancelSwipeTimer() {
+      if (swipeTimer) {
+        window.clearTimeout(swipeTimer);
+        swipeTimer = 0;
+      }
+    }
+
+    function updateSwipeAtPoint(clientX, clientY) {
+      if (!swiping || !swipeParaEl) return;
+      const el = document.elementFromPoint(clientX, clientY);
+      const wordEl = el?.closest?.(".pdf-en-prose .pdf-w");
+      if (!wordEl || wordEl.closest("p") !== swipeParaEl) return;
+      const wi = Number(wordEl.dataset.wi);
+      if (!Number.isFinite(wi)) return;
+      const nextStart = Math.min(swipeAnchorIdx, wi);
+      const nextEnd = Math.max(swipeAnchorIdx, wi);
+      if (nextStart !== dockState.startIdx || nextEnd !== dockState.endIdx) {
+        dockState.paraEl = swipeParaEl;
+        dockState.startIdx = nextStart;
+        dockState.endIdx = nextEnd;
+        applyWordRangeSelection(root);
+      }
+    }
+
+    function finishSwipe() {
+      cancelSwipeTimer();
+      if (!swiping) return;
+      swiping = false;
+      lastSwipeEndAt = Date.now();
+      root.classList.remove("is-swipe-selecting");
+      const phrase = dockState.phrase;
+      swipeAnchorEl = null;
+      swipeParaEl = null;
+      swipeAnchorIdx = -1;
+      if (phrase) {
+        const mode = phrase.includes(" ") ? "chunk" : "word";
+        void runDockQuickGloss(root, mode);
+      }
+    }
+
+    root.addEventListener("touchstart", (e) => {
+      if (root.dataset.page !== "reader" || e.touches.length !== 1) return;
+      const wordEl = e.target.closest(".pdf-en-prose .pdf-w");
+      if (!wordEl) return;
+      const paraEl = wordEl.closest("p");
+      const wi = Number(wordEl.dataset.wi);
+      if (!paraEl || !Number.isFinite(wi)) return;
+      const t = e.touches[0];
+      swipeStartX = t.clientX;
+      swipeStartY = t.clientY;
+      swipeAnchorEl = wordEl;
+      swipeParaEl = paraEl;
+      swipeAnchorIdx = wi;
+      cancelSwipeTimer();
+      swipeTimer = window.setTimeout(() => {
+        swiping = true;
+        root.classList.add("is-swipe-selecting");
+        try { navigator.vibrate?.(12); } catch (_) { /* ignore */ }
+        dockState.paraEl = swipeParaEl;
+        dockState.startIdx = swipeAnchorIdx;
+        dockState.endIdx = swipeAnchorIdx;
+        applyWordRangeSelection(root);
+      }, 220);
+    }, { passive: true });
+
+    root.addEventListener("touchmove", (e) => {
+      if (root.dataset.page !== "reader" || e.touches.length !== 1) return;
+      const t = e.touches[0];
+      if (!swiping) {
+        if (swipeTimer && (Math.hypot(t.clientX - swipeStartX, t.clientY - swipeStartY) > 10)) {
+          cancelSwipeTimer();
+        }
+        return;
+      }
+      e.preventDefault();
+      updateSwipeAtPoint(t.clientX, t.clientY);
+    }, { passive: false });
+
+    root.addEventListener("touchend", finishSwipe, { passive: true });
+    root.addEventListener("touchcancel", () => {
+      cancelSwipeTimer();
+      swiping = false;
+      root.classList.remove("is-swipe-selecting");
+    }, { passive: true });
+
+    root.addEventListener("contextmenu", (e) => {
+      if (swiping || Date.now() - lastSwipeEndAt < 450) {
+        if (e.target.closest(".pdf-en-prose")) e.preventDefault();
+      }
+    });
+
+    /* --- 2. Resizable 3-Detent Bottom Sheet (#reader-lookup-dock) --- */
+    let draggingDock = false;
+    let dragStartY = 0;
+    let dragStartH = 0;
+    let lastHandleTap = 0;
+
+    function snapDockDetent(dock, targetHeight, deltaY) {
+      const vh = window.innerHeight || 760;
+      const compactH = 82;
+      const halfH = Math.round(vh * 0.36);
+      const expandedH = Math.round(vh * 0.72);
+      dock.classList.remove("is-dragging");
+      if (targetHeight < 58 || (deltaY > 110 && dragStartH <= halfH + 30)) {
+        hideLookupDock(root);
+        return;
+      }
+      let detent = "half";
+      if (targetHeight < (compactH + halfH) / 2) detent = "compact";
+      else if (targetHeight > (halfH + expandedH) / 2) detent = "expanded";
+      dock.dataset.detent = detent;
+      dock.style.height = "";
+    }
+
+    root.addEventListener("pointerdown", (e) => {
+      if (root.dataset.page !== "reader") return;
+      const handle = e.target.closest("#reader-dock-handle");
+      if (!handle) return;
+      const dock = root.querySelector("#reader-lookup-dock");
+      if (!dock || dock.hidden) return;
+      const now = Date.now();
+      if (now - lastHandleTap < 300) {
+        lastHandleTap = 0;
+        dock.dataset.detent = dock.dataset.detent === "expanded" ? "half" : "expanded";
+        dock.style.height = "";
+        return;
+      }
+      lastHandleTap = now;
+      draggingDock = true;
+      dragStartY = e.clientY;
+      dragStartH = dock.getBoundingClientRect().height;
+      dock.classList.add("is-dragging");
+      try { handle.setPointerCapture?.(e.pointerId); } catch (_) { /* ignore */ }
+      e.preventDefault();
+    });
+
+    root.addEventListener("pointermove", (e) => {
+      if (!draggingDock) return;
+      const dock = root.querySelector("#reader-lookup-dock");
+      if (!dock) return;
+      const vh = window.innerHeight || 760;
+      const dy = e.clientY - dragStartY;
+      const nextH = Math.max(44, Math.min(Math.round(vh * 0.82), Math.round(dragStartH - dy)));
+      dock.style.height = `${nextH}px`;
+      e.preventDefault();
+    });
+
+    const endDockDrag = (e) => {
+      if (!draggingDock) return;
+      draggingDock = false;
+      const dock = root.querySelector("#reader-lookup-dock");
+      if (!dock) return;
+      const curH = dock.getBoundingClientRect().height;
+      const dy = (e?.clientY ?? dragStartY) - dragStartY;
+      snapDockDetent(dock, curH, dy);
+    };
+    root.addEventListener("pointerup", endDockDrag);
+    root.addEventListener("pointercancel", endDockDrag);
     let printingLock = false;
     root.addEventListener("click", async (e) => {
       if (root.dataset.page !== "reader") return;
@@ -1363,6 +1545,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
         }
         const wordEl = e.target.closest(".pdf-en-prose .pdf-w");
         if (wordEl) {
+          if (Date.now() - lastSwipeEndAt < 380) return;
           const paraEl = wordEl.closest("p");
           const wi = Number(wordEl.dataset.wi);
           if (paraEl && Number.isFinite(wi)) {

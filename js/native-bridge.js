@@ -63,6 +63,35 @@
     });
   }
 
+  // Force a 1-frame GPU compositor repaint when returning from Android background
+  // so WebView never stays visually blank until the first touch event.
+  let resumeTimer = 0;
+  function kickRepaint() {
+    window.clearTimeout(resumeTimer);
+    resumeTimer = window.setTimeout(() => {
+      syncStatusBar();
+      const root = document.documentElement;
+      const prev = root.style.transform;
+      root.style.transform = "translateZ(0)";
+      window.requestAnimationFrame(() => {
+        root.style.transform = prev;
+        window.dispatchEvent(new Event("resize"));
+      });
+    }, 32);
+  }
+
+  if (appPlugin?.addListener) {
+    appPlugin.addListener("appStateChange", (state) => {
+      if (state && state.isActive) kickRepaint();
+    });
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) kickRepaint();
+  });
+  window.addEventListener("pageshow", kickRepaint);
+  window.addEventListener("focus", kickRepaint);
+  window.addEventListener("talk:native-resume", kickRepaint);
+
   window.addEventListener("DOMContentLoaded", () => {
     syncStatusBar();
     const obs = new MutationObserver(syncStatusBar);

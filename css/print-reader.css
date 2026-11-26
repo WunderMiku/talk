@@ -1833,3 +1833,161 @@
 @media (max-width: 420px) {
   .pdf-foot-mono { font-size: 9.5px; letter-spacing: 0.04em; }
 }
+
+/* ============================================================
+   Intensive Reader: Swipe-to-Select & Resizable Bottom Sheet
+   ============================================================ */
+.is-swipe-selecting .pdf-en-prose,
+.is-swipe-selecting .pdf-en-prose .pdf-w {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  touch-action: none;
+}
+
+.reader-lookup-dock {
+  display: flex;
+  flex-direction: column;
+  max-height: 82vh;
+  padding-top: 0 !important;
+  padding-bottom: calc(10px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px))) !important;
+  transition: height 0.24s cubic-bezier(0.22, 1, 0.36, 1), max-height 0.24s ease;
+  overflow: hidden;
+}
+
+.reader-lookup-dock.is-dragging {
+  transition: none !important;
+}
+
+.reader-lookup-dock[data-detent="compact"] .reader-dock-gloss {
+  display: none !important;
+}
+
+.reader-lookup-dock[data-detent="half"] {
+  height: auto;
+  max-height: 38vh;
+}
+
+.reader-lookup-dock[data-detent="expanded"] {
+  height: 72vh;
+  max-height: 78vh;
+}
+
+.reader-dock-handle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  margin: 0 -14px 2px;
+  cursor: ns-resize;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.reader-dock-grip {
+  width: 38px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--line-strong, rgba(20, 20, 20, 0.22));
+  transition: width 0.16s ease, background 0.16s ease;
+}
+
+.reader-lookup-dock.is-dragging .reader-dock-grip,
+.reader-dock-handle:active .reader-dock-grip {
+  width: 52px;
+  background: var(--ink, #141414);
+}
+
+.reader-dock-gloss {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.reader-dock-bar {
+  flex: 0 0 auto;
+}
+
+/* ============================================================
+   Mobile Portrait: Full-Width Reader Sheet (Zero Side Gaps)
+   ============================================================ */
+@media screen and (max-width: 640px) {
+  .screen[data-page="reader"] {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .reader-page:has(.pdf-root),
+  .reader-reading {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .reader-reading .reader-topbar,
+  .reader-page:has(.pdf-root) > .reader-topbar {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .pdf-root {
+    gap: 14px;
+    padding: 0;
+  }
+
+  .pdf-sheet {
+    margin-left: 0;
+    margin-right: 0;
+    border-left: 0 !important;
+    border-right: 0 !important;
+    border-radius: 0 !important;
+    padding: 16px 16px 20px !important;
+  }
+
+  .pdf-sec-bar {
+    flex-wrap: wrap;
+    row-gap: 6px;
+    margin: 14px 0 12px;
+  }
+
+  .pdf-sec-rule {
+    display: none;
+  }
+
+  .pdf-sec-title {
+    flex: 1 1 100%;
+    order: 3;
+    font-size: 16px;
+    line-height: 1.38;
+  }
+}
+
+/* Mobile reader: never let full-bleed content introduce horizontal scroll. */
+@media screen and (max-width: 640px) {
+  .screen[data-page="reader"] { overflow-x: clip; }
+  .reader-page, .reader-reading, .reader-doc, .pdf-root { max-width: 100%; }
+}
+
+@media screen and (max-width: 640px) {
+  .screen[data-page="reader"] > .topbar {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .screen[data-page="reader"] .reader-topbar {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+@media screen and (max-width: 640px) {
+  .screen[data-page="reader"] .reader-chrome {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  .screen[data-page="reader"] .reader-chrome .topbar {
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+}

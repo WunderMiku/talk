@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "283"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "284"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1612,6 +1612,7 @@
         const query = chunkFromSlug(decoded.slice(6));
         if (query) return { name: "chunk", query };
       }
+      if (decoded === "reverse") return { name: "reverse", id: "" };
       if (decoded.startsWith("reverse/")) {
         const id = decoded.slice(8);
         if (id) return { name: "reverse", id };
@@ -2062,7 +2063,18 @@
           }
         }
         if (!state.reverseThread?.length) {
-          return missPage("reverse", route.query || "", []);
+          // No thread in the URL: resume the most recent conversation so the
+          // history entry point stays reachable.
+          const recent = listReverseThreads()[0];
+          if (recent) {
+            state.reverseThreadId = recent.id;
+            state.reverseThread = recent.messages.map((turn) => ({ ...turn }));
+            state.reverseBudget = Number(recent.budget) || state.reverseBudget;
+            state.reverseStyle = recent.style || state.reverseStyle;
+            history.replaceState({ ...history.state, route: { name: "reverse", id: recent.id } }, "", routeHash({ name: "reverse", id: recent.id }));
+          } else {
+            return missPage("reverse", route.query || "", []);
+          }
         }
         return reversePage({ id: route.id });
       }
@@ -4506,6 +4518,19 @@
     return loadReverseThreads()[id] || null;
   }
 
+  function listReverseThreads() {
+    return Object.values(loadReverseThreads())
+      .filter((entry) => entry && entry.id && Array.isArray(entry.messages) && entry.messages.length)
+      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
+  }
+
+  function deleteReverseThread(id) {
+    if (!id) return;
+    const map = loadReverseThreads();
+    delete map[id];
+    saveReverseThreads(map);
+  }
+
   function currentReverseThread() {
     return Array.isArray(state.reverseThread) ? state.reverseThread : [];
   }
@@ -4541,16 +4566,18 @@
       return `<div class="reverse-turn-mine"><div class="reverse-bubble">${esc(turn.content)}</div></div>`;
     }
     if (turn.pending) {
-      return `<article class="reverse-turn is-pending">
+      return `<article class="reverse-turn is-pending" data-surface="elevated">
+        <div class="reverse-turn-head"><span class="reverse-turn-dot" aria-hidden="true"></span><span>talk.</span></div>
         <div class="reverse-typing" aria-label="正在组织语言"><i></i><i></i><i></i></div>
         <div class="typing-skeleton"><span></span><span></span><span></span></div>
         <div class="reverse-stream-body" id="reverse-stream"></div>
       </article>`;
     }
     if (turn.error) {
-      return `<article class="reverse-turn"><p class="reverse-error">${esc(turn.error)}</p></article>`;
+      return `<article class="reverse-turn is-error" data-surface="stamp"><p class="reverse-error">${esc(turn.error)}</p></article>`;
     }
-    return `<article class="reverse-turn">
+    return `<article class="reverse-turn" data-surface="elevated">
+      <div class="reverse-turn-head"><span class="reverse-turn-dot" aria-hidden="true"></span><span>talk.</span></div>
       <div class="reverse-markdown">${markdownLite(turn.content, true)}</div>
       ${turn.reasoning ? `<details class="rev-reasoning"><summary>模型思考</summary><p>${esc(String(turn.reasoning).slice(0, 4000))}</p></details>` : ""}
     </article>`;
@@ -4569,7 +4596,10 @@
           <span class="reverse-kicker">${esc(copy.label || "语境寻词")}</span>
           <strong>${esc(copy.title || "语境寻词")}</strong>
         </div>
-        <button class="icon-btn reverse-new" type="button" data-action="reverse-new" aria-label="新对话"><span aria-hidden="true">+</span></button>
+        <div class="reverse-topbar-actions">
+          <button class="icon-btn reverse-hist-btn" type="button" data-action="reverse-history" aria-label="历史对话" title="历史对话">${icon("clock")}${(() => { const n = listReverseThreads().length; return n ? `<span class="reverse-hist-badge">${n}</span>` : ""; })()}</button>
+          <button class="icon-btn reverse-new" type="button" data-action="reverse-new" aria-label="新对话" title="新对话"><span aria-hidden="true">+</span></button>
+        </div>
       </header>
       <main class="reverse-page reverse-thread">
         <div class="reverse-scroll">
@@ -6826,7 +6856,7 @@
 
   function openHistorySheet(defaultTab) {
     const translating = state.module === "translator";
-    if (defaultTab === "saved" || defaultTab === "recent") {
+    if (defaultTab === "saved" || defaultTab === "recent" || defaultTab === "reverse") {
       historySheetTab = defaultTab;
     } else if (state.module === "reader" && state.saved.length) {
       historySheetTab = "saved";
@@ -6853,13 +6883,38 @@
     const items = historyForCurrentModule();
     const translating = state.module === "translator";
     const saved = Array.isArray(state.saved) ? state.saved : [];
-    const activeTab = historySheetTab === "saved" ? "saved" : "recent";
+    const revThreads = listReverseThreads();
+    const activeTab = historySheetTab === "saved" ? "saved" : historySheetTab === "reverse" ? "reverse" : "recent";
 
     const tabsHtml = `
       <div class="history-tabs" role="tablist">
         <button class="history-tab ${activeTab === "recent" ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === "recent"}" data-action="history-tab" data-tab="recent">${translating ? "最近翻译" : "最近查询"} (${items.length})</button>
-        <button class="history-tab ${activeTab === "saved" ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === "saved"}" data-action="history-tab" data-tab="saved">收藏词册 (${saved.length})</button>
+        <button class="history-tab ${activeTab === "reverse" ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === "reverse"}" data-action="history-tab" data-tab="reverse">寻词记录 (${revThreads.length})</button>
+        <button class="history-tab ${activeTab === "saved" ? "active" : ""}" type="button" role="tab" aria-selected="${activeTab === "saved"}" data-action="history-tab" data-tab="saved">收藏 (${saved.length})</button>
       </div>`;
+
+    const reverseBody = revThreads.length ? `
+      <div class="history-list">
+        ${revThreads.map((entry) => {
+          const turns = Math.max(1, Math.ceil((entry.messages?.length || 0) / 2));
+          const isCurrent = state.route?.name === "reverse" && state.reverseThreadId === entry.id;
+          return `
+            <div class="saved-row">
+              <button class="history-item saved-item-btn${isCurrent ? " is-current" : ""}" type="button" data-action="reverse-open-thread" data-id="${attr(entry.id)}">
+                <span class="history-icon">${icon("sparkle")}</span>
+                <span class="history-copy">
+                  <strong>${esc(shorten(entry.title || "语境寻词", 44))}</strong>
+                  <span>${turns} 轮对话 · ${esc(timeAgo(entry.updatedAt || Date.now()))}${isCurrent ? " · 当前" : ""}</span>
+                </span>
+              </button>
+              <button class="saved-remove-btn" type="button" data-action="reverse-delete-thread" data-id="${attr(entry.id)}" aria-label="删除对话" title="删除对话">×</button>
+            </div>`;
+        }).join("")}
+      </div>
+      <div class="settings-actions">
+        <button class="btn btn-secondary" type="button" data-action="clear-reverse-threads">${icon("trash")} 清空寻词记录</button>
+      </div>` : `
+      <div class="history-empty">还没有语境寻词记录。<br />问一次 AI，对话会自动留在这里。</div>`;
 
     const recentBody = items.length ? `
       <div class="history-list">
@@ -6903,7 +6958,7 @@
     holder.innerHTML = `
       <div class="sheet-content">
         ${tabsHtml}
-        ${activeTab === "saved" ? savedBody : recentBody}
+        ${activeTab === "saved" ? savedBody : activeTab === "reverse" ? reverseBody : recentBody}
       </div>`;
   }
 
@@ -9018,8 +9073,54 @@
 
       case "history-tab": {
         event.preventDefault();
-        historySheetTab = target.dataset.tab === "saved" ? "saved" : "recent";
+        historySheetTab = target.dataset.tab === "saved" ? "saved" : target.dataset.tab === "reverse" ? "reverse" : "recent";
         renderHistoryContent();
+        break;
+      }
+
+      case "reverse-history": {
+        event.preventDefault();
+        tapFeedback();
+        openHistorySheet("reverse");
+        break;
+      }
+
+      case "reverse-open-thread": {
+        event.preventDefault();
+        const id = target.dataset.id || "";
+        const stored = loadReverseThread(id);
+        if (!stored) break;
+        tapFeedback();
+        closeSheet({ immediate: true });
+        state.reverseThreadId = stored.id;
+        state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
+        state.reverseBudget = Number(stored.budget) || state.reverseBudget;
+        state.reverseStyle = stored.style || state.reverseStyle;
+        navigate({ name: "reverse", id: stored.id });
+        break;
+      }
+
+      case "reverse-delete-thread": {
+        event.preventDefault();
+        const id = target.dataset.id || "";
+        if (!id) break;
+        deleteReverseThread(id);
+        if (state.reverseThreadId === id) {
+          state.reverseThread = [];
+          state.reverseThreadId = "";
+        }
+        renderHistoryContent();
+        toast("已删除这条寻词记录");
+        break;
+      }
+
+      case "clear-reverse-threads": {
+        event.preventDefault();
+        writeLocalJson(reverseThreadsKey(), {});
+        state.reverseThread = [];
+        state.reverseThreadId = "";
+        renderHistoryContent();
+        toast("已清空寻词记录");
         break;
       }
 

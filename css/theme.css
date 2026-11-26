@@ -211,3 +211,263 @@ html.is-native-app .reverse-composer {
 html.is-native-app .toast {
   bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px)));
 }
+
+/* ============================================================
+   Reverse / Context Lookup: 4-Surface Tactile Upgrade
+   ============================================================ */
+.reverse-topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 4px 14px;
+}
+
+.reverse-topbar-copy {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.reverse-kicker {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary, var(--muted));
+}
+
+.reverse-topbar-copy strong {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reverse-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.reverse-hist-btn {
+  position: relative;
+}
+
+.reverse-hist-badge {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  text-align: center;
+}
+
+.reverse-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px 12px;
+}
+
+.reverse-turn-mine {
+  margin: 2px 0;
+}
+
+.reverse-bubble {
+  max-width: 84%;
+  padding: 11px 15px;
+  border: 0;
+  border-radius: 18px 18px 4px 18px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 14.5px;
+  line-height: 1.55;
+  box-shadow: var(--shadow-card, none);
+}
+
+.reverse-turn[data-surface="elevated"] {
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.reverse-turn[data-surface="stamp"] {
+  padding: 12px 14px;
+}
+
+.reverse-turn-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-tertiary, var(--muted));
+  letter-spacing: 0.03em;
+}
+
+.reverse-turn-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-ink, var(--accent));
+}
+
+.reverse-markdown {
+  font-size: 15px;
+  line-height: 1.72;
+  color: var(--ink);
+}
+
+.reverse-markdown p + p {
+  margin-top: 10px;
+}
+
+.reverse-markdown ul,
+.reverse-markdown ol {
+  margin: 8px 0;
+  padding-left: 18px;
+}
+
+.reverse-markdown li + li {
+  margin-top: 5px;
+}
+
+.rev-reasoning {
+  margin-top: 4px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 10px);
+  background: var(--paper-deep, rgba(20, 20, 20, 0.04));
+  font-size: 12.5px;
+  color: var(--text-secondary, var(--muted));
+}
+
+.rev-reasoning summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.rev-reasoning p {
+  margin-top: 6px;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.reverse-actions {
+  margin-top: 4px;
+  gap: 7px;
+}
+
+.reverse-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-raised, var(--card));
+  color: var(--text-secondary, var(--muted));
+  font-size: 12.5px;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease, transform 0.12s ease;
+}
+
+.reverse-chip:hover {
+  color: var(--ink);
+  border-color: var(--border-strong, var(--ink));
+}
+
+.reverse-chip:active {
+  transform: scale(0.97);
+}
+
+.reverse-chip.is-icon {
+  padding: 7px 10px;
+}
+
+.reverse-chip svg {
+  width: 14px;
+  height: 14px;
+}
+
+.reverse-hint {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-tertiary, var(--muted));
+}
+
+.reverse-composer {
+  align-items: center;
+  border-radius: 16px;
+  padding: 6px 6px 6px 14px;
+  bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px)));
+}
+
+.reverse-composer input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-ui, var(--sans));
+  font-size: 14.5px;
+  padding: 8px 4px;
+}
+
+.reverse-composer input:focus {
+  outline: none;
+}
+
+.reverse-send {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--paper);
+  cursor: pointer;
+}
+
+.reverse-send svg {
+  width: 16px;
+  height: 16px;
+}
+
+[data-theme="retro-stub"] .reverse-bubble,
+[data-theme="constructivist"] .reverse-bubble,
+[data-theme="retro-stub"] .reverse-composer,
+[data-theme="constructivist"] .reverse-composer,
+[data-theme="retro-stub"] .reverse-send,
+[data-theme="constructivist"] .reverse-send {
+  border-radius: 0;
+}
+
+/* Three history tabs (queries / reverse threads / saved) share one row. */
+.history-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.history-tabs .history-tab {
+  padding: 8px 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
