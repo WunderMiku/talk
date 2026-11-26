@@ -28,26 +28,94 @@ if (!manifest.includes("usesCleartextTraffic")) {
   console.log("Patched AndroidManifest.xml (usesCleartextTraffic=true)");
 }
 
-// 2. MainActivity.java — register Android PrintManager JS bridge
+// 2. MainActivity.java — transparent bottom gesture bar + safe-area insets + PrintManager bridge
 const mainActPath = path.join(ANDROID, "app/src/main/java/app/wundermiku/talk/MainActivity.java");
 if (existsSync(mainActPath)) {
   const javaCode = `package app.wundermiku.talk;
 
 import android.content.Context;
+import android.graphics.Color;
+import android.os.Build;
 import android.os.Bundle;
 import android.print.PrintAttributes;
 import android.print.PrintDocumentAdapter;
 import android.print.PrintManager;
+import android.view.View;
+import android.view.Window;
 import android.webkit.JavascriptInterface;
 import android.webkit.WebView;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowCompat;
+import androidx.core.view.WindowInsetsCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private int lastBottomDp = 0;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        Window window = getWindow();
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        window.setNavigationBarColor(Color.TRANSPARENT);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            window.setNavigationBarContrastEnforced(false);
+        }
+
+        View content = findViewById(android.R.id.content);
+        if (content != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(content, (view, windowInsets) -> {
+                Insets bars = windowInsets.getInsets(
+                    WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout()
+                );
+                // Keep top safely below status bar / punch-hole, let canvas bleed behind bottom gesture bar.
+                view.setPadding(bars.left, bars.top, bars.right, 0);
+                float density = getResources().getDisplayMetrics().density;
+                lastBottomDp = Math.round(bars.bottom / Math.max(density, 1f));
+                pushSafeBottom();
+                return WindowInsetsCompat.CONSUMED;
+            });
+            ViewCompat.requestApplyInsets(content);
+        }
+
         if (this.bridge != null && this.bridge.getWebView() != null) {
-            this.bridge.getWebView().addJavascriptInterface(new TalkPrintBridge(), "TalkPrintBridge");
+            WebView wv = this.bridge.getWebView();
+            wv.addJavascriptInterface(new TalkPrintBridge(), "TalkPrintBridge");
+            wv.addJavascriptInterface(new TalkSystemBars(), "TalkSystemBars");
+        }
+    }
+
+    private void pushSafeBottom() {
+        WebView webView = bridge != null ? bridge.getWebView() : null;
+        if (webView == null) return;
+        final String js = "document.documentElement.style.setProperty('--native-safe-bottom','" + lastBottomDp + "px');";
+        webView.post(() -> webView.evaluateJavascript(js, null));
+    }
+
+    private class TalkSystemBars {
+        @JavascriptInterface
+        public void sync(final String colorHex, final boolean isDark) {
+            runOnUiThread(() -> {
+                Window window = getWindow();
+                try {
+                    int parsed = Color.parseColor(colorHex != null ? colorHex.trim() : "#F3F0E7");
+                    window.setStatusBarColor(parsed);
+                    window.getDecorView().setBackgroundColor(parsed);
+                } catch (IllegalArgumentException ignored) { }
+                window.setNavigationBarColor(Color.TRANSPARENT);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    window.setNavigationBarContrastEnforced(false);
+                }
+                WindowInsetsControllerCompat controller = WindowCompat.getInsetsController(window, window.getDecorView());
+                if (controller != null) {
+                    controller.setAppearanceLightStatusBars(!isDark);
+                    controller.setAppearanceLightNavigationBars(!isDark);
+                }
+                pushSafeBottom();
+            });
         }
     }
 
@@ -72,7 +140,7 @@ public class MainActivity extends BridgeActivity {
 }
 `;
   await writeFile(mainActPath, javaCode, "utf8");
-  console.log("Patched MainActivity.java (TalkPrintBridge)");
+  console.log("Patched MainActivity.java (Edge-to-Edge nav + TalkPrintBridge)");
 }
 
 // 3. Replace ALL Android launcher icons (including API 26+ Adaptive Icons)

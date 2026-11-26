@@ -189,3 +189,25 @@ html[data-module-dir="prev"] .screen.is-module-glide {
   html[data-module-dir]::view-transition-new(screen),
   .screen.is-module-glide { animation: none !important; }
 }
+
+/* ============================================================
+   Native Android App: Edge-to-Edge Bottom Gesture Bar Clearance
+   ============================================================ */
+html.is-native-app .screen,
+html.is-native-app .layer-scroll,
+html.is-native-app .sheet-scroll {
+  padding-bottom: calc(28px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px)));
+}
+
+html.is-native-app .settings-footer,
+html.is-native-app .sheet-footer {
+  padding-bottom: calc(14px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px)));
+}
+
+/* Fixed elements must clear the gesture bar too. */
+html.is-native-app .reverse-composer {
+  bottom: calc(12px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px)));
+}
+html.is-native-app .toast {
+  bottom: calc(24px + max(env(safe-area-inset-bottom, 0px), var(--native-safe-bottom, 0px)));
+}

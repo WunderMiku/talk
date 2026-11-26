@@ -25,14 +25,17 @@
     return false;
   };
 
-  // Sync Android StatusBar color & icon contrast with active talk. theme.
+  // Sync Android StatusBar + transparent bottom gesture bar with active talk. theme.
   function syncStatusBar() {
-    const sb = cap.Plugins?.StatusBar;
-    if (!sb) return;
     const theme = window.TALK_THEME?.current?.();
     const color = theme?.themeColor || "#f3f0e7";
     const isDark = /^#([0-3]|4[0-5])/i.test(color.trim());
-    sb.setOverlaysWebView?.({ overlay: false }).catch?.(() => {});
+    if (window.TalkSystemBars && typeof window.TalkSystemBars.sync === "function") {
+      window.TalkSystemBars.sync(color, isDark);
+      return;
+    }
+    const sb = cap.Plugins?.StatusBar;
+    if (!sb) return;
     sb.setBackgroundColor?.({ color }).catch?.(() => {});
     sb.setStyle?.({ style: isDark ? "DARK" : "LIGHT" }).catch?.(() => {});
   }
