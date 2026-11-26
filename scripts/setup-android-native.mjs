@@ -6,7 +6,7 @@
  *    Intensive Reader PDF export works natively inside the APK WebView.
  * 3. Copies icons/icon-512.png into mipmap launcher icons if present.
  */
-import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -75,12 +75,55 @@ public class MainActivity extends BridgeActivity {
   console.log("Patched MainActivity.java (TalkPrintBridge)");
 }
 
-// 3. Copy app icon into mipmap-xxxhdpi
+// 3. Replace ALL Android launcher icons (including API 26+ Adaptive Icons)
 const srcIcon = path.join(ROOT, "icons/icon-512.png");
+const srcMaskable = existsSync(path.join(ROOT, "icons/maskable-512.png"))
+  ? path.join(ROOT, "icons/maskable-512.png")
+  : srcIcon;
+const resDir = path.join(ANDROID, "app/src/main/res");
+
 if (existsSync(srcIcon)) {
-  const targetDir = path.join(ANDROID, "app/src/main/res/mipmap-xxxhdpi");
-  await mkdir(targetDir, { recursive: true });
-  await copyFile(srcIcon, path.join(targetDir, "ic_launcher.png"));
-  await copyFile(srcIcon, path.join(targetDir, "ic_launcher_round.png"));
-  console.log("Copied app icon into mipmap-xxxhdpi");
+  // Replace legacy & adaptive foreground PNGs across all densities
+  for (const density of ["mipmap-mdpi", "mipmap-hdpi", "mipmap-xhdpi", "mipmap-xxhdpi", "mipmap-xxxhdpi"]) {
+    const dir = path.join(resDir, density);
+    await mkdir(dir, { recursive: true });
+    await copyFile(srcIcon, path.join(dir, "ic_launcher.png"));
+    await copyFile(srcIcon, path.join(dir, "ic_launcher_round.png"));
+    await copyFile(srcMaskable, path.join(dir, "ic_launcher_foreground.png"));
+  }
+
+  // Remove any default Capacitor vector foreground/background XMLs that could shadow our PNGs
+  for (const stale of [
+    "drawable/ic_launcher_foreground.xml",
+    "drawable-v24/ic_launcher_foreground.xml",
+    "drawable/ic_launcher_background.xml"
+  ]) {
+    await rm(path.join(resDir, stale), { force: true });
+  }
+
+  // Set Adaptive Icon background color to match talk.'s Paper theme (#F3F0E7)
+  const valuesDir = path.join(resDir, "values");
+  await mkdir(valuesDir, { recursive: true });
+  await writeFile(
+    path.join(valuesDir, "ic_launcher_background.xml"),
+    `<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="ic_launcher_background">#F3F0E7</color>
+</resources>
+`,
+    "utf8"
+  );
+
+  // Point API 26+ Adaptive Icons explicitly to @mipmap/ic_launcher_foreground + @color/ic_launcher_background
+  const anydpiDir = path.join(resDir, "mipmap-anydpi-v26");
+  await mkdir(anydpiDir, { recursive: true });
+  const adaptiveXml = `<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>
+`;
+  await writeFile(path.join(anydpiDir, "ic_launcher.xml"), adaptiveXml, "utf8");
+  await writeFile(path.join(anydpiDir, "ic_launcher_round.xml"), adaptiveXml, "utf8");
+  console.log("Replaced all Android mipmap & API 26+ Adaptive Icons");
 }

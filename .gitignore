@@ -11,3 +11,5 @@ opencode.jsonc
 *.local
 secrets/
 android/
+
+.local-keys/
