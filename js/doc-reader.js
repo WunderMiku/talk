@@ -940,8 +940,9 @@ A more mature generation of tools will learn when to get out of the way—and wh
         ${modalHtml}
       </section>
       <div class="reader-lookup-dock" id="reader-lookup-dock" hidden role="region" aria-label="划词与点词联动栏" data-detent="compact">
-        <div class="reader-dock-handle" id="reader-dock-handle" role="separator" aria-orientation="horizontal" aria-label="上下拖动缩放查询栏高度" title="上拉展开完整词条，下拉收起">
+        <div class="reader-dock-handle" id="reader-dock-handle" role="separator" aria-orientation="horizontal" aria-label="上拉进入完整词卡抽屉，下拉收起" title="上拉进入完整词卡抽屉，下拉收起">
           <span class="reader-dock-grip" aria-hidden="true"></span>
+          <span class="reader-dock-pull-hint" id="reader-dock-pull-hint" aria-hidden="true">↑ 松手拉起完整词条</span>
         </div>
         <div class="reader-dock-body" id="reader-dock-body">
           <div class="reader-dock-gloss" id="reader-dock-gloss" hidden></div>
@@ -1164,7 +1165,11 @@ A more mature generation of tools will learn when to get out of the way—and wh
       dock.hidden = true;
       dock.dataset.detent = "compact";
       dock.style.height = "";
-      dock.classList.remove("is-dragging");
+      dock.classList.remove("is-dragging", "is-pull-armed", "is-handoff");
+      dock.style.transform = "";
+      const gEl = root.querySelector("#reader-dock-gloss");
+      if (gEl) gEl.style.opacity = "";
+      dockState.lastGloss = null;
       const exp = root.querySelector("#reader-dock-expanded");
       if (exp) { exp.hidden = true; exp.innerHTML = ""; exp.dataset.loadedKey = ""; }
     }
@@ -1215,6 +1220,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
       syncDockGeometry(root);
       return;
     }
+    dockState.lastGloss = data || null;
     const isSaved = bridge()?.isWordSaved?.(phrase);
     box.hidden = false;
     box.innerHTML = `
@@ -1298,6 +1304,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
     if (!dock || !label || !phrase) return;
     dockState.phrase = phrase;
     dockState.sentence = sentence || phrase;
+    dockState.lastGloss = null;
     label.textContent = phrase;
     const gloss = root.querySelector("#reader-dock-gloss");
     if (gloss) { gloss.hidden = true; gloss.innerHTML = ""; }
@@ -1493,113 +1500,35 @@ A more mature generation of tools will learn when to get out of the way—and wh
       }
     });
 
-    /* --- 2. Resizable 3-Detent Bottom Sheet (#reader-lookup-dock) --- */
+    /* --- 2. Pull-Up Handoff to Native .word-layer Drawer (#reader-lookup-dock) --- */
+    const PULL_THRESHOLD = 68;
     let draggingDock = false;
     let dragStartY = 0;
     let dragStartH = 0;
+    let pullArmed = false;
     let lastHandleTap = 0;
 
-    function renderExpandedEntryHtml(kind, data) {
-      if (!data) return '<p class="reader-exp-empty">未配置模型且本地无此词条缓存。</p>';
-      if (kind === "chunk") {
-        const senses = (data.senses || []).slice(0, 3);
-        const examples = (data.examples || []).slice(0, 2);
-        const kws = (data.keyWords || []).slice(0, 3);
-        return `
-          <div class="reader-exp-sec">
-            <div class="reader-exp-head">
-              <strong class="notranslate" translate="no" lang="en">${esc(data.chunk || "")}</strong>
-              ${data.phonetic ? `<span class="reader-exp-ipa">${esc(data.phonetic)}</span>` : ""}
-            </div>
-            ${data.translation ? `<p class="reader-exp-zh">${esc(data.translation)}</p>` : ""}
-            ${data.short ? `<p class="reader-exp-en">${esc(data.short)}</p>` : ""}
-          </div>
-          ${senses.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">释义</span><ul class="reader-exp-list">${senses.map((x) => `<li><strong>${esc(x.zh || "")}</strong>${x.when ? ` <span>· ${esc(x.when)}</span>` : ""}${x.en ? `<div class="reader-exp-sub">${esc(x.en)}</div>` : ""}</li>`).join("")}</ul></div>` : ""}
-          ${kws.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">词眼</span><ul class="reader-exp-list">${kws.map((k) => `<li><strong class="notranslate" translate="no" lang="en">${esc(k.word || "")}</strong> <span>${esc(k.gloss || "")}${k.why ? ` · ${esc(k.why)}` : ""}</span></li>`).join("")}</ul></div>` : ""}
-          ${examples.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">例句</span>${examples.map((ex) => `<div class="reader-exp-ex"><p class="notranslate" translate="no" lang="en">${esc(ex.en || "")}</p><p class="reader-exp-ex-zh">${esc(ex.zh || "")}</p></div>`).join("")}</div>` : ""}
-          ${data.note ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">提示</span><p class="reader-exp-note">${esc(data.note)}</p></div>` : ""}`;
-      }
-      const groups = (data.posGroups || []).slice(0, 3);
-      const examples = (data.examples || []).slice(0, 2);
-      const collocs = (data.collocations || []).slice(0, 5);
-      const family = (data.family || []).slice(0, 4);
-      return `
-        <div class="reader-exp-sec">
-          <div class="reader-exp-head">
-            <strong class="notranslate" translate="no" lang="en">${esc(data.word || "")}</strong>
-            ${data.phonetic ? `<span class="reader-exp-ipa">${esc(data.phonetic)}</span>` : ""}
-            ${data.level && data.level !== "—" ? `<span class="reader-exp-tag">${esc(data.level)}</span>` : ""}
-          </div>
-          ${data.translation ? `<p class="reader-exp-zh">${esc(data.translation)}</p>` : ""}
-          ${data.short ? `<p class="reader-exp-en">${esc(data.short)}</p>` : ""}
-        </div>
-        ${groups.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">词义</span><ul class="reader-exp-list">${groups.map((g) => (g.senses || []).slice(0, 2).map((x) => `<li>${g.pos ? `<code class="reader-exp-pos">${esc(g.pos)}</code> ` : ""}<strong>${esc(x.zh || "")}</strong>${x.en ? `<div class="reader-exp-sub">${esc(x.en)}</div>` : ""}</li>`).join("")).join("")}</ul></div>` : ""}
-        ${collocs.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">常见搭配</span><div class="reader-exp-chips">${collocs.map((c) => `<span class="reader-exp-chip notranslate" translate="no" lang="en">${esc(c)}</span>`).join("")}</div></div>` : ""}
-        ${examples.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">例句</span>${examples.map((ex) => `<div class="reader-exp-ex"><p class="notranslate" translate="no" lang="en">${esc(ex.en || "")}</p><p class="reader-exp-ex-zh">${esc(ex.zh || "")}</p></div>`).join("")}</div>` : ""}
-        ${family.length ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">同根词</span><div class="reader-exp-chips">${family.map((f) => `<span class="reader-exp-chip"><b class="notranslate" translate="no" lang="en">${esc(f.word)}</b> ${esc(f.gloss || "")}</span>`).join("")}</div></div>` : ""}
-        ${data.origin?.story ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">词源</span><p class="reader-exp-note">${esc(data.origin.story)}</p></div>` : ""}
-        ${data.note ? `<div class="reader-exp-sec"><span class="reader-exp-lbl">附注</span><p class="reader-exp-note">${esc(data.note)}</p></div>` : ""}`;
-    }
-
-    async function loadExpandedDockDetail(dock) {
-      const exp = root.querySelector("#reader-dock-expanded");
+    function handoffDockToLayer(dock) {
       const phrase = dockState.phrase;
-      if (!exp || !phrase) return;
-      const mode = phrase.includes(" ") ? "chunk" : "word";
-      const loadKey = `${mode}:${phrase.toLowerCase()}`;
-      exp.hidden = false;
-      if (exp.dataset.loadedKey === loadKey && exp.innerHTML.trim()) return;
-      exp.dataset.loadedKey = loadKey;
-      exp.innerHTML = `<div class="reader-dock-gloss-loading">正在展开「${esc(phrase)}」完整词条…</div>`;
-      try {
-        const res = await bridge()?.lookupFullEntry?.(phrase, mode);
-        if (exp.dataset.loadedKey !== loadKey) return;
-        const realHtml = res?.data ? bridge()?.renderEntryBodyHtml?.(res.kind || mode, res.data) : "";
-        exp.innerHTML = realHtml || renderExpandedEntryHtml(res?.kind || mode, res?.data || null);
-        if (realHtml) bridge()?.enhanceEntryDom?.(exp);
-      } catch (err) {
-        if (exp.dataset.loadedKey !== loadKey) return;
-        exp.innerHTML = `<p class="reader-exp-empty">${esc(err?.message || "完整词条加载失败")}</p>`;
-      }
-    }
-
-    function applyDockDetent(dock, detent) {
-      dock.dataset.detent = detent;
-      dock.style.height = "";
-      const exp = root.querySelector("#reader-dock-expanded");
-      const gloss = root.querySelector("#reader-dock-gloss");
-      if (detent === "expanded") {
-        if (gloss && gloss.hidden && dockState.phrase) {
-          void runDockQuickGloss(root, dockState.phrase.includes(" ") ? "chunk" : "word");
-        }
-        void loadExpandedDockDetail(dock);
-      } else if (exp) {
-        exp.hidden = true;
-      }
-    }
-
-    function snapDockDetent(dock, targetHeight, deltaY) {
-      const vh = window.innerHeight || 760;
-      const startDetent = dock.dataset.detent || "compact";
-      dock.classList.remove("is-dragging");
-      // Strong downward drag closes or steps down
-      if (targetHeight < 58 || (deltaY > 85 && startDetent !== "expanded")) {
+      const gloss = dockState.lastGloss;
+      if (!phrase) {
         hideLookupDock(root);
         return;
       }
-      if (deltaY < -55) {
-        applyDockDetent(dock, "expanded");
-        return;
+      const isChunk = phrase.includes(" ");
+      dock.classList.remove("is-dragging", "is-pull-armed");
+      dock.classList.add("is-handoff");
+      const glossEl = root.querySelector("#reader-dock-gloss");
+      if (glossEl) glossEl.style.opacity = "0";
+      window.setTimeout(() => hideLookupDock(root), 180);
+      if (isChunk) {
+        bridge()?.openChunk?.(phrase);
+      } else {
+        const ctx = gloss && (gloss.inContextZh || gloss.nuance)
+          ? { meaningZh: gloss.inContextZh || "", why: gloss.nuance || "" }
+          : null;
+        bridge()?.openWord?.(phrase, { relation: "精读选词", origin: "精读本", ...(ctx ? { context: ctx } : {}) });
       }
-      if (deltaY > 55 && startDetent === "expanded") {
-        const hasGloss = Boolean(root.querySelector("#reader-dock-gloss:not([hidden])"));
-        applyDockDetent(dock, hasGloss ? "half" : "compact");
-        return;
-      }
-      const halfThreshold = Math.round(vh * 0.44);
-      if (targetHeight >= halfThreshold) applyDockDetent(dock, "expanded");
-      else if (targetHeight <= 110) applyDockDetent(dock, "compact");
-      else applyDockDetent(dock, "half");
     }
 
     root.addEventListener("pointerdown", (e) => {
@@ -1611,14 +1540,17 @@ A more mature generation of tools will learn when to get out of the way—and wh
       const now = Date.now();
       if (now - lastHandleTap < 300) {
         lastHandleTap = 0;
-        applyDockDetent(dock, dock.dataset.detent === "expanded" ? "half" : "expanded");
+        handoffDockToLayer(dock);
         return;
       }
       lastHandleTap = now;
       draggingDock = true;
+      pullArmed = false;
       dragStartY = e.clientY;
       dragStartH = dock.getBoundingClientRect().height;
       dock.classList.add("is-dragging");
+      const hint = root.querySelector("#reader-dock-pull-hint");
+      if (hint) hint.textContent = dockState.phrase?.includes(" ") ? "↑ 松手拉起完整意群" : "↑ 松手拉起完整词条";
       try { handle.setPointerCapture?.(e.pointerId); } catch (_) { /* ignore */ }
       e.preventDefault();
     });
@@ -1627,10 +1559,39 @@ A more mature generation of tools will learn when to get out of the way—and wh
       if (!draggingDock) return;
       const dock = root.querySelector("#reader-lookup-dock");
       if (!dock) return;
-      const vh = window.innerHeight || 760;
+      const glossEl = root.querySelector("#reader-dock-gloss");
       const dy = e.clientY - dragStartY;
-      const nextH = Math.max(44, Math.min(Math.round(vh * 0.82), Math.round(dragStartH - dy)));
-      dock.style.height = `${nextH}px`;
+      if (dy < 0) {
+        // Elastic upward stretch + smoothly fade out the brief gloss as user approaches threshold
+        const pull = Math.min(130, -dy);
+        const progress = Math.min(1, pull / PULL_THRESHOLD);
+        const elastic = Math.round(pull * 0.62);
+        dock.style.height = `${Math.round(dragStartH + elastic)}px`;
+        dock.style.transform = "";
+        if (glossEl && !glossEl.hidden) {
+          glossEl.style.opacity = String(Math.max(0.08, 1 - progress * 0.92).toFixed(2));
+        }
+        const nowArmed = pull >= PULL_THRESHOLD;
+        if (nowArmed !== pullArmed) {
+          pullArmed = nowArmed;
+          dock.classList.toggle("is-pull-armed", pullArmed);
+          if (pullArmed) {
+            try {
+              if (window.TalkHaptics?.tick) window.TalkHaptics.tick(14);
+              else navigator.vibrate?.(14);
+            } catch (_) { /* ignore */ }
+          }
+        }
+      } else {
+        // Downward drag to dismiss
+        if (pullArmed) {
+          pullArmed = false;
+          dock.classList.remove("is-pull-armed");
+        }
+        dock.style.height = "";
+        dock.style.transform = `translateY(${Math.min(120, Math.round(dy * 0.85))}px)`;
+        if (glossEl && !glossEl.hidden) glossEl.style.opacity = "";
+      }
       e.preventDefault();
     });
 
@@ -1639,9 +1600,20 @@ A more mature generation of tools will learn when to get out of the way—and wh
       draggingDock = false;
       const dock = root.querySelector("#reader-lookup-dock");
       if (!dock) return;
-      const curH = dock.getBoundingClientRect().height;
+      const glossEl = root.querySelector("#reader-dock-gloss");
       const dy = (e?.clientY ?? dragStartY) - dragStartY;
-      snapDockDetent(dock, curH, dy);
+      if (pullArmed || dy <= -PULL_THRESHOLD) {
+        pullArmed = false;
+        handoffDockToLayer(dock);
+        return;
+      }
+      dock.classList.remove("is-dragging", "is-pull-armed");
+      dock.style.height = "";
+      dock.style.transform = "";
+      if (glossEl) glossEl.style.opacity = "";
+      if (dy > 64) {
+        hideLookupDock(root);
+      }
     };
     root.addEventListener("pointerup", endDockDrag);
     root.addEventListener("pointercancel", endDockDrag);

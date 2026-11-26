@@ -2150,3 +2150,40 @@
 .reader-dock-expanded .page-actions {
   display: none;
 }
+
+/* Pull-up handoff cue & smooth brief-gloss fade */
+.reader-dock-handle {
+  flex-direction: column;
+  gap: 3px;
+  height: auto;
+  min-height: 28px;
+  padding: 6px 0 4px;
+}
+
+.reader-dock-pull-hint {
+  display: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--accent-ink, var(--ink));
+  line-height: 1.2;
+}
+
+.reader-lookup-dock.is-pull-armed .reader-dock-pull-hint {
+  display: block;
+}
+
+.reader-lookup-dock.is-pull-armed .reader-dock-grip {
+  width: 56px;
+  background: var(--accent-ink, var(--ink));
+}
+
+.reader-dock-gloss {
+  transition: opacity 0.14s ease;
+}
+
+.reader-lookup-dock.is-handoff {
+  opacity: 0;
+  transform: translateY(-18px) !important;
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
