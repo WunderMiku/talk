@@ -522,3 +522,280 @@ html.is-native-app .toast {
     animation: none;
   }
 }
+
+/* ============================================================
+   Cold-Launch Splash (3 Random Styles: expand / type / think)
+   ============================================================ */
+.talk-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--surface-page, var(--paper, #f3f0e7));
+  color: var(--text-primary, var(--ink, #171813));
+  transition: opacity 0.36s ease, transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+  cursor: pointer;
+}
+
+.talk-splash.is-out {
+  opacity: 0;
+  transform: translate3d(0, -10px, 0) scale(0.985);
+  pointer-events: none;
+}
+
+.talk-splash-stage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.talk-splash[data-splash-mode="think"] .talk-splash-stage {
+  transform: translateY(-28px);
+}
+
+.talk-splash-mark {
+  display: inline-flex;
+  align-items: baseline;
+  font-family: var(--display, var(--font-ui, var(--sans)));
+  font-size: clamp(24px, 6.2vw, 38px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  white-space: nowrap;
+  user-select: none;
+}
+
+/* Mode 1: Smooth symmetric expansion */
+.talk-splash:not([data-splash-mode="expand"]) .ts-mid {
+  display: none;
+}
+
+.talk-splash .ts-mid {
+  display: inline-grid;
+  grid-template-columns: 0fr;
+  transition: grid-template-columns 0.72s cubic-bezier(0.22, 1, 0.36, 1);
+  vertical-align: baseline;
+}
+
+.talk-splash.is-open .ts-mid {
+  grid-template-columns: 1fr;
+}
+
+.talk-splash .ts-mid-inner {
+  overflow: hidden;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: baseline;
+  opacity: 0;
+  transform: translate3d(-4px, 0, 0);
+  filter: blur(3px);
+  transition:
+    opacity 0.48s ease 0.14s,
+    transform 0.64s cubic-bezier(0.22, 1, 0.36, 1) 0.1s,
+    filter 0.48s ease 0.14s;
+}
+
+.talk-splash.is-open .ts-mid-inner {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  filter: blur(0);
+}
+
+.talk-splash .ts-colon {
+  color: var(--accent-secondary, var(--accent-ink, #e85d3f));
+  font-weight: 700;
+  margin-left: 0.02em;
+}
+
+.talk-splash .ts-copy {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text-secondary, var(--muted, #6c6c61));
+}
+
+.talk-splash.is-open .ts-dot {
+  animation: talk-splash-dot-settle 0.72s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes talk-splash-dot-settle {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.24) translateY(-1px); }
+  100% { transform: scale(1); }
+}
+
+/* Mode 2 & 3: Caret + typed chars / LLM tokens */
+.talk-splash .ts-typed {
+  display: inline-flex;
+  align-items: baseline;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text-secondary, var(--muted, #6c6c61));
+}
+
+.talk-splash .ts-ch {
+  display: inline-block;
+  animation: talk-splash-char-in 0.16s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.talk-splash .ts-tok {
+  display: inline-block;
+  animation: talk-splash-tok-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.talk-splash .ts-ch.is-colon,
+.talk-splash .ts-tok.is-colon {
+  color: var(--accent-secondary, var(--accent-ink, #e85d3f));
+  font-weight: 700;
+  margin-left: 0.02em;
+}
+
+@keyframes talk-splash-char-in {
+  from { opacity: 0; transform: translate3d(0, 2px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes talk-splash-tok-in {
+  from { opacity: 0; filter: blur(3px); transform: translate3d(-2px, 1px, 0); }
+  to { opacity: 1; filter: blur(0); transform: translate3d(0, 0, 0); }
+}
+
+.talk-splash .ts-caret {
+  display: inline-block;
+  width: 0;
+  height: 0.92em;
+  margin: 0;
+  border-radius: 2px;
+  background: var(--accent-secondary, var(--accent-ink, #e85d3f));
+  vertical-align: -0.1em;
+  opacity: 0;
+  transition: width 0.18s cubic-bezier(0.22, 1, 0.36, 1), margin 0.18s ease, opacity 0.18s ease;
+}
+
+.talk-splash .ts-caret.is-on {
+  width: 2.2px;
+  margin: 0 2px;
+  opacity: 1;
+  animation: talk-splash-blink 0.75s steps(1, end) infinite;
+}
+
+.talk-splash .ts-caret.is-solid {
+  animation: none;
+  opacity: 1;
+}
+
+@keyframes talk-splash-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.15; }
+}
+
+.talk-splash .ts-dot {
+  display: inline-block;
+  color: var(--accent-secondary, var(--accent-ink, #e85d3f));
+  transform-origin: center bottom;
+}
+
+/* Mode 3: Miniature fixed-width thinking box */
+.talk-splash .ts-think-wrap {
+  width: 248px;
+  height: 82px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  margin-bottom: 12px;
+  pointer-events: none;
+}
+
+.talk-splash .ts-think-wrap[hidden] {
+  display: none;
+}
+
+.talk-splash .ts-think-box {
+  width: 248px;
+  height: 76px;
+  padding: 8px 11px 9px;
+  border-radius: var(--radius-sm, 10px);
+  border: 1px solid var(--border-soft, var(--line, rgba(23, 24, 19, 0.14)));
+  background: var(--surface-raised, var(--card, #faf7f0));
+  box-shadow: var(--shadow-card, 0 12px 28px -18px rgba(0, 0, 0, 0.25));
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  opacity: 0;
+  transform: translate3d(0, 10px, 0) scale(0.94);
+  transform-origin: center bottom;
+  transition: opacity 0.22s ease, transform 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+  overflow: hidden;
+}
+
+[data-theme="constructivist"] .talk-splash .ts-think-box,
+[data-theme="retro-stub"] .talk-splash .ts-think-box {
+  border-radius: 0;
+  border-width: 1.5px;
+}
+
+.talk-splash .ts-think-box.is-show {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.talk-splash .ts-think-box.is-collapse {
+  opacity: 0;
+  transform: translate3d(0, 8px, 0) scaleY(0.75) scaleX(0.92);
+  transition: opacity 0.2s ease, transform 0.22s cubic-bezier(0.4, 0, 1, 1);
+}
+
+.talk-splash .ts-think-head {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-code, var(--mono, monospace));
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary, var(--muted, #6c6c61));
+  flex: 0 0 auto;
+}
+
+.talk-splash .ts-think-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent-secondary, var(--accent-ink, #e85d3f));
+  animation: talk-splash-pulse 0.7s ease-in-out infinite alternate;
+}
+
+@keyframes talk-splash-pulse {
+  from { opacity: 0.35; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1.15); }
+}
+
+.talk-splash .ts-think-viewport {
+  flex: 1 1 auto;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, #000 22%, #000 100%);
+}
+
+.talk-splash .ts-think-stream {
+  font-family: var(--font-code, var(--mono, monospace));
+  font-size: 10.5px;
+  line-height: 1.42;
+  color: var(--text-secondary, var(--muted, #6c6c61));
+  word-break: break-word;
+  white-space: pre-wrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talk-splash .ts-mid,
+  .talk-splash .ts-mid-inner,
+  .talk-splash .ts-think-box,
+  .talk-splash .ts-ch,
+  .talk-splash .ts-tok,
+  .talk-splash .ts-caret,
+  .talk-splash.is-open .ts-dot {
+    animation: none !important;
+    transition: none !important;
+    filter: none !important;
+  }
+}

@@ -29,17 +29,156 @@
     })();
   </script>
 
-  <link rel="stylesheet" href="css/styles.css?v=290" />
-  <link rel="stylesheet" href="css/theme.css?v=290" />
-  <link rel="stylesheet" href="css/themes/still.css?v=290" />
-  <link rel="stylesheet" href="css/themes/constructivist.css?v=290" />
-  <link rel="stylesheet" href="css/themes/swiss-lab.css?v=290" />
-  <link rel="stylesheet" href="css/themes/topo-acid.css?v=290" />
-  <link rel="stylesheet" href="css/themes/archive-grid.css?v=290" />
-  <link rel="stylesheet" href="css/themes/retro-stub.css?v=290" />
-  <link rel="stylesheet" href="css/print-reader.css?v=290" />
+  <link rel="stylesheet" href="css/styles.css?v=291" />
+  <link rel="stylesheet" href="css/theme.css?v=291" />
+  <link rel="stylesheet" href="css/themes/still.css?v=291" />
+  <link rel="stylesheet" href="css/themes/constructivist.css?v=291" />
+  <link rel="stylesheet" href="css/themes/swiss-lab.css?v=291" />
+  <link rel="stylesheet" href="css/themes/topo-acid.css?v=291" />
+  <link rel="stylesheet" href="css/themes/archive-grid.css?v=291" />
+  <link rel="stylesheet" href="css/themes/retro-stub.css?v=291" />
+  <link rel="stylesheet" href="css/print-reader.css?v=291" />
 </head>
 <body>
+  <div class="talk-splash" id="talk-splash" aria-hidden="true">
+    <div class="talk-splash-stage">
+      <div class="ts-think-wrap" id="talk-splash-think-wrap" hidden>
+        <div class="ts-think-box" id="talk-splash-think">
+          <div class="ts-think-head"><span class="ts-think-dot"></span><span>thinking</span></div>
+          <div class="ts-think-viewport" id="talk-splash-vp"><div class="ts-think-stream" id="talk-splash-stream"></div></div>
+        </div>
+      </div>
+      <div class="talk-splash-mark" id="talk-splash-mark" translate="no" lang="en">
+        <span class="ts-lead">talk</span><span class="ts-mid" id="talk-splash-mid"><span class="ts-mid-inner"><span class="ts-colon">:</span><span class="ts-copy">&nbsp;an LLM dict</span></span></span><span class="ts-typed" id="talk-splash-typed"></span><span class="ts-caret" id="talk-splash-caret" aria-hidden="true"></span><span class="ts-dot">.</span>
+      </div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      var el = document.getElementById("talk-splash");
+      var typed = document.getElementById("talk-splash-typed");
+      var caret = document.getElementById("talk-splash-caret");
+      var thinkWrap = document.getElementById("talk-splash-think-wrap");
+      var box = document.getElementById("talk-splash-think");
+      var vp = document.getElementById("talk-splash-vp");
+      var stream = document.getElementById("talk-splash-stream");
+      if (!el || !typed || !caret) return;
+      // Automated browsers should never wait behind a decorative splash.
+      if (navigator.webdriver) { el.remove(); return; }
+      try {
+        if (sessionStorage.getItem("talk.splash.seen") === "1") { el.remove(); return; }
+        sessionStorage.setItem("talk.splash.seen", "1");
+      } catch (_) {}
+
+      // Pick 1 of 3 styles randomly without repeating the previous launch
+      var modes = ["expand", "type", "think"];
+      var pick = 0;
+      try {
+        var prev = Number(localStorage.getItem("talk.splash.last"));
+        var pool = [0, 1, 2].filter(function (i) { return i !== prev; });
+        pick = pool[Math.floor(Math.random() * pool.length)];
+        localStorage.setItem("talk.splash.last", String(pick));
+      } catch (_) {
+        pick = Math.floor(Math.random() * 3);
+      }
+      var mode = modes[pick] || "expand";
+      el.dataset.splashMode = mode;
+
+      var reduced = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      var timers = [];
+      var done = false;
+      function at(ms, fn) { timers.push(window.setTimeout(fn, ms)); }
+      function dismiss() {
+        if (done) return;
+        done = true;
+        timers.forEach(function (id) { window.clearTimeout(id); });
+        el.classList.add("is-out");
+        window.setTimeout(function () { el.remove(); }, 380);
+      }
+      el.addEventListener("click", dismiss, { once: true });
+      el.addEventListener("pointerdown", dismiss, { once: true, passive: true });
+      window.addEventListener("keydown", dismiss, { once: true });
+
+      if (reduced) {
+        el.dataset.splashMode = "expand";
+        el.classList.add("is-open");
+        at(700, dismiss);
+        return;
+      }
+
+      if (mode === "expand") {
+        at(320, function () { el.classList.add("is-open"); });
+        at(1620, dismiss);
+        return;
+      }
+
+      if (mode === "type") {
+        var text = ": an LLM dict";
+        at(360, function () { caret.classList.add("is-on"); });
+        var t = 640;
+        for (var i = 0; i < text.length; i++) {
+          (function (ch, delay) {
+            at(delay, function () {
+              caret.classList.add("is-solid");
+              var span = document.createElement("span");
+              span.className = "ts-ch" + (ch === ":" ? " is-colon" : "");
+              span.textContent = ch === " " ? "\u00A0" : ch;
+              typed.appendChild(span);
+            });
+          })(text[i], t);
+          t += text[i] === ":" ? 125 : text[i] === " " ? 70 : 50;
+        }
+        at(t + 60, function () { caret.classList.remove("is-solid"); });
+        at(t + 360, function () { caret.classList.remove("is-on"); });
+        at(t + 820, dismiss);
+        return;
+      }
+
+      // mode === "think": Thinking box + LLM token-by-token streaming insertion
+      if (thinkWrap) thinkWrap.hidden = false;
+      var thought = "defining talk. not a static glossary—read the sentence first, weigh register, tone, collocation & nuance... distill into one line: \": an LLM dict\"";
+      var tokens = [
+        { text: ":", colon: true, delay: 90 },
+        { text: "\u00A0an", delay: 115 },
+        { text: "\u00A0LLM", delay: 120 },
+        { text: "\u00A0dict", delay: 130 }
+      ];
+      at(280, function () { caret.classList.add("is-on"); });
+      at(440, function () { if (box) box.classList.add("is-show"); });
+      var tt = 560;
+      for (var j = 0; j < thought.length; j += 4) {
+        (function (slice, delay) {
+          at(delay, function () {
+            if (stream && vp) {
+              stream.textContent += slice;
+              vp.scrollTop = vp.scrollHeight;
+            }
+          });
+        })(thought.slice(j, j + 4), tt);
+        tt += 26;
+      }
+      at(tt + 100, function () {
+        if (box) {
+          box.classList.remove("is-show");
+          box.classList.add("is-collapse");
+        }
+      });
+      var tokT = tt + 310;
+      tokens.forEach(function (tok) {
+        at(tokT, function () {
+          caret.classList.add("is-solid");
+          var span = document.createElement("span");
+          span.className = "ts-tok" + (tok.colon ? " is-colon" : "");
+          span.textContent = tok.text;
+          typed.appendChild(span);
+        });
+        tokT += tok.delay;
+      });
+      at(tokT + 80, function () { caret.classList.remove("is-solid"); });
+      at(tokT + 300, function () { caret.classList.remove("is-on"); });
+      at(tokT + 820, dismiss);
+    })();
+  </script>
   <div class="stage">
     <div class="ambient ambient-a" aria-hidden="true"></div>
     <div class="ambient ambient-b" aria-hidden="true"></div>
@@ -88,17 +227,17 @@
     </footer>
   </div>
 
-  <script src="js/data.js?v=290"></script>
-  <script src="js/theme.js?v=290"></script>
-  <script src="js/content.js?v=290"></script>
-  <script src="js/prompts.js?v=290"></script>
+  <script src="js/data.js?v=291"></script>
+  <script src="js/theme.js?v=291"></script>
+  <script src="js/content.js?v=291"></script>
+  <script src="js/prompts.js?v=291"></script>
   <script src="vendor/idb.js"></script>
-  <script src="vendor/lenis.min.js?v=290"></script>
-  <script src="vendor/html-to-image.js?v=290"></script>
-  <script src="js/i18n.js?v=290"></script>
-  <script src="js/doc-parser.js?v=290"></script>
-  <script src="js/doc-reader.js?v=290"></script>
-  <script src="js/native-bridge.js?v=290"></script>
-  <script src="js/app.js?v=290"></script>
+  <script src="vendor/lenis.min.js?v=291"></script>
+  <script src="vendor/html-to-image.js?v=291"></script>
+  <script src="js/i18n.js?v=291"></script>
+  <script src="js/doc-parser.js?v=291"></script>
+  <script src="js/doc-reader.js?v=291"></script>
+  <script src="js/native-bridge.js?v=291"></script>
+  <script src="js/app.js?v=291"></script>
 </body>
 </html>
