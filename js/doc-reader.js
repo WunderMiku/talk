@@ -22,6 +22,13 @@
     recentDocs: [],
     focusEn: false,
     simplifyOnInput: false,
+    wbBookId: "",
+    wbSelected: new Set(),
+    wbLevel: "",
+    wbLength: "medium",
+    wbSmartFilter: true,
+    wbGenerating: false,
+    wbSheetOpen: false,
     showSimplified: true,
     modalOpen: false,
     opts: {
@@ -424,6 +431,119 @@ A more mature generation of tools will learn when to get out of the way—and wh
   }
 
   /* ---------- Rendering ---------- */
+  const WB_LEVELS = [
+    ["zhongkao", "中考"],
+    ["gaokao", "高考"],
+    ["cet4", "四级"],
+    ["cet6", "六级"],
+    ["kaoyan", "考研"],
+    ["ielts", "雅思"],
+    ["toefl", "托福"]
+  ];
+
+  const WB_LENGTHS = [
+    ["short", "约 150 词"],
+    ["medium", "约 300 词"],
+    ["long", "约 500 词"]
+  ];
+
+  function renderWordbookGeneratorHtml() {
+    const wb = window.TALK_WORDBOOKS;
+    if (!wb) return "";
+    const books = wb.listBooks();
+    const st = wb.stats();
+    const nonEmpty = books.filter((b) => b.items.length > 0);
+
+    // Quiet single-row entry card on the Reader home screen
+    const entryMeta = !nonEmpty.length
+      ? "暂无词条"
+      : books.length > 1
+        ? `${books.length} 本分册 · ${st.uniqueWords} 词`
+        : `${nonEmpty[0].name} · ${nonEmpty[0].items.length} 词`;
+
+    const entryAction = nonEmpty.length ? "wb-open-modal" : "wb-open-sheet";
+    const entryArrow = readerState.wbGenerating ? "正在生成…" : nonEmpty.length ? "挑词生成 →" : "打开书库 →";
+
+    const entryHtml = `
+      <button type="button" class="reader-wb-entry" data-reader-action="${entryAction}" ${readerState.wbGenerating ? "disabled" : ""}>
+        <span class="reader-wb-entry-left">
+          <span class="reader-wb-entry-title">从词汇书库生成精读</span>
+          <span class="reader-wb-entry-meta">${esc(entryMeta)}</span>
+        </span>
+        <span class="reader-wb-entry-arrow">${entryArrow}</span>
+      </button>`;
+
+    if (!readerState.wbSheetOpen || !nonEmpty.length) {
+      return entryHtml;
+    }
+
+    const activeBook = nonEmpty.find((b) => b.id === readerState.wbBookId) || nonEmpty[0];
+    readerState.wbBookId = activeBook.id;
+    const validTerms = new Set(activeBook.items.map((it) => it.term));
+    for (const t of [...readerState.wbSelected]) {
+      if (!validTerms.has(t)) readerState.wbSelected.delete(t);
+    }
+    const levelId = readerState.wbLevel || bridge()?.getSentenceLevel?.() || "cet6";
+    readerState.wbLevel = levelId;
+    const levelLabel = (WB_LEVELS.find(([id]) => id === levelId) || WB_LEVELS[3])[1];
+    const lenLabel = (WB_LENGTHS.find(([id]) => id === readerState.wbLength) || WB_LENGTHS[1])[1];
+    const pickedCount = readerState.wbSelected.size;
+
+    const modalHtml = `
+      <div class="reader-wb-backdrop" data-reader-action="wb-close-modal">
+        <div class="reader-wb-sheet" role="dialog" aria-modal="true" aria-label="从词汇书库生成精读">
+          <div class="reader-wb-sheet-head">
+            <strong>从词汇书库生成精读</strong>
+            <button type="button" class="reader-wb-close" data-reader-action="wb-close-modal" aria-label="关闭">×</button>
+          </div>
+
+          <div class="reader-wb-sheet-body">
+            <div class="reader-wb-select-wrap">
+              <select id="reader-wb-book-select" class="reader-wb-select" aria-label="选择词汇书">
+                ${nonEmpty.map((b) => `<option value="${esc(b.id)}" ${b.id === activeBook.id ? "selected" : ""}>${esc(b.name)}（${b.items.length} 词）</option>`).join("")}
+              </select>
+              <span class="reader-wb-select-caret" aria-hidden="true">▾</span>
+            </div>
+
+            <div class="reader-wb-pick-bar">
+              <span class="reader-wb-count">已选 <strong>${pickedCount}</strong> / 20</span>
+              <div class="reader-wb-quick">
+                <button type="button" class="reader-wb-text-btn" data-reader-action="wb-pick-random" data-count="8">随机 8 词</button>
+                <button type="button" class="reader-wb-text-btn" data-reader-action="wb-pick-uncached">未查词</button>
+                ${pickedCount ? `<button type="button" class="reader-wb-text-btn" data-reader-action="wb-pick-clear">清空</button>` : ""}
+              </div>
+            </div>
+
+            <div class="reader-wb-words">
+              ${activeBook.items.slice(0, 80).map((it) => {
+                const on = readerState.wbSelected.has(it.term);
+                const cached = bridge()?.isWordCached?.(it.term);
+                return `<button type="button" class="reader-wb-word${on ? " is-picked" : ""}" data-reader-action="wb-toggle-word" data-term="${esc(it.term)}" aria-pressed="${on}">
+                  <span class="wb-cache-dot ${cached ? "is-cached" : ""}"></span>
+                  <span class="notranslate" translate="no" lang="en">${esc(it.term)}</span>
+                </button>`;
+              }).join("")}
+            </div>
+
+            <button type="button" class="reader-wb-smart-row${readerState.wbSmartFilter ? " is-on" : ""}" data-reader-action="wb-toggle-smart" aria-pressed="${readerState.wbSmartFilter}">
+              <span class="reader-wb-check">${readerState.wbSmartFilter ? "✓" : ""}</span>
+              <span>允许略过离群词</span>
+            </button>
+          </div>
+
+          <div class="reader-wb-sheet-foot">
+            <div class="reader-wb-cycle-group">
+              <button type="button" class="reader-wb-cycle" data-reader-action="wb-cycle-level" title="点击切换难度">${esc(levelLabel)}</button>
+              <button type="button" class="reader-wb-cycle" data-reader-action="wb-cycle-length" title="点击切换篇幅">${esc(lenLabel)}</button>
+            </div>
+            <button type="button" class="reader-primary-btn" data-reader-action="wb-generate-reader" ${(!pickedCount || readerState.wbGenerating) ? "disabled" : ""}>${readerState.wbGenerating ? "生成中…" : (pickedCount ? `生成精读 (${pickedCount})` : "生成精读")}</button>
+          </div>
+        </div>
+      </div>`;
+
+    return entryHtml + modalHtml;
+  }
+
   function renderInputPage() {
     const recentHtml = readerState.recentDocs.length
       ? `<div class="reader-recent">
@@ -474,6 +594,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
             <button type="button" class="reader-primary-btn" data-reader-action="start-read">开始精读</button>
           </div>
         </div>
+        ${renderWordbookGeneratorHtml()}
         ${recentHtml}
       </section>
     `;
@@ -1364,6 +1485,17 @@ A more mature generation of tools will learn when to get out of the way—and wh
       });
     }
 
+    const wbSelect = root.querySelector("#reader-wb-book-select");
+    if (wbSelect) {
+      wbSelect.addEventListener("change", () => {
+        readerState.wbBookId = wbSelect.value || "";
+        readerState.wbSelected.clear();
+        const b = window.TALK_WORDBOOKS?.getBook(readerState.wbBookId);
+        if (b) b.items.slice(0, 8).forEach((it) => readerState.wbSelected.add(it.term));
+        renderIntoScreen();
+      });
+    }
+
     const fileInput = root.querySelector("#reader-file-input");
     if (fileInput) {
       fileInput.addEventListener("change", async () => {
@@ -1646,7 +1778,114 @@ A more mature generation of tools will learn when to get out of the way—and wh
         return;
       }
       const act = target.dataset.readerAction;
-      if (act === "load-sample") {
+      if (act === "wb-open-sheet") {
+        bridge()?.openWordbooksSheet?.();
+      } else if (act === "wb-open-modal") {
+        const wb = window.TALK_WORDBOOKS;
+        const nonEmpty = wb ? wb.listBooks().filter((b) => b.items.length > 0) : [];
+        if (!nonEmpty.length) {
+          bridge()?.openWordbooksSheet?.();
+          return;
+        }
+        const active = nonEmpty.find((b) => b.id === readerState.wbBookId) || nonEmpty[0];
+        readerState.wbBookId = active.id;
+        if (!readerState.wbSelected.size) {
+          active.items.slice(0, 8).forEach((it) => readerState.wbSelected.add(it.term));
+        }
+        readerState.wbSheetOpen = true;
+        renderIntoScreen();
+      } else if (act === "wb-close-modal") {
+        if (e.target !== target && target.classList.contains("reader-wb-backdrop")) return;
+        readerState.wbSheetOpen = false;
+        renderIntoScreen();
+      } else if (act === "wb-toggle-word") {
+        const term = target.dataset.term || "";
+        if (!term) return;
+        if (readerState.wbSelected.has(term)) {
+          readerState.wbSelected.delete(term);
+        } else {
+          if (readerState.wbSelected.size >= 20) {
+            bridge()?.toast?.("单篇文章最多选 20 个词，保证自然流畅");
+            return;
+          }
+          readerState.wbSelected.add(term);
+        }
+        renderIntoScreen();
+      } else if (act === "wb-pick-random") {
+        const count = Math.min(20, Number(target.dataset.count) || 8);
+        const book = window.TALK_WORDBOOKS?.getBook(readerState.wbBookId);
+        if (!book) return;
+        const pool = [...book.items.map((it) => it.term)];
+        for (let i = pool.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [pool[i], pool[j]] = [pool[j], pool[i]];
+        }
+        readerState.wbSelected = new Set(pool.slice(0, count));
+        renderIntoScreen();
+      } else if (act === "wb-pick-uncached") {
+        const book = window.TALK_WORDBOOKS?.getBook(readerState.wbBookId);
+        if (!book) return;
+        const uncached = book.items.map((it) => it.term).filter((t) => !bridge()?.isWordCached?.(t));
+        if (!uncached.length) {
+          bridge()?.toast?.("这本词册里的词都已查过缓存了");
+          return;
+        }
+        readerState.wbSelected = new Set(uncached.slice(0, 12));
+        renderIntoScreen();
+      } else if (act === "wb-pick-clear") {
+        readerState.wbSelected.clear();
+        renderIntoScreen();
+      } else if (act === "wb-cycle-level") {
+        const cur = readerState.wbLevel || bridge()?.getSentenceLevel?.() || "cet6";
+        const idx = WB_LEVELS.findIndex(([id]) => id === cur);
+        readerState.wbLevel = WB_LEVELS[(idx + 1 + WB_LEVELS.length) % WB_LEVELS.length][0];
+        renderIntoScreen();
+      } else if (act === "wb-cycle-length") {
+        const idx = WB_LENGTHS.findIndex(([id]) => id === readerState.wbLength);
+        readerState.wbLength = WB_LENGTHS[(idx + 1 + WB_LENGTHS.length) % WB_LENGTHS.length][0];
+        renderIntoScreen();
+      } else if (act === "wb-toggle-smart") {
+        readerState.wbSmartFilter = !readerState.wbSmartFilter;
+        renderIntoScreen();
+      } else if (act === "wb-generate-reader") {
+        if (readerState.wbGenerating) return;
+        const words = [...readerState.wbSelected];
+        if (!words.length) {
+          bridge()?.toast?.("先勾选几个想练的词，或点「随机 8 词」");
+          return;
+        }
+        if (!bridge()?.hasModelConfig?.()) {
+          bridge()?.toast?.("请先在右上角设置中配置模型 API");
+          return;
+        }
+        readerState.wbSheetOpen = false;
+        readerState.wbGenerating = true;
+        renderIntoScreen();
+        bridge()?.toast?.(`正在用 ${words.length} 个词生成英文文章并进入精读…`);
+        try {
+          const res = await bridge().callWordbookAi("article", {
+            words,
+            level: readerState.wbLevel || "cet6",
+            length: readerState.wbLength || "medium",
+            smartFilter: Boolean(readerState.wbSmartFilter)
+          });
+          const title = String(res?.title || "Vocabulary Intensive Reading").trim();
+          const body = String(res?.article || "").trim();
+          if (!body) throw new Error("模型没有返回有效正文");
+          const skipped = Array.isArray(res?.skippedWords) ? res.skippedWords.filter(Boolean) : [];
+          if (skipped.length) {
+            bridge()?.toast?.(`已自然织入 ${(res?.usedWords || []).length || (words.length - skipped.length)} 词；离群词留待下篇：${skipped.join(", ")}`);
+          }
+          const md = `# ${title}\n\n${body}`;
+          const doc = window.TALK_DOC_PARSER.parseText(md, { level: readerState.wbLevel || "cet6" });
+          readerState.wbGenerating = false;
+          await runDocPipeline(doc);
+        } catch (err) {
+          readerState.wbGenerating = false;
+          renderIntoScreen();
+          bridge()?.toast?.(err?.message || "生成文章失败，请重试");
+        }
+      } else if (act === "load-sample") {
         await loadBuiltinSample();
       } else if (act === "start-read") {
         const field = root.querySelector("#reader-textarea");
@@ -1863,6 +2102,17 @@ A more mature generation of tools will learn when to get out of the way—and wh
 
   /* ---------- Public Hooks for app.js ---------- */
   window.TALK_READER = {
+    selectWordbook: (bookId) => {
+      readerState.view = "input";
+      readerState.doc = null;
+      readerState.overview = null;
+      readerState.wbBookId = bookId || "";
+      readerState.wbSelected.clear();
+      const b = window.TALK_WORDBOOKS?.getBook(readerState.wbBookId);
+      if (b) b.items.slice(0, 8).forEach((it) => readerState.wbSelected.add(it.term));
+      readerState.wbSheetOpen = true;
+      renderIntoScreen();
+    },
     pageHtml() {
       return readerState.view === "doc" ? renderDocView() : renderInputPage();
     },

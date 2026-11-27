@@ -799,3 +799,286 @@ html.is-native-app .toast {
     filter: none !important;
   }
 }
+
+/* ============================================================
+   Wordbooks (分册词汇书库) inside Clock Sheet
+   ============================================================ */
+.wb-sub-pills {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.wb-sub-pill {
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text-secondary, var(--muted));
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.wb-sub-pill.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
+.wb-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  min-height: 28px;
+}
+
+.wb-list-meta {
+  font-size: 12px;
+  color: var(--ink-muted, #636159);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.wb-text-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.wb-text-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted, #636159);
+  cursor: pointer;
+}
+
+.wb-text-btn:hover {
+  color: var(--ink, #161614);
+}
+
+.wb-text-btn.is-accent {
+  color: var(--ink, #161614);
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong, rgba(22, 22, 20, 0.35));
+  text-underline-offset: 4px;
+}
+
+.wb-text-btn:disabled {
+  opacity: 0.45;
+  cursor: progress;
+}
+
+.wb-back-link {
+  color: var(--ink, #161614);
+  font-size: 14px;
+}
+
+.wb-menu-wrap {
+  position: relative;
+}
+
+.wb-pop-menu {
+  position: absolute;
+  right: 0;
+  top: 26px;
+  min-width: 164px;
+  background: var(--surface, #fcfbf7);
+  border: 1px solid var(--line-strong, rgba(22, 22, 20, 0.18));
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14);
+  padding: 5px;
+  z-index: 40;
+}
+
+.wb-pop-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--ink, #161614);
+  cursor: pointer;
+}
+
+.wb-pop-item:hover {
+  background: var(--surface-2, rgba(22, 22, 20, 0.06));
+}
+
+.wb-pop-item.is-danger {
+  color: #b42318;
+}
+
+.wb-audit-strip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--surface, #fcfbf7);
+  border: 1px solid var(--line-strong, rgba(22, 22, 20, 0.18));
+  font-size: 12px;
+  color: var(--ink-muted, #636159);
+  margin-bottom: 12px;
+  line-height: 1.5;
+  word-break: break-word;
+}
+
+.wb-audit-strip .wb-text-btn {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wb-import-box {
+  background: var(--surface, #fcfbf7);
+  border: 1px solid var(--line-strong, rgba(22, 22, 20, 0.18));
+  border-radius: 14px;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.wb-import-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--ink-muted, #636159);
+  margin-bottom: 8px;
+}
+
+.wb-import-ta {
+  width: 100%;
+  border: none;
+  outline: none;
+  border-radius: 10px;
+  background: var(--bg, #f6f4ec);
+  color: var(--ink, #161614);
+  padding: 9px 10px;
+  font-size: 13px;
+  resize: vertical;
+  margin-bottom: 8px;
+}
+
+.wb-import-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.wb-editorial-list {
+  background: var(--surface, #fcfbf7);
+  border: 1px solid var(--line, rgba(22, 22, 20, 0.09));
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.wb-list-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 15px;
+  border: none;
+  border-bottom: 1px solid var(--line, rgba(22, 22, 20, 0.09));
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wb-list-row:last-child {
+  border-bottom: none;
+}
+
+.wb-list-row:hover {
+  background: rgba(22, 22, 20, 0.025);
+}
+
+.wb-word-item {
+  cursor: default;
+}
+
+.wb-word-trigger {
+  flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+
+.wb-row-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.wb-row-title {
+  font-size: 14.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wb-pin-tag {
+  font-size: 10.5px;
+  color: var(--ink-muted, #636159);
+  background: var(--surface-2, rgba(22, 22, 20, 0.07));
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-weight: 500;
+}
+
+.wb-row-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink-muted, #636159);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  flex-shrink: 0;
+}
+
+.wb-cache-label {
+  font-size: 11.5px;
+}
+
+.wb-mini-act {
+  font-size: 12px;
+  font-family: var(--font-sans, system-ui, sans-serif);
+}
+
+.wb-mini-del {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wb-cache-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink-muted, #8c8a80);
+  flex-shrink: 0;
+}
+
+.wb-cache-dot.is-cached {
+  background: #3b7a57;
+  border-color: #3b7a57;
+}

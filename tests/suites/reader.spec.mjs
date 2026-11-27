@@ -71,8 +71,9 @@ suite("reader · intensive booklet & linkages", { timeout: 60_000 }, (s) => {
 
     await page.click('#reader-dock-gloss [data-reader-action="save-term"]');
     await page.click('[data-action="history"]');
-    await page.waitForSelector(".saved-row");
-    t.expect(await page.locator(".saved-row").count()).toBeGreaterThan(0);
+    await page.click('[data-action="history-tab"][data-tab="wordbooks"]');
+    await page.waitForSelector(".wb-row-title");
+    t.expect(await page.locator(".wb-row-title").count()).toBeGreaterThan(0);
     t.expect(page.errors).toEqual([]);
   });
 

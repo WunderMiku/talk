@@ -2066,6 +2066,14 @@
     padding-right: 0 !important;
   }
 
+  .screen[data-page="reader"] > .topbar,
+  .screen[data-page="reader"] .topbar {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: var(--page-gutter, 22px) !important;
+    padding-right: var(--page-gutter, 22px) !important;
+  }
+
   .reader-page:has(.pdf-root),
   .reader-reading {
     padding-left: 0 !important;
@@ -2116,8 +2124,10 @@
 
 @media screen and (max-width: 640px) {
   .screen[data-page="reader"] > .topbar {
-    padding-left: 16px;
-    padding-right: 16px;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    padding-left: var(--page-gutter, 22px) !important;
+    padding-right: var(--page-gutter, 22px) !important;
   }
   .screen[data-page="reader"] .reader-topbar {
     padding-left: 14px;
@@ -2187,3 +2197,305 @@
   transform: translateY(-18px) !important;
   transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.22, 1, 0.36, 1) !important;
 }
+
+/* ============================================================
+   Intensive Reader: Wordbook-to-Article Generator Panel
+   ============================================================ */
+.reader-wb-entry {
+  width: 100%;
+  margin: 14px 0 24px;
+  padding: 15px 18px;
+  border-radius: 18px;
+  border: 1px solid var(--line, rgba(22, 22, 20, 0.1));
+  background: var(--surface, #fcfbf7);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 0.16s ease, transform 0.14s ease;
+}
+
+.reader-wb-entry:hover {
+  border-color: var(--line-strong, rgba(22, 22, 20, 0.22));
+  transform: translateY(-1px);
+}
+
+.reader-wb-entry:disabled {
+  opacity: 0.6;
+  cursor: progress;
+  transform: none;
+}
+
+.reader-wb-entry-left {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.reader-wb-entry-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--ink, #161614);
+}
+
+.reader-wb-entry-meta {
+  font-size: 12.5px;
+  color: var(--ink-muted, #636159);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-wb-entry-arrow {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink, #161614);
+  background: var(--surface-2, rgba(22, 22, 20, 0.06));
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.reader-wb-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 18, 0.36);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 120;
+}
+
+@media (min-width: 640px) {
+  .reader-wb-backdrop {
+    align-items: center;
+    padding: 20px;
+  }
+}
+
+.reader-wb-sheet {
+  width: 100%;
+  max-width: 520px;
+  max-height: 84vh;
+  background: var(--bg, #f6f4ec);
+  border-radius: 24px 24px 0 0;
+  border: 1px solid var(--line, rgba(22, 22, 20, 0.1));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+}
+
+@media (min-width: 640px) {
+  .reader-wb-sheet {
+    border-radius: 24px;
+    max-height: 80vh;
+  }
+}
+
+.reader-wb-sheet-head {
+  padding: 16px 20px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line, rgba(22, 22, 20, 0.09));
+  background: var(--surface, #fcfbf7);
+  font-size: 15px;
+}
+
+.reader-wb-close {
+  width: 30px;
+  height: 30px;
+  border-radius: 999px;
+  border: none;
+  background: var(--surface-2, rgba(22, 22, 20, 0.07));
+  color: var(--ink-muted, #636159);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reader-wb-sheet-body {
+  padding: 16px 20px 20px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.reader-wb-select-wrap {
+  position: relative;
+  margin-bottom: 14px;
+}
+
+.reader-wb-select {
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--surface, #fcfbf7);
+  border: 1px solid var(--line-strong, rgba(22, 22, 20, 0.18));
+  border-radius: 12px;
+  padding: 11px 36px 11px 14px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink, #161614);
+  outline: none;
+  cursor: pointer;
+}
+
+.reader-wb-select:focus {
+  border-color: var(--ink, #161614);
+}
+
+.reader-wb-select-caret {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  font-size: 12px;
+  color: var(--ink-muted, #636159);
+}
+
+.reader-wb-pick-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.reader-wb-count {
+  font-size: 12px;
+  color: var(--ink-muted, #636159);
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.reader-wb-quick {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.reader-wb-text-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted, #636159);
+  cursor: pointer;
+}
+
+.reader-wb-text-btn:hover {
+  color: var(--ink, #161614);
+}
+
+.reader-wb-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 14px;
+}
+
+.reader-wb-word {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(22, 22, 20, 0.1));
+  background: var(--surface, #fcfbf7);
+  color: var(--ink, #161614);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.reader-wb-word.is-picked {
+  background: var(--ink, #161614);
+  color: var(--bg, #fcfbf7);
+  border-color: var(--ink, #161614);
+}
+
+.reader-wb-word.is-picked .wb-cache-dot:not(.is-cached) {
+  border-color: currentColor;
+  opacity: 0.65;
+}
+
+.reader-wb-smart-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 12px;
+  color: var(--ink-muted, #636159);
+  cursor: pointer;
+  text-align: left;
+}
+
+.reader-wb-check {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  border: 1.5px solid var(--line-strong, rgba(22, 22, 20, 0.25));
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.reader-wb-smart-row.is-on .reader-wb-check {
+  background: var(--ink, #161614);
+  border-color: var(--ink, #161614);
+  color: var(--bg, #fff);
+}
+
+.reader-wb-sheet-foot {
+  padding: 12px 20px calc(16px + env(safe-area-inset-bottom, 0px));
+  background: var(--surface, #fcfbf7);
+  border-top: 1px solid var(--line, rgba(22, 22, 20, 0.09));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.reader-wb-cycle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.reader-wb-cycle {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: none;
+  background: var(--surface-2, rgba(22, 22, 20, 0.07));
+  color: var(--ink, #161614);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.reader-wb-cycle:hover {
+  opacity: 0.85;
+}
+
+.wb-import-hint {
+  margin: 6px 2px 0;
+  font: 500 11px/1.5 var(--font-mono);
+  color: var(--muted);
+  letter-spacing: 0.01em;
+}
+.wb-import-hint[hidden] { display: none; }
