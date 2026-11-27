@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "288"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "289"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1180,6 +1180,17 @@
     if (wordDb) wordDb.clear(SENTENCE_DB_STORE).catch(() => {});
   }
 
+  // Model sometimes echoes a parameter value (e.g. "standard") instead of the requested word.
+  // Only that narrow mistake is treated as a hallucination; inflections and irregular forms
+  // (went -> go, mice -> mouse) are legitimate answers and must pass.
+  const PARAM_WORDS = new Set(["standard", "detail", "fast", "deep", "word", "query", "json", "english", "chinese"]);
+  function isHallucinatedWord(returnedWord, requestedWord) {
+    const got = normalizeWord(returnedWord);
+    const req = normalizeWord(requestedWord);
+    if (!got || !req || got === req) return false;
+    return PARAM_WORDS.has(got) && !PARAM_WORDS.has(req);
+  }
+
   function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
     const key = normalizeWord(word) + langSuffix();
     const hit = wordCache.get(key);
@@ -1191,6 +1202,10 @@
     // Detail is metadata only. A cached word is reusable across fast/standard/deep;
     // the user can explicitly regenerate if a different depth is desired.
     if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
+      void removeWordRecord(key);
+      return null;
+    }
+    if (hit.data?.word && isHallucinatedWord(hit.data.word, word)) {
       void removeWordRecord(key);
       return null;
     }
@@ -2206,6 +2221,38 @@
   function sharePageData() {
     const route = state.route;
     const theme = window.TALK_THEME?.current?.() || { label: "Talk" };
+    const topLayer = state.wordLayers[state.wordLayers.length - 1];
+    if (topLayer?.kind === "sentence" && topLayer.data) {
+      const sentence = topLayer.data;
+      return {
+        kind: "句子",
+        title: shorten(sentence.text || "", 36),
+        phonetic: "",
+        pos: "",
+        translation: sentence.translation || "",
+        note: sentence.summary || sentence.tone || "",
+        example: sentence.text || "",
+        exampleZh: sentence.translation || "",
+        senses: (sentence.keyWords || []).map((k) => `${k.word} · ${k.meaningZh || k.meaning || ""}`).slice(0, 3),
+        theme: theme.label || "Talk"
+      };
+    }
+    if (topLayer?.kind === "chunk" && topLayer.data) {
+      const chunk = topLayer.data;
+      const example = chunk.examples?.[0] || null;
+      return {
+        kind: "意群",
+        title: chunk.chunk,
+        phonetic: chunk.phonetic || "",
+        pos: chunk.form || "",
+        translation: chunk.translation || "",
+        note: chunk.short || "",
+        example: example?.en || "",
+        exampleZh: example?.zh || "",
+        senses: (chunk.senses || []).map((x) => x.zh).filter(Boolean).slice(0, 3),
+        theme: theme.label || "Talk"
+      };
+    }
     if (state.wordLayers.length || route.name === "word") {
       const word = activeWordData();
       if (!word?.word) return null;
@@ -2442,7 +2489,7 @@
 
   function shareHeroNode() {
     const scope = activeShareScope();
-    if (state.wordLayers.length) return scope.querySelector(".result-hero");
+    if (state.wordLayers.length) return scope.querySelector(".sentence-stage") || scope.querySelector(".sentence-line") || scope.querySelector(".chunk-hero") || scope.querySelector(".result-hero");
     const route = state.route;
     const pick = (selector) => scope.querySelector(selector);
     if (route.name === "word") return pick(".result-hero");
@@ -2477,11 +2524,14 @@
     const paper = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#f6f1e7";
     const theme = window.TALK_THEME?.current?.() || {};
     const stage = document.createElement("div");
-    const inLayer = state.wordLayers.length > 0;
-    const scope = inLayer ? "result-page" : route.name === "chunk" ? "chunk-page" : route.name === "sentence" ? "sentence-page" : "result-page";
+    const topLayer = state.wordLayers[state.wordLayers.length - 1];
+    const inLayer = Boolean(topLayer);
+    const scope = inLayer
+      ? (topLayer.kind === "chunk" ? "chunk-page" : topLayer.kind === "sentence" ? "sentence-page" : "result-page")
+      : (route.name === "chunk" ? "chunk-page" : route.name === "sentence" ? "sentence-page" : "result-page");
     stage.className = `share-compose ${scope}`;
     stage.setAttribute("data-theme", theme.id || "");
-    if (!inLayer && route.name === "sentence") stage.setAttribute("data-view", "original");
+    if (scope === "sentence-page") stage.setAttribute("data-view", "original");
     stage.innerHTML = `
       <div class="share-compose-brand">
         <span class="share-compose-logo">talk.</span>
@@ -4324,7 +4374,7 @@
     </div>`;
   }
 
-  function chunkPage(chunk) {
+  function chunkPage(chunk, layer = null) {
     let blockNo = 0;
     const nextNo = () => String(++blockNo).padStart(2, "0");
     const copy = copyFor("chunk");
@@ -4351,7 +4401,16 @@
       </article>`;
 
     return `
-      ${backTopbar({ label: `${copy.label || "意群"} · ${formLabel}`, title: shorten(chunk.chunk, 26), bookmark, share: true })}
+      ${layer
+        ? layerTopbar({
+            label: `${copy.label || "意群"} · ${formLabel}`,
+            title: shorten(chunk.chunk, 26),
+            bookmark,
+            origin: layer.origin,
+            relation: layer.relation,
+            depth: layer.depth
+          })
+        : backTopbar({ label: `${copy.label || "意群"} · ${formLabel}`, title: shorten(chunk.chunk, 26), bookmark, share: true })}
       <main class="result-page chunk-page">
         <section class="result-hero chunk-hero">
           <div class="result-kicker reveal" style="--d:0">
@@ -5314,7 +5373,7 @@
     </section>`;
   }
 
-  function sentencePage(sentence) {
+  function sentencePage(sentence, layer = null) {
     let blockNo = 0;
     const nextNo = () => String(++blockNo).padStart(2, "0");
     const parts = Array.isArray(sentence.sentences) && sentence.sentences.length
@@ -5342,10 +5401,19 @@
       || renderParts.map((part) => part.translation).filter(Boolean).join(" ");
     const primary = renderParts[0];
     const primaryKeyWords = primary.keyWords.length ? primary.keyWords : topKeyWords;
-    const bookmark = `sentence:${sentence.id}`;
+    const bookmark = `sentence:${sentence.text || sentence.id}`;
     const single = !multi;
     return `
-      ${backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`, bookmark, share: true })}
+      ${layer
+        ? layerTopbar({
+            label: multi ? "多句" : "句子",
+            title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`,
+            bookmark,
+            origin: layer.origin,
+            relation: layer.relation,
+            depth: layer.depth
+          })
+        : backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`, bookmark, share: true })}
       <main class="result-page sentence-page" data-view="original">
         <section class="sentence-hero">
           <div class="result-kicker reveal" style="--d:0">
@@ -5756,7 +5824,7 @@
     return scrim;
   }
 
-  function mountWordLayer({ word, data, origin, relation, depth, content, options = {} }) {
+  function mountWordLayer({ word, data, origin, relation, depth, content, options = {}, kind = "word" }) {
     const layer = document.createElement("section");
     layer.className = "word-layer";
     layer.style.setProperty("--depth", String(depth));
@@ -5778,6 +5846,7 @@
     layerRoot.appendChild(layer);
     const record = {
       el: layer,
+      kind,
       word,
       content,
       data: data || null,
@@ -5945,6 +6014,162 @@
       content: layerLoadingPage(key, origin, relation, depth)
     });
     await hydrateLayerWithModel(record);
+  }
+
+  async function openChunkLayer(phrase, options = {}) {
+    const clean = String(phrase || "").trim();
+    if (!clean) return;
+    if (state.sheetOpen) closeSheet({ immediate: true });
+    const depth = state.wordLayers.length + 1;
+    const origin = options.origin || currentLayerOrigin();
+    const relation = options.relation || "意群";
+    const slug = chunkSlug(clean);
+    let data = DATA.chunks?.[slug] ? ensureChunk(DATA.chunks[slug]) : null;
+    if (!data) {
+      const cached = cacheGetChunk(clean);
+      if (cached) data = ensureChunk(cached);
+    }
+    if (data) {
+      mountWordLayer({
+        word: data.chunk,
+        kind: "chunk",
+        data,
+        origin,
+        relation,
+        depth,
+        options,
+        content: chunkPage(data, { origin, relation, depth })
+      });
+      return;
+    }
+    if (!hasModelConfig()) {
+      mountWordLayer({
+        word: clean,
+        kind: "chunk",
+        data: null,
+        origin,
+        relation,
+        depth,
+        options,
+        content: layerConnectPage(clean, origin, relation, depth)
+      });
+      return;
+    }
+    const record = mountWordLayer({
+      word: clean,
+      kind: "chunk",
+      data: null,
+      origin,
+      relation,
+      depth,
+      options,
+      content: layerLoadingPage(clean, origin, relation, depth)
+    });
+    try {
+      const result = await modelLookup(clean, "chunk", state.settings);
+      if (!state.wordLayers.includes(record)) return;
+      const chunkData = ensureChunk(result.data);
+      record.data = chunkData;
+      record.word = chunkData.chunk;
+      const inner = record.el?.querySelector(".layer-scroll") || record.el;
+      if (inner) {
+        inner.innerHTML = chunkPage(chunkData, { origin: record.origin, relation: record.relation, depth: record.depth });
+        inner.querySelectorAll(".reveal, .reveal-item").forEach((el) => el.classList.add("is-in"));
+        refreshCacheBorders(inner);
+      }
+    } catch (error) {
+      if (!state.wordLayers.includes(record)) return;
+      const inner = record.el?.querySelector(".layer-scroll") || record.el;
+      if (inner) {
+        inner.innerHTML = layerErrorPage(clean, error?.message || "意群加载失败", record.origin, record.relation, record.depth);
+      }
+    }
+  }
+
+  async function openSentenceLayer(text, options = {}) {
+    const clean = String(text || "").trim();
+    if (!clean) return;
+    if (state.sheetOpen) closeSheet({ immediate: true });
+    const depth = state.wordLayers.length + 1;
+    const origin = options.origin || currentLayerOrigin();
+    const relation = options.relation || "拆句";
+    const titleShort = shorten(clean, 26);
+
+    const localHit = DATA.sentences?.find((item) => String(item.text || "").trim().toLowerCase() === clean.toLowerCase());
+    if (localHit) {
+      mountWordLayer({
+        word: titleShort,
+        kind: "sentence",
+        data: localHit,
+        origin,
+        relation,
+        depth,
+        options,
+        content: sentencePage(localHit, { origin, relation, depth })
+      });
+      return;
+    }
+
+    const detail = state.settings?.detailLevel || "standard";
+    const sKey = await sentenceKey(clean, sentenceLevelOf(state.settings?.sentenceLevel).id, detail);
+    const cached = sKey ? cacheGetSentence(sKey) : null;
+    if (cached) {
+      mountWordLayer({
+        word: titleShort,
+        kind: "sentence",
+        data: cached,
+        origin,
+        relation,
+        depth,
+        options,
+        content: sentencePage(cached, { origin, relation, depth })
+      });
+      return;
+    }
+
+    if (!hasModelConfig()) {
+      mountWordLayer({
+        word: titleShort,
+        kind: "sentence",
+        data: null,
+        origin,
+        relation,
+        depth,
+        options,
+        content: layerConnectPage(titleShort, origin, relation, depth)
+      });
+      return;
+    }
+
+    const record = mountWordLayer({
+      word: titleShort,
+      kind: "sentence",
+      data: null,
+      origin,
+      relation,
+      depth,
+      options,
+      content: layerLoadingPage(titleShort, origin, relation, depth)
+    });
+    try {
+      const result = await modelLookup(clean, "sentence", state.settings);
+      if (!state.wordLayers.includes(record)) return;
+      const sentData = result.data;
+      record.data = sentData;
+      record.word = shorten(sentData?.text || clean, 26);
+      const inner = record.el?.querySelector(".layer-scroll") || record.el;
+      if (inner) {
+        inner.innerHTML = sentencePage(sentData, { origin: record.origin, relation: record.relation, depth: record.depth });
+        inner.querySelectorAll(".reveal, .reveal-item").forEach((el) => el.classList.add("is-in"));
+        refreshCacheBorders(inner);
+      }
+    } catch (error) {
+      if (!state.wordLayers.includes(record)) return;
+      const inner = record.el?.querySelector(".layer-scroll") || record.el;
+      if (inner) {
+        inner.innerHTML = layerErrorPage(titleShort, error?.message || "拆句加载失败", record.origin, record.relation, record.depth);
+      }
+    }
   }
 
   function openWordLayerFromButton(button) {
@@ -7568,7 +7793,34 @@
       return { type: "chunk", data };
     }
     if (type === "word") {
-      const data = normalizeModelWord(parsed, query);
+      let data = normalizeModelWord(parsed, query);
+      if (isHallucinatedWord(data.word, query)) {
+        diagLog("warn", "model.wrong-word", `returned "${data.word}" for "${query}", retrying`, { query, got: data.word });
+        armDeadline();
+        try {
+          const fixMessages = [
+            { role: "system", content: systemPrompt("word") },
+            { role: "user", content: `请解释英文词 "${String(query)}"（详细度：${detail}）。注意：JSON 的 word 字段必须是 "${String(query)}"，绝不要把 detail 参数值（如 standard）当成要查的词。` }
+          ];
+          const fixRes = await postChat(endpoint, cfg, fixMessages, controller.signal, true, maxTokens);
+          if (fixRes.ok) {
+            const fixJson = await readJsonResponse(fixRes, "词头纠偏重试");
+            addUsage(fixJson?.usage || fixJson?.usageMetadata);
+            const fixText = isGoogleProvider(cfg)
+              ? (googleText(fixJson) || fixJson?.choices?.[0]?.message?.content || "")
+              : (typeof fixJson?.choices?.[0]?.message?.content === "string" ? fixJson.choices[0].message.content : "");
+            if (fixText) {
+              const reparsed = parseJsonObject(fixText);
+              const retried = normalizeModelWord(reparsed, query);
+              if (!isHallucinatedWord(retried.word, query)) data = retried;
+            }
+          }
+        } catch (_) { /* checked below */ }
+        finally { window.clearTimeout(timer); }
+        if (isHallucinatedWord(data.word, query)) {
+          throw new Error(`模型误返回了无关词条「${data.word}」，请重试查「${query}」。`);
+        }
+      }
       data.source = "model";
       data.model = cfg.model;
       data.gen = { ms: Math.max(0, Date.now() - startedAt), model: cfg.model || "", tokens: usage?.total ?? null, at: Date.now() };
@@ -9540,6 +9792,9 @@
   }
 
   function bookmarkKey() {
+    const topLayer = state.wordLayers[state.wordLayers.length - 1];
+    if (topLayer?.kind === "chunk" && topLayer.data?.chunk) return String(topLayer.data.chunk).trim().toLowerCase();
+    if (topLayer?.kind === "sentence" && topLayer.data?.text) return `sentence:${String(topLayer.data.text).trim()}`;
     const active = activeWordData();
     if (active?.word) return normalizeWord(active.word);
     if (state.route.name === "sentence") {
@@ -10261,8 +10516,8 @@
       return true;
     },
     openWord: (word, opts = {}) => openWordLayer(word, { relation: "精读词眼", origin: "精读本", ...opts }),
-    openChunk: (phrase) => runSearch(phrase, "chunk"),
-    openSentence: (sentence) => runSearch(sentence, "sentence"),
+    openChunk: (phrase, opts = {}) => openChunkLayer(phrase, { relation: "精读意群", origin: "精读本", ...opts }),
+    openSentence: (sentence, opts = {}) => openSentenceLayer(sentence, { relation: "精读拆句", origin: "精读本", ...opts }),
     openTranslator: (text) => navigate({ name: "translator", text }),
     speakText: (text, btn) => speakText(text, btn),
     getSentenceLevel: () => state.settings?.sentenceLevel || "cet6",
