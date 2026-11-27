@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "294"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "295"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -1932,6 +1932,7 @@
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
     if (route.name === "home" && revealMode === "normal") setRevealMode("instant-home");
     const apply = () => {
+      if (!screen) return;
       state.route = route;
       screen.dataset.page = route.name;
       state.module = route.name === "translator" ? "translator" : route.name === "reader" ? "reader" : "dictionary";
@@ -2198,6 +2199,7 @@
   }
 
   function updateModuleBar() {
+    if (!app) return;
     $$(".module-btn", app).forEach((button) => {
       const active = button.dataset.module === state.module;
       button.classList.toggle("active", active);
@@ -7744,12 +7746,11 @@
     // task/detail prefix can be reused by provider prompt caches.
     return JSON.stringify({
       task: "word",
-      detail,
+      query: String(query),
       themes: themeBriefs().filter((theme) => {
         const active = window.TALK_THEME?.current?.();
         return !active || theme.id === active.id;
-      }),
-      query: String(query)
+      })
     });
   }
 

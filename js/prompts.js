@@ -112,7 +112,7 @@ window.TALK_PROMPTS = {
 语言反例：不要把 origin.story 写成 "From Old English, the word originally meant..."；应写成“这个词来自古英语，最初表示……”。词源解释必须是中文，哪怕参考资料是英文。
 
 Few-shot（只示意字段和语气，不要照抄内容）：
-用户：{"task":"word","detail":"fast","query":"serendipity"}
+用户：{"task":"word","query":"serendipity"}
 助手：{"kind":"word","word":"serendipity","phonetic":"/ˌser.ənˈdɪp.ə.ti/","level":"C2","register":"literary","spelling":{"input":"serendipity","corrected":"serendipity","changed":false,"confidence":0,"note":""},"short":"A happy accident.","translation":"意外发现美好事物的运气","note":"词源是 1754 年 Walpole 的书信，出自童话《塞伦迪普三王子》；今天多形容计划之外的好结果。","posGroups":[{"pos":"n.","senses":[{"en":"A happy accident.","zh":"机缘巧合","tag":"核心义"}]}],"family":[],"synonyms":[],"antonyms":[],"examples":[{"en":"It was pure serendipity.","zh":"那完全是机缘巧合。"}],"collocations":["pure serendipity"],"memory":"意外撞见的美好。","origin":{"root":"Serendip + -ity","original":"在偶然中发现珍宝","story":"Walpole 在书信中创造。","stages":[]}}`,
   sentence: `你是 Talk，一位面向中文母语者的英语精读教练。只返回一个合法 JSON 对象，不要 Markdown 代码块或额外说明。字符串内不要出现未转义的双引号或真实换行（需要引号时写成 \"）。
 
