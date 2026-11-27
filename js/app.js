@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "293"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "294"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -3554,28 +3554,18 @@
   }
 
   async function requestThemeDeck(seed, exclude = []) {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 50_000);
-    try {
-      const endpoint = endpointFor(state.settings.baseUrl, state.settings);
-      const messages = [
-        { role: "system", content: window.TALK_PROMPTS.theme },
-        // Keep the (potentially long) exclusion list last: the static prompt
-        // and task prefix stay stable for provider prompt caching.
-        { role: "user", content: JSON.stringify({ task: "theme", seed, exclude }) }
-      ];
-      const response = await postChat(endpoint, state.settings, messages, controller.signal, false, 1200);
-      if (!response.ok) {
-        const raw = await response.text().catch(() => "");
-        throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 160)}` : ""}`);
-      }
-      const json = await response.json();
-      let content = json?.choices?.[0]?.message?.content;
-      if (Array.isArray(content)) content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-      return normalizeThemeDeck(parseJsonObject(content));
-    } finally {
-      window.clearTimeout(timer);
-    }
+    const data = await window.TALK_LLM.requestJson({
+      settings: state.settings,
+      system: window.TALK_PROMPTS.theme,
+      user: { task: "theme", seed, exclude },
+      maxTokens: 1400,
+      timeoutMs: 50_000,
+      label: "主题沙龙",
+      disableThinking: true,
+      temperature: state.pendingTemperature ?? 0.3,
+      retries: 1
+    });
+    return normalizeThemeDeck(data);
   }
 
   async function generateThemeDeck() {
@@ -5831,20 +5821,50 @@
     return scrim;
   }
 
+  /**
+   * Unified surface renderer shared by initial layer mount and async hydration.
+   * Ensures data-page, reveal state, widescreen word columns, and cache borders
+   * are always applied through one single code path.
+   */
+  function mountResultSurface(container, { kind = "word", content = "", animate = false } = {}) {
+    if (!container) return;
+    const holder = document.createElement("div");
+    holder.innerHTML = content;
+    holder.querySelectorAll(".reveal, .reveal-item").forEach((node) => node.classList.add("is-in"));
+    container.replaceChildren(...holder.childNodes);
+    if (kind === "word") enhanceWordColumns(container);
+    applyCacheDisplay();
+    refreshCacheBorders(container);
+    container.scrollTop = 0;
+    if (animate && !reduceMotion) {
+      const first = $(".sheet-content, .result-page", container);
+      if (first) {
+        first.animate(
+          [
+            { opacity: 0, transform: "translateY(8px)" },
+            { opacity: 1, transform: "translateY(0)" }
+          ],
+          { duration: 320, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
+        );
+      }
+    }
+  }
+
   function mountWordLayer({ word, data, origin, relation, depth, content, options = {}, kind = "word" }) {
     const layerKind = kind || "word";
     const layer = document.createElement("section");
     layer.className = "word-layer";
+    layer.dataset.page = layerKind;
     layer.dataset.layerKind = layerKind;
     layer.style.setProperty("--depth", String(depth));
     layer.style.zIndex = String(2 + depth);
     layer.tabIndex = -1;
     layer.setAttribute("role", "region");
     layer.setAttribute("aria-label", `${word} 词条，第 ${depth} 层`);
-    layer.innerHTML = `<div class="layer-scroll">${content}</div>`;
-    if (layerKind === "word") enhanceWordColumns(layer);
-    applyCacheDisplay();
-    refreshCacheBorders(layer);
+    const scroll = document.createElement("div");
+    scroll.className = "layer-scroll";
+    layer.appendChild(scroll);
+    mountResultSurface(scroll, { kind: layerKind, content, animate: false });
 
     ensureLayerScrim();
     const previous = state.wordLayers[state.wordLayers.length - 1];
@@ -5856,7 +5876,7 @@
     layerRoot.appendChild(layer);
     const record = {
       el: layer,
-      kind,
+      kind: layerKind,
       word,
       content,
       data: data || null,
@@ -5870,8 +5890,8 @@
     state.wordLayers.push(record);
     shelveLayersBelow();
     updateScrollLock();
-    if (data) schedulePrefetch(data);
-    else updateCacheCorner(false, "正在生成本层词条");
+    if (data && layerKind === "word") schedulePrefetch(data);
+    else if (!data) updateCacheCorner(false, "正在生成本层词条");
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -5888,25 +5908,7 @@
     if (!scroll) return;
     record.content = content;
     record.shelved = false;
-    // Build off-screen, settle the entrance states, then swap in one paint.
-    const holder = document.createElement("div");
-    holder.innerHTML = content;
-    holder.querySelectorAll(".reveal, .reveal-item").forEach((node) => node.classList.add("is-in"));
-    scroll.replaceChildren(...holder.childNodes);
-    if ((record?.kind || "word") === "word") enhanceWordColumns(scroll);
-    applyCacheDisplay();
-    refreshCacheBorders(scroll);
-    scroll.scrollTop = 0;
-    const first = $(".sheet-content, .result-page", scroll);
-    if (first && !reduceMotion) {
-      first.animate(
-        [
-          { opacity: 0, transform: "translateY(8px)" },
-          { opacity: 1, transform: "translateY(0)" }
-        ],
-        { duration: 320, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
-      );
-    }
+    mountResultSurface(scroll, { kind: record.kind || "word", content, animate: true });
   }
 
   async function hydrateLayerWithModel(record) {
@@ -8851,36 +8853,21 @@
 
       case "regenerate-chunk": {
         event.preventDefault();
-        const top = state.wordLayers[state.wordLayers.length - 1];
-        if (top && top.kind === "chunk") {
-          const phrase = top.data?.chunk || top.word || "";
-          if (!phrase) break;
-          await removeWordRecord(chunkCacheKey(phrase));
-          await hydrateChunkLayer(top, phrase);
-          break;
-        }
-        const route = state.route;
-        if (route?.name !== "chunk") break;
-        void removeWordRecord(chunkCacheKey(route.query || ""));
-        runSearch(route.query || "", "chunk", { skipCache: true });
+        const surface = getActiveSurface();
+        if (surface.kind !== "chunk" || !surface.query) break;
+        await removeWordRecord(chunkCacheKey(surface.query));
+        if (surface.isLayer) await hydrateChunkLayer(surface.record, surface.query);
+        else runSearch(surface.query, "chunk", { skipCache: true });
         break;
       }
 
       case "delete-chunk-cache": {
         event.preventDefault();
-        const top = state.wordLayers[state.wordLayers.length - 1];
-        if (top && top.kind === "chunk") {
-          const phrase = top.data?.chunk || top.word || "";
-          if (!phrase) break;
-          await removeWordRecord(chunkCacheKey(phrase));
-          toast("已删除这份意群缓存");
-          closeTopWordLayer();
-          break;
-        }
-        const route = state.route;
-        if (route?.name !== "chunk") break;
-        void removeWordRecord(chunkCacheKey(route.query || ""));
+        const surface = getActiveSurface();
+        if (surface.kind !== "chunk" || !surface.query) break;
+        await removeWordRecord(chunkCacheKey(surface.query));
         toast("已删除这份意群缓存");
+        if (surface.isLayer) closeTopWordLayer();
         break;
       }
 
@@ -8996,31 +8983,25 @@
 
       case "regenerate-sentence": {
         event.preventDefault();
-        const active = activeSentenceData();
-        if (!active || !hasModelConfig()) break;
+        const surface = getActiveSurface();
+        if (surface.kind !== "sentence" || !surface.query || !hasModelConfig()) break;
         const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
         const detail = state.settings?.detailLevel || "standard";
-        const key = await sentenceKey(active.text, level, detail);
-        removeSentenceRecord(key);
-        const top = state.wordLayers[state.wordLayers.length - 1];
-        if (top && top.kind === "sentence") {
-          await hydrateSentenceLayer(top, active.text);
-          break;
-        }
-        await runSearch(active.text, "sentence", { skipCache: true });
+        removeSentenceRecord(await sentenceKey(surface.query, level, detail));
+        if (surface.isLayer) await hydrateSentenceLayer(surface.record, surface.query);
+        else await runSearch(surface.query, "sentence", { skipCache: true });
         break;
       }
 
       case "forget-sentence": {
         event.preventDefault();
-        const active = activeSentenceData();
-        if (!active) break;
+        const surface = getActiveSurface();
+        if (surface.kind !== "sentence" || !surface.query) break;
         const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
         const detail = state.settings?.detailLevel || "standard";
-        removeSentenceRecord(await sentenceKey(active.text, level, detail));
+        removeSentenceRecord(await sentenceKey(surface.query, level, detail));
         toast("已删除这条句子缓存");
-        const top = state.wordLayers[state.wordLayers.length - 1];
-        if (top && top.kind === "sentence") closeTopWordLayer();
+        if (surface.isLayer) closeTopWordLayer();
         break;
       }
 
@@ -9032,19 +9013,18 @@
 
       case "regenerate-word": {
         event.preventDefault();
-        const active = activeWordData();
-        if (!active) break;
-        const key = normalizeWord(active.word);
+        const surface = getActiveSurface();
+        if (surface.kind !== "word" || !surface.query) break;
+        const key = normalizeWord(surface.query);
         if (!key || !hasModelConfig()) break;
         await removeWordRecord(key);
-        const top = state.wordLayers[state.wordLayers.length - 1];
-        if (top && (top.kind || "word") === "word") {
-          top.word = key;
-          top.data = null;
-          await hydrateLayerWithModel(top);
-          break;
+        if (surface.isLayer) {
+          surface.record.word = key;
+          surface.record.data = null;
+          await hydrateLayerWithModel(surface.record);
+        } else {
+          await runSearch(key, "word");
         }
-        await runSearch(key, "word");
         break;
       }
 
@@ -10291,18 +10271,44 @@
     runSearch(word, "word");
   }
 
-  function activeSentenceData() {
+  /**
+   * Unified active surface resolver: checks top overlay layer first, then main screen route.
+   * All page-level actions (regenerate, delete cache, ask AI, save) read from here.
+   */
+  function getActiveSurface() {
     const top = state.wordLayers[state.wordLayers.length - 1];
-    if (top && top.kind === "sentence") return top.data || null;
-    if (state.route.name !== "sentence") return null;
-    return getSentence(state.route);
+    if (top) {
+      const kind = top.kind || "word";
+      const query = kind === "chunk"
+        ? (top.data?.chunk || top.word || "")
+        : kind === "sentence"
+          ? (top.data?.text || top.word || "")
+          : (top.data?.word || top.word || "");
+      return { kind, query, data: top.data || null, isLayer: true, record: top };
+    }
+    const name = state.route?.name || "home";
+    if (name === "word") {
+      const data = getWord(state.route);
+      return { kind: "word", query: data?.word || state.route?.word || "", data, isLayer: false, record: null };
+    }
+    if (name === "chunk") {
+      return { kind: "chunk", query: state.route?.query || "", data: state.route?.data || null, isLayer: false, record: null };
+    }
+    if (name === "sentence") {
+      const data = getSentence(state.route);
+      return { kind: "sentence", query: data?.text || "", data, isLayer: false, record: null };
+    }
+    return { kind: name, query: "", data: null, isLayer: false, record: null };
+  }
+
+  function activeSentenceData() {
+    const surface = getActiveSurface();
+    return surface.kind === "sentence" ? surface.data : null;
   }
 
   function activeWordData() {
-    const top = state.wordLayers[state.wordLayers.length - 1];
-    if (top) return (top.kind || "word") === "word" ? (top.data || null) : null;
-    if (state.route.name === "word") return getWord(state.route);
-    return null;
+    const surface = getActiveSurface();
+    return surface.kind === "word" ? surface.data : null;
   }
 
   function parseSavedEntry(raw) {
@@ -11046,42 +11052,24 @@
 
 
   async function callWordbookAi(task, payload) {
-    const baseCfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
-    if (!hasModelConfig(baseCfg)) throw new Error("请先在设置中配置模型 API。");
-    // Disable thinking mode for structured JSON wordbook tasks so Qwen/DeepSeek don't exhaust max_tokens or reject json_object
-    const cfg = { ...baseCfg, enableThinking: false, thinkingBudget: 0 };
-    const endpoint = endpointFor(cfg.baseUrl, cfg);
     const sys = task === "classify"
       ? window.TALK_PROMPTS.wordbookClassify
       : task === "extract"
         ? window.TALK_PROMPTS.wordbookExtract
         : window.TALK_PROMPTS.wordbookArticle;
+    const label = task === "classify" ? "主题分册" : task === "extract" ? "AI 提取词条" : "生成精读文章";
     const maxTokens = task === "extract" ? 2400 : 3200;
-    const messages = [
-      { role: "system", content: sys },
-      { role: "user", content: JSON.stringify(payload) }
-    ];
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), Math.max(MODEL_TIMEOUT_MS, 90_000));
-    try {
-      const res = await postChat(endpoint, cfg, messages, controller.signal, true, maxTokens);
-      if (!res.ok) {
-        const errText = await res.text().catch(() => "");
-        throw new Error(`HTTP ${res.status}${errText ? ` · ${errText.slice(0, 180)}` : ""}`);
-      }
-      const json = await readJsonResponse(res, task === "classify" ? "主题分册" : task === "extract" ? "AI 提取词条" : "生成精读文章");
-      const content = isGoogleProvider(cfg)
-        ? (googleText(json) || json?.choices?.[0]?.message?.content || "")
-        : (typeof json?.choices?.[0]?.message?.content === "string"
-            ? json.choices[0].message.content
-            : Array.isArray(json?.choices?.[0]?.message?.content)
-              ? json.choices[0].message.content.map((x) => (typeof x === "string" ? x : x?.text || "")).join("")
-              : "");
-      if (!content) throw new Error("模型返回了空内容，请重试。");
-      return parseJsonObject(content);
-    } finally {
-      window.clearTimeout(timer);
-    }
+    return window.TALK_LLM.requestJson({
+      settings: state.settings,
+      system: sys,
+      user: payload,
+      maxTokens,
+      timeoutMs: Math.max(MODEL_TIMEOUT_MS, 90_000),
+      label,
+      disableThinking: true,
+      temperature: state.pendingTemperature ?? 0.3,
+      retries: 1
+    });
   }
 
   window.__TALK_BRIDGE__ = {
@@ -11163,34 +11151,18 @@
       return found ? found.label : lv.toUpperCase();
     },
     callModelJSON: async (systemPrompt, userPayload, { signal, maxTokens = 4096 } = {}) => {
-      const cfg = state.settings;
-      const endpoint = endpointFor(cfg.baseUrl, cfg);
-      const messages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: JSON.stringify(userPayload) }
-      ];
-      let lastErr = null;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        try {
-          const response = await postChat(endpoint, cfg, messages, signal, true, maxTokens);
-          if (!response.ok) {
-            const raw = await response.text().catch(() => "");
-            throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 180)}` : ""}`);
-          }
-          const json = await readJsonResponse(response, "模型接口");
-          const msg = json?.choices?.[0]?.message;
-          const content = msg?.content || json?.candidates?.[0]?.content?.parts?.map((p) => p.text || "").join("") || "";
-          if (!content || !String(content).trim()) {
-            throw new Error("模型返回了空内容（可能是输出上限不足或网关波动）。");
-          }
-          return parseJsonObject(content);
-        } catch (err) {
-          if (err?.name === "AbortError") throw err;
-          lastErr = err;
-          if (attempt === 0) continue;
-        }
-      }
-      throw lastErr;
+      return window.TALK_LLM.requestJson({
+        settings: state.settings,
+        system: systemPrompt,
+        user: userPayload,
+        maxTokens,
+        timeoutMs: Math.max(MODEL_TIMEOUT_MS, 90_000),
+        signal,
+        label: "模型接口",
+        disableThinking: true,
+        temperature: state.pendingTemperature ?? 0.3,
+        retries: 1
+      });
     }
   };
 

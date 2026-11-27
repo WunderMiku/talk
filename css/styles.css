@@ -7481,54 +7481,46 @@ html.motion-ready .reveal.is-in .reveal {
   }
 
   /* Word page: hero left, meaning right, then full-width rows. */
-  .screen[data-page="word"] .result-page,
-  .word-layer[data-layer-kind="word"] .result-page {
+  [data-page="word"] .result-page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
     column-gap: var(--word-col-gap);
   }
 
-  .screen[data-page="word"] .result-hero,
-  .word-layer[data-layer-kind="word"] .result-hero {
+  [data-page="word"] .result-hero {
     grid-column: 1;
     grid-row: 1;
     padding-right: 18px;
   }
 
-  .screen[data-page="word"] .result-page > .block,
-  .word-layer[data-layer-kind="word"] .result-page > .block {
+  [data-page="word"] .result-page > .block {
     grid-column: 2;
     margin-top: 9px;
   }
 
-  .screen[data-page="word"] .result-page > .block:first-of-type,
-  .word-layer[data-layer-kind="word"] .result-page > .block:first-of-type {
+  [data-page="word"] .result-page > .block:first-of-type {
     margin-top: 0;
   }
 
-  .screen[data-page="word"] .word-meaning-block,
-  .word-layer[data-layer-kind="word"] .word-meaning-block {
+  [data-page="word"] .word-meaning-block {
     grid-column: 2;
     grid-row: 1;
   }
 
-  .screen[data-page="word"] .result-page > .word-family-block,
-  .word-layer[data-layer-kind="word"] .result-page > .word-family-block {
+  [data-page="word"] .result-page > .word-family-block {
     grid-column: 1 / -1 !important;
     grid-row: 2;
     margin-top: var(--word-family-gap) !important;
   }
 
-  .screen[data-page="word"] .spelling-banner,
-  .word-layer[data-layer-kind="word"] .spelling-banner {
+  [data-page="word"] .spelling-banner {
     grid-column: 1 / -1;
     margin-bottom: 14px;
   }
 
   /* The receipt line belongs to the page, not to the left column. */
-  .screen[data-page="word"] .page-gen-note,
-  .word-layer[data-layer-kind="word"] .page-gen-note {
+  [data-page="word"] .page-gen-note {
     grid-column: 1 / -1;
     justify-self: stretch;
     margin-top: 26px;
@@ -7536,8 +7528,7 @@ html.motion-ready .reveal.is-in .reveal {
   }
 
   /* The two-column block cluster under the family row. */
-  .screen[data-page="word"] .word-columns,
-  .word-layer[data-layer-kind="word"] .word-columns {
+  [data-page="word"] .word-columns {
     grid-column: 1 / -1;
     grid-row: auto;
     display: grid !important;
@@ -7549,15 +7540,13 @@ html.motion-ready .reveal.is-in .reveal {
     columns: auto !important;
   }
 
-  .screen[data-page="word"] .word-columns > .block,
-  .word-layer[data-layer-kind="word"] .word-columns > .block {
+  [data-page="word"] .word-columns > .block {
     margin-top: 0;
     margin-bottom: 0;
   }
 
   /* One rule for every theme: the grid above owns the layout. */
-  [data-theme] .screen[data-page="word"] .word-columns > .block,
-  [data-theme] .word-layer[data-layer-kind="word"] .word-columns > .block {
+  [data-theme] [data-page="word"] .word-columns > .block {
     display: block !important;
     width: auto !important;
     break-inside: auto !important;
@@ -7565,26 +7554,22 @@ html.motion-ready .reveal.is-in .reveal {
     vertical-align: top;
   }
 
-  .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer[data-layer-kind="word"] .result-page > .word-origin-block,
-  .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer[data-layer-kind="word"] .result-page > .word-related-block {
+  [data-page="word"] .result-page > .word-origin-block,
+  [data-page="word"] .result-page > .word-related-block {
     grid-column: 1 / -1 !important;
     grid-row: auto;
     margin-top: var(--word-section-gap) !important;
   }
 
   /* Origin: etymology card left, timeline right. */
-  .screen[data-page="word"] .word-origin-block,
-  .word-layer[data-layer-kind="word"] .word-origin-block {
+  [data-page="word"] .word-origin-block {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: var(--word-col-gap);
     align-items: start;
   }
 
-  .screen[data-page="word"] .word-origin-block > .block-head,
-  .word-layer[data-layer-kind="word"] .word-origin-block > .block-head {
+  [data-page="word"] .word-origin-block > .block-head {
     grid-column: 1 / -1;
   }
 
