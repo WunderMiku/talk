@@ -471,3 +471,54 @@ html.is-native-app .toast {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ============================================================
+   Restrained Parabolic Toss for Discarded Wrong-Word Preview
+   ============================================================ */
+@keyframes live-preview-toss {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  28% {
+    opacity: 0.94;
+    transform: translate3d(26px, -18px, 0) rotate(4deg) scale(0.99);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(136px, 86px, 0) rotate(15deg) scale(0.91);
+  }
+}
+
+@keyframes live-preview-arrive {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.live-preview.is-tossing {
+  animation: live-preview-toss 0.42s cubic-bezier(0.32, 0, 0.72, 0.28) forwards;
+  transform-origin: 60% 40%;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.live-preview.is-arriving {
+  animation: live-preview-arrive 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-preview.is-tossing {
+    animation: none;
+    opacity: 0;
+    transition: opacity 0.16s ease;
+  }
+  .live-preview.is-arriving {
+    animation: none;
+  }
+}

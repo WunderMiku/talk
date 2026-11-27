@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "289"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "290"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -7796,24 +7796,37 @@
       let data = normalizeModelWord(parsed, query);
       if (isHallucinatedWord(data.word, query)) {
         diagLog("warn", "model.wrong-word", `returned "${data.word}" for "${query}", retrying`, { query, got: data.word });
+        if (typeof options.onPreview === "function") {
+          try { options.onPreview({ kind: "discard", wrongWord: data.word, targetWord: String(query) }); } catch (_) { /* best-effort */ }
+        }
         armDeadline();
         try {
           const fixMessages = [
             { role: "system", content: systemPrompt("word") },
             { role: "user", content: `请解释英文词 "${String(query)}"（详细度：${detail}）。注意：JSON 的 word 字段必须是 "${String(query)}"，绝不要把 detail 参数值（如 standard）当成要查的词。` }
           ];
-          const fixRes = await postChat(endpoint, cfg, fixMessages, controller.signal, true, maxTokens);
-          if (fixRes.ok) {
-            const fixJson = await readJsonResponse(fixRes, "词头纠偏重试");
-            addUsage(fixJson?.usage || fixJson?.usageMetadata);
-            const fixText = isGoogleProvider(cfg)
-              ? (googleText(fixJson) || fixJson?.choices?.[0]?.message?.content || "")
-              : (typeof fixJson?.choices?.[0]?.message?.content === "string" ? fixJson.choices[0].message.content : "");
-            if (fixText) {
-              const reparsed = parseJsonObject(fixText);
-              const retried = normalizeModelWord(reparsed, query);
-              if (!isHallucinatedWord(retried.word, query)) data = retried;
+          let fixText = "";
+          try {
+            fixText = await postChatStream(endpoint, cfg, fixMessages, controller.signal, false, maxTokens, (partial) => {
+              if (typeof options.onPreview === "function") {
+                try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
+              }
+            }, addUsage);
+          } catch (_) { /* fall back to non-streaming below */ }
+          if (!fixText) {
+            const fixRes = await postChat(endpoint, cfg, fixMessages, controller.signal, true, maxTokens);
+            if (fixRes.ok) {
+              const fixJson = await readJsonResponse(fixRes, "词头纠偏重试");
+              addUsage(fixJson?.usage || fixJson?.usageMetadata);
+              fixText = isGoogleProvider(cfg)
+                ? (googleText(fixJson) || fixJson?.choices?.[0]?.message?.content || "")
+                : (typeof fixJson?.choices?.[0]?.message?.content === "string" ? fixJson.choices[0].message.content : "");
             }
+          }
+          if (fixText) {
+            const reparsed = parseJsonObject(fixText);
+            const retried = normalizeModelWord(reparsed, query);
+            if (!isHallucinatedWord(retried.word, query)) data = retried;
           }
         } catch (_) { /* checked below */ }
         finally { window.clearTimeout(timer); }
@@ -8087,6 +8100,30 @@
     return { kind: "word", word, phonetic, translation, short, pos, senses, received: String(text).length };
   }
 
+  function tossWrongPreview(host, wrongWord, targetWord) {
+    if (!host) return;
+    const skeleton = $(".skeleton-stack");
+    const hasCard = !host.hidden && host.innerHTML.trim().length > 0;
+    const finishReset = () => {
+      host.classList.remove("is-tossing", "has-content");
+      host.dataset.signature = "";
+      host.dataset.tossing = "";
+      host.innerHTML = `<span class="live-preview-kicker is-retry"><i></i>${wrongWord ? `已丢弃跑偏词条「${esc(wrongWord)}」，` : ""}正在重查「${esc(targetWord || "")}」…</span>`;
+      host.hidden = false;
+      host.classList.add("is-arriving");
+      window.setTimeout(() => host.classList.remove("is-arriving"), 280);
+      if (skeleton) skeleton.classList.remove("is-streaming");
+    };
+    if (!hasCard) {
+      finishReset();
+      return;
+    }
+    host.dataset.tossing = "1";
+    host.classList.remove("is-arriving");
+    host.classList.add("is-tossing");
+    window.setTimeout(finishReset, 420);
+  }
+
   function updateStreamPreview(preview, type) {
     if (!preview) return;
     if (preview.kind === "reverse") {
@@ -8095,6 +8132,11 @@
     }
     const host = $("#live-preview");
     if (!host) return;
+    if (preview.kind === "discard") {
+      tossWrongPreview(host, preview.wrongWord || "", preview.targetWord || "");
+      return;
+    }
+    if (host.dataset.tossing === "1") return;
     const signature = JSON.stringify(preview);
     if (host.dataset.signature === signature) return;
     host.dataset.signature = signature;
