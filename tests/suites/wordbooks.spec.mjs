@@ -112,4 +112,21 @@ suite("wordbooks · engine & zero-loss audit (unit)", { timeout: 10_000 }, (s) =
     t.expect(wb.stats().uniqueWords).toBe(3);
     t.expect(wb.getBook("dense-stacks").items.length).toBe(3);
   });
+
+  s.test("applyAiClassification never drops words when AI assigns a group back to source self-book (密集书库)", async (_state, t) => {
+    const { wb } = loadWordbooks();
+    wb.loadStore(["distaste", "touchy", "treasury", "liability", "petition"]);
+    const audit = wb.applyAiClassification("dense-stacks", [
+      { book: "密集书库", words: ["distaste", "touchy"] },
+      { book: "财经法律", words: ["treasury", "liability", "petition"] }
+    ]);
+    t.expect(audit.before.uniqueWords).toBe(5);
+    t.expect(audit.after.uniqueWords).toBe(5);
+    t.expect(audit.lost).toBe(0);
+    t.expect(audit.moved).toBe(3);
+    t.expect(audit.retained).toBe(2);
+    const denseTerms = wb.getBook("dense-stacks").items.map((it) => it.term);
+    t.expect(denseTerms.includes("distaste")).toBe(true);
+    t.expect(denseTerms.includes("touchy")).toBe(true);
+  });
 });

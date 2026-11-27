@@ -382,20 +382,30 @@
    */
   function applyAiClassification(sourceBookId, groups) {
     const before = stats();
-    const source = getBook(sourceBookId);
+    const store = loadStore();
+    const source = store.books.find((b) => b.id === sourceBookId) || null;
     if (!source || !source.items.length) {
-      return { before, after: before, moved: 0, retained: 0, createdBooks: [], lost: 0 };
+      return { before, after: before, moved: 0, retained: 0, createdBooks: [], lost: 0, recovered: 0 };
+    }
+
+    // Snapshot EVERY unique word across ALL books before touching anything (hard zero-loss baseline)
+    const beforeAllMap = new Map();
+    for (const b of store.books) {
+      for (const item of b.items) {
+        const k = normKey(item.term);
+        if (k && !beforeAllMap.has(k)) beforeAllMap.set(k, item);
+      }
     }
 
     const sourceSnapshot = new Map();
     for (const item of source.items) {
-      sourceSnapshot.set(normKey(item.term), item);
+      const k = normKey(item.term);
+      if (k && !sourceSnapshot.has(k)) sourceSnapshot.set(k, item);
     }
 
-    const store = loadStore();
     const existingBookNames = new Set(store.books.map((b) => b.name));
     const createdBooks = [];
-    const assignedKeys = new Set();
+    const movedKeys = new Set(); // ONLY tracks words actually inserted into a DIFFERENT destination book
     let moved = 0;
 
     if (Array.isArray(groups)) {
@@ -404,15 +414,7 @@
         const words = Array.isArray(group?.words) ? group.words : [];
         if (!bookName || !words.length) continue;
 
-        const matchedItems = [];
-        for (const w of words) {
-          const k = normKey(w);
-          if (!k || assignedKeys.has(k) || !sourceSnapshot.has(k)) continue;
-          assignedKeys.add(k);
-          matchedItems.push(sourceSnapshot.get(k));
-        }
-        if (!matchedItems.length) continue;
-
+        // Resolve or create destination book FIRST before marking any word as moved
         let dest = store.books.find((b) => b.name.toLowerCase() === bookName.toLowerCase());
         if (!dest) {
           dest = createBook(bookName);
@@ -421,28 +423,53 @@
             existingBookNames.add(dest.name);
           }
         }
+        // If AI assigned words back to the same source book (e.g. "密集书库"), keep them safely in source!
         if (!dest || dest.id === source.id) continue;
 
         const destKeys = new Set(dest.items.map((it) => normKey(it.term)));
-        for (const item of matchedItems) {
-          const k = normKey(item.term);
+        for (const w of words) {
+          const k = normKey(w);
+          if (!k || movedKeys.has(k) || !sourceSnapshot.has(k)) continue;
+          const item = sourceSnapshot.get(k);
           if (!destKeys.has(k)) {
             dest.items.unshift(item);
             destKeys.add(k);
           }
+          movedKeys.add(k);
           moved += 1;
         }
       }
     }
 
-    // Keep EVERY unassigned source word safely in sourceBookId (lossless invariant!)
-    source.items = source.items.filter((item) => !assignedKeys.has(normKey(item.term)));
+    // Remove ONLY words confirmed moved to another book
+    source.items = source.items.filter((item) => !movedKeys.has(normKey(item.term)));
+
+    // Hard post-audit reconciliation: compare against beforeAllMap and restore any missing word
+    const afterKeys = new Set();
+    for (const b of store.books) {
+      for (const item of b.items) {
+        const k = normKey(item.term);
+        if (k) afterKeys.add(k);
+      }
+    }
+    let recovered = 0;
+    const rescueBook = store.books.find((b) => b.id === source.id) || store.books.find((b) => b.id === DEFAULT_BOOK_ID);
+    if (rescueBook) {
+      for (const [k, item] of beforeAllMap.entries()) {
+        if (!afterKeys.has(k)) {
+          rescueBook.items.push(item);
+          afterKeys.add(k);
+          recovered += 1;
+        }
+      }
+    }
+
     const retained = source.items.length;
     saveStore(store);
 
     const after = stats();
     const lost = Math.max(0, before.uniqueWords - after.uniqueWords);
-    return { before, after, moved, retained, createdBooks, lost };
+    return { before, after, moved, retained, createdBooks, lost, recovered };
   }
 
   window.TALK_WORDBOOKS = {

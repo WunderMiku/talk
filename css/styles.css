@@ -7482,7 +7482,7 @@ html.motion-ready .reveal.is-in .reveal {
 
   /* Word page: hero left, meaning right, then full-width rows. */
   .screen[data-page="word"] .result-page,
-  .word-layer .result-page {
+  .word-layer[data-layer-kind="word"] .result-page {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     align-content: start;
@@ -7490,45 +7490,45 @@ html.motion-ready .reveal.is-in .reveal {
   }
 
   .screen[data-page="word"] .result-hero,
-  .word-layer .result-hero {
+  .word-layer[data-layer-kind="word"] .result-hero {
     grid-column: 1;
     grid-row: 1;
     padding-right: 18px;
   }
 
   .screen[data-page="word"] .result-page > .block,
-  .word-layer .result-page > .block {
+  .word-layer[data-layer-kind="word"] .result-page > .block {
     grid-column: 2;
     margin-top: 9px;
   }
 
   .screen[data-page="word"] .result-page > .block:first-of-type,
-  .word-layer .result-page > .block:first-of-type {
+  .word-layer[data-layer-kind="word"] .result-page > .block:first-of-type {
     margin-top: 0;
   }
 
   .screen[data-page="word"] .word-meaning-block,
-  .word-layer .word-meaning-block {
+  .word-layer[data-layer-kind="word"] .word-meaning-block {
     grid-column: 2;
     grid-row: 1;
   }
 
   .screen[data-page="word"] .result-page > .word-family-block,
-  .word-layer .result-page > .word-family-block {
+  .word-layer[data-layer-kind="word"] .result-page > .word-family-block {
     grid-column: 1 / -1 !important;
     grid-row: 2;
     margin-top: var(--word-family-gap) !important;
   }
 
   .screen[data-page="word"] .spelling-banner,
-  .word-layer .spelling-banner {
+  .word-layer[data-layer-kind="word"] .spelling-banner {
     grid-column: 1 / -1;
     margin-bottom: 14px;
   }
 
   /* The receipt line belongs to the page, not to the left column. */
   .screen[data-page="word"] .page-gen-note,
-  .word-layer .page-gen-note {
+  .word-layer[data-layer-kind="word"] .page-gen-note {
     grid-column: 1 / -1;
     justify-self: stretch;
     margin-top: 26px;
@@ -7537,7 +7537,7 @@ html.motion-ready .reveal.is-in .reveal {
 
   /* The two-column block cluster under the family row. */
   .screen[data-page="word"] .word-columns,
-  .word-layer .word-columns {
+  .word-layer[data-layer-kind="word"] .word-columns {
     grid-column: 1 / -1;
     grid-row: auto;
     display: grid !important;
@@ -7550,14 +7550,14 @@ html.motion-ready .reveal.is-in .reveal {
   }
 
   .screen[data-page="word"] .word-columns > .block,
-  .word-layer .word-columns > .block {
+  .word-layer[data-layer-kind="word"] .word-columns > .block {
     margin-top: 0;
     margin-bottom: 0;
   }
 
   /* One rule for every theme: the grid above owns the layout. */
   [data-theme] .screen[data-page="word"] .word-columns > .block,
-  [data-theme] .word-layer .word-columns > .block {
+  [data-theme] .word-layer[data-layer-kind="word"] .word-columns > .block {
     display: block !important;
     width: auto !important;
     break-inside: auto !important;
@@ -7566,9 +7566,9 @@ html.motion-ready .reveal.is-in .reveal {
   }
 
   .screen[data-page="word"] .result-page > .word-origin-block,
-  .word-layer .result-page > .word-origin-block,
+  .word-layer[data-layer-kind="word"] .result-page > .word-origin-block,
   .screen[data-page="word"] .result-page > .word-related-block,
-  .word-layer .result-page > .word-related-block {
+  .word-layer[data-layer-kind="word"] .result-page > .word-related-block {
     grid-column: 1 / -1 !important;
     grid-row: auto;
     margin-top: var(--word-section-gap) !important;
@@ -7576,7 +7576,7 @@ html.motion-ready .reveal.is-in .reveal {
 
   /* Origin: etymology card left, timeline right. */
   .screen[data-page="word"] .word-origin-block,
-  .word-layer .word-origin-block {
+  .word-layer[data-layer-kind="word"] .word-origin-block {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     column-gap: var(--word-col-gap);
@@ -7584,28 +7584,28 @@ html.motion-ready .reveal.is-in .reveal {
   }
 
   .screen[data-page="word"] .word-origin-block > .block-head,
-  .word-layer .word-origin-block > .block-head {
+  .word-layer[data-layer-kind="word"] .word-origin-block > .block-head {
     grid-column: 1 / -1;
   }
 
   .screen[data-page="word"] .word-origin-block > .origin-card,
-  .word-layer .word-origin-block > .origin-card {
+  .word-layer[data-layer-kind="word"] .word-origin-block > .origin-card {
     grid-column: 1;
   }
 
   .screen[data-page="word"] .word-origin-block > .origin-timeline,
-  .word-layer .word-origin-block > .origin-timeline {
+  .word-layer[data-layer-kind="word"] .word-origin-block > .origin-timeline {
     grid-column: 2;
     margin-top: 0;
   }
 
   .screen[data-page="word"] .word-related-block,
-  .word-layer .word-related-block {
+  .word-layer[data-layer-kind="word"] .word-related-block {
     padding-top: 2px;
   }
 
   .screen[data-page="word"] .page-actions,
-  .word-layer .page-actions {
+  .word-layer[data-layer-kind="word"] .page-actions {
     grid-column: 1 / -1;
     margin-top: var(--word-section-gap) !important;
   }

@@ -9,7 +9,7 @@
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "292"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "293"; // cache-busting build, kept in step with ?v= and sw.js
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -5832,14 +5832,17 @@
   }
 
   function mountWordLayer({ word, data, origin, relation, depth, content, options = {}, kind = "word" }) {
+    const layerKind = kind || "word";
     const layer = document.createElement("section");
     layer.className = "word-layer";
+    layer.dataset.layerKind = layerKind;
     layer.style.setProperty("--depth", String(depth));
     layer.style.zIndex = String(2 + depth);
     layer.tabIndex = -1;
     layer.setAttribute("role", "region");
     layer.setAttribute("aria-label", `${word} 词条，第 ${depth} 层`);
     layer.innerHTML = `<div class="layer-scroll">${content}</div>`;
+    if (layerKind === "word") enhanceWordColumns(layer);
     applyCacheDisplay();
     refreshCacheBorders(layer);
 
@@ -5890,7 +5893,7 @@
     holder.innerHTML = content;
     holder.querySelectorAll(".reveal, .reveal-item").forEach((node) => node.classList.add("is-in"));
     scroll.replaceChildren(...holder.childNodes);
-    enhanceWordColumns(scroll);
+    if ((record?.kind || "word") === "word") enhanceWordColumns(scroll);
     applyCacheDisplay();
     refreshCacheBorders(scroll);
     scroll.scrollTop = 0;
@@ -5928,6 +5931,7 @@
       record.word = data.word;
       record.loading = false;
       record.el.setAttribute("aria-label", `${data.word} 词条，第 ${record.depth} 层`);
+      addHistory("word", data.word);
       replaceLayerContent(record, wordPage(data, {
         origin: record.origin,
         relation: record.relation,
@@ -5970,6 +5974,7 @@
     if (data) {
       if (options.context) data = { ...data, context: options.context };
       if (!data.related?.length && siblings.length) data.related = siblings.slice(0, 6);
+      addHistory("word", data.word);
       mountWordLayer({
         word: data.word,
         data,
@@ -6023,6 +6028,32 @@
     await hydrateLayerWithModel(record);
   }
 
+  async function hydrateChunkLayer(record, phrase) {
+    if (!record || !record.el?.isConnected) return;
+    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
+    if (!hasModelConfig(cfg)) {
+      replaceLayerContent(record, layerConnectPage(phrase, record.origin, record.relation, record.depth));
+      return;
+    }
+    record.loading = true;
+    replaceLayerContent(record, layerLoadingPage(phrase, record.origin, record.relation, record.depth));
+    try {
+      const result = await modelLookup(phrase, "chunk", cfg);
+      if (!state.wordLayers.includes(record)) return;
+      const chunkData = ensureChunk(result.data);
+      if (!chunkData) throw new Error("模型返回的意群为空");
+      record.data = chunkData;
+      record.word = chunkData.chunk;
+      record.loading = false;
+      addHistory("chunk", chunkData.chunk);
+      replaceLayerContent(record, chunkPage(chunkData, { origin: record.origin, relation: record.relation, depth: record.depth }));
+    } catch (error) {
+      if (!state.wordLayers.includes(record)) return;
+      record.loading = false;
+      replaceLayerContent(record, layerErrorPage(phrase, record.origin, record.relation, record.depth, error?.message || "意群加载失败"));
+    }
+  }
+
   async function openChunkLayer(phrase, options = {}) {
     const clean = String(phrase || "").trim();
     if (!clean) return;
@@ -6031,12 +6062,13 @@
     const origin = options.origin || currentLayerOrigin();
     const relation = options.relation || "意群";
     const slug = chunkSlug(clean);
-    let data = DATA.chunks?.[slug] ? ensureChunk(DATA.chunks[slug]) : null;
-    if (!data) {
+    let data = !options.skipCache && DATA.chunks?.[slug] ? ensureChunk(DATA.chunks[slug]) : null;
+    if (!data && !options.skipCache) {
       const cached = cacheGetChunk(clean);
       if (cached) data = ensureChunk(cached);
     }
     if (data) {
+      addHistory("chunk", data.chunk);
       mountWordLayer({
         word: data.chunk,
         kind: "chunk",
@@ -6049,7 +6081,8 @@
       });
       return;
     }
-    if (!hasModelConfig()) {
+    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
+    if (!hasModelConfig(cfg)) {
       mountWordLayer({
         word: clean,
         kind: "chunk",
@@ -6072,24 +6105,33 @@
       options,
       content: layerLoadingPage(clean, origin, relation, depth)
     });
+    await hydrateChunkLayer(record, clean);
+  }
+
+  async function hydrateSentenceLayer(record, clean) {
+    if (!record || !record.el?.isConnected) return;
+    const titleShort = shorten(clean, 26);
+    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
+    if (!hasModelConfig(cfg)) {
+      replaceLayerContent(record, layerConnectPage(titleShort, record.origin, record.relation, record.depth));
+      return;
+    }
+    record.loading = true;
+    replaceLayerContent(record, layerLoadingPage(titleShort, record.origin, record.relation, record.depth));
     try {
-      const result = await modelLookup(clean, "chunk", state.settings);
+      const result = await modelLookup(clean, "sentence", cfg);
       if (!state.wordLayers.includes(record)) return;
-      const chunkData = ensureChunk(result.data);
-      record.data = chunkData;
-      record.word = chunkData.chunk;
-      const inner = record.el?.querySelector(".layer-scroll") || record.el;
-      if (inner) {
-        inner.innerHTML = chunkPage(chunkData, { origin: record.origin, relation: record.relation, depth: record.depth });
-        inner.querySelectorAll(".reveal, .reveal-item").forEach((el) => el.classList.add("is-in"));
-        refreshCacheBorders(inner);
-      }
+      const sentData = result.data;
+      if (!sentData) throw new Error("模型返回的拆句为空");
+      record.data = sentData;
+      record.word = shorten(sentData?.text || clean, 26);
+      record.loading = false;
+      addHistory("sentence", sentData?.text || clean);
+      replaceLayerContent(record, sentencePage(sentData, { origin: record.origin, relation: record.relation, depth: record.depth }));
     } catch (error) {
       if (!state.wordLayers.includes(record)) return;
-      const inner = record.el?.querySelector(".layer-scroll") || record.el;
-      if (inner) {
-        inner.innerHTML = layerErrorPage(clean, error?.message || "意群加载失败", record.origin, record.relation, record.depth);
-      }
+      record.loading = false;
+      replaceLayerContent(record, layerErrorPage(titleShort, record.origin, record.relation, record.depth, error?.message || "拆句加载失败"));
     }
   }
 
@@ -6102,8 +6144,11 @@
     const relation = options.relation || "拆句";
     const titleShort = shorten(clean, 26);
 
-    const localHit = DATA.sentences?.find((item) => String(item.text || "").trim().toLowerCase() === clean.toLowerCase());
+    const localHit = !options.skipCache
+      ? DATA.sentences?.find((item) => String(item.text || "").trim().toLowerCase() === clean.toLowerCase())
+      : null;
     if (localHit) {
+      addHistory("sentence", localHit.text || clean);
       mountWordLayer({
         word: titleShort,
         kind: "sentence",
@@ -6119,8 +6164,9 @@
 
     const detail = state.settings?.detailLevel || "standard";
     const sKey = await sentenceKey(clean, sentenceLevelOf(state.settings?.sentenceLevel).id, detail);
-    const cached = sKey ? cacheGetSentence(sKey) : null;
+    const cached = !options.skipCache && sKey ? cacheGetSentence(sKey) : null;
     if (cached) {
+      addHistory("sentence", cached.text || clean);
       mountWordLayer({
         word: titleShort,
         kind: "sentence",
@@ -6134,7 +6180,8 @@
       return;
     }
 
-    if (!hasModelConfig()) {
+    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
+    if (!hasModelConfig(cfg)) {
       mountWordLayer({
         word: titleShort,
         kind: "sentence",
@@ -6158,25 +6205,7 @@
       options,
       content: layerLoadingPage(titleShort, origin, relation, depth)
     });
-    try {
-      const result = await modelLookup(clean, "sentence", state.settings);
-      if (!state.wordLayers.includes(record)) return;
-      const sentData = result.data;
-      record.data = sentData;
-      record.word = shorten(sentData?.text || clean, 26);
-      const inner = record.el?.querySelector(".layer-scroll") || record.el;
-      if (inner) {
-        inner.innerHTML = sentencePage(sentData, { origin: record.origin, relation: record.relation, depth: record.depth });
-        inner.querySelectorAll(".reveal, .reveal-item").forEach((el) => el.classList.add("is-in"));
-        refreshCacheBorders(inner);
-      }
-    } catch (error) {
-      if (!state.wordLayers.includes(record)) return;
-      const inner = record.el?.querySelector(".layer-scroll") || record.el;
-      if (inner) {
-        inner.innerHTML = layerErrorPage(titleShort, error?.message || "拆句加载失败", record.origin, record.relation, record.depth);
-      }
-    }
+    await hydrateSentenceLayer(record, clean);
   }
 
   function openWordLayerFromButton(button) {
@@ -8822,6 +8851,14 @@
 
       case "regenerate-chunk": {
         event.preventDefault();
+        const top = state.wordLayers[state.wordLayers.length - 1];
+        if (top && top.kind === "chunk") {
+          const phrase = top.data?.chunk || top.word || "";
+          if (!phrase) break;
+          await removeWordRecord(chunkCacheKey(phrase));
+          await hydrateChunkLayer(top, phrase);
+          break;
+        }
         const route = state.route;
         if (route?.name !== "chunk") break;
         void removeWordRecord(chunkCacheKey(route.query || ""));
@@ -8831,6 +8868,15 @@
 
       case "delete-chunk-cache": {
         event.preventDefault();
+        const top = state.wordLayers[state.wordLayers.length - 1];
+        if (top && top.kind === "chunk") {
+          const phrase = top.data?.chunk || top.word || "";
+          if (!phrase) break;
+          await removeWordRecord(chunkCacheKey(phrase));
+          toast("已删除这份意群缓存");
+          closeTopWordLayer();
+          break;
+        }
         const route = state.route;
         if (route?.name !== "chunk") break;
         void removeWordRecord(chunkCacheKey(route.query || ""));
@@ -8956,6 +9002,11 @@
         const detail = state.settings?.detailLevel || "standard";
         const key = await sentenceKey(active.text, level, detail);
         removeSentenceRecord(key);
+        const top = state.wordLayers[state.wordLayers.length - 1];
+        if (top && top.kind === "sentence") {
+          await hydrateSentenceLayer(top, active.text);
+          break;
+        }
         await runSearch(active.text, "sentence", { skipCache: true });
         break;
       }
@@ -8968,6 +9019,8 @@
         const detail = state.settings?.detailLevel || "standard";
         removeSentenceRecord(await sentenceKey(active.text, level, detail));
         toast("已删除这条句子缓存");
+        const top = state.wordLayers[state.wordLayers.length - 1];
+        if (top && top.kind === "sentence") closeTopWordLayer();
         break;
       }
 
@@ -8984,6 +9037,13 @@
         const key = normalizeWord(active.word);
         if (!key || !hasModelConfig()) break;
         await removeWordRecord(key);
+        const top = state.wordLayers[state.wordLayers.length - 1];
+        if (top && (top.kind || "word") === "word") {
+          top.word = key;
+          top.data = null;
+          await hydrateLayerWithModel(top);
+          break;
+        }
         await runSearch(key, "word");
         break;
       }
@@ -9403,7 +9463,8 @@
         if (!window.confirm("删除这个词的本地缓存？相关拼写也会一起删除。")) break;
         const removed = await deleteWordCacheFor(targetWord);
         toast(removed ? "已删除这条缓存" : "没有找到对应缓存");
-        goBack();
+        if (state.wordLayers.length) closeTopWordLayer();
+        else goBack();
         break;
       }
 
@@ -10231,12 +10292,15 @@
   }
 
   function activeSentenceData() {
+    const top = state.wordLayers[state.wordLayers.length - 1];
+    if (top && top.kind === "sentence") return top.data || null;
     if (state.route.name !== "sentence") return null;
     return getSentence(state.route);
   }
 
   function activeWordData() {
-    if (state.wordLayers.length) return state.wordLayers[state.wordLayers.length - 1].data;
+    const top = state.wordLayers[state.wordLayers.length - 1];
+    if (top) return (top.kind || "word") === "word" ? (top.data || null) : null;
     if (state.route.name === "word") return getWord(state.route);
     return null;
   }
