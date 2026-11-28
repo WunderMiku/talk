@@ -2,9 +2,14 @@ name: Build Android APK
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, neo]
     tags: ["v*"]
   workflow_dispatch:
+    inputs:
+      channel:
+        description: "Optional APK suffix/channel (blank = auto from branch; e.g. neo)"
+        required: false
+        default: ""
 
 permissions:
   contents: write
@@ -43,10 +48,53 @@ jobs:
       - name: Install dependencies
         run: npm install --no-audit --no-fund
 
-      - name: Read the web build number
+      - name: Resolve build metadata and channel
+        env:
+          INPUT_CHANNEL: ${{ github.event.inputs.channel }}
         run: |
           BUILD=$(grep -oE 'APP_BUILD = "[0-9]+"' js/app.js | head -1 | grep -oE '[0-9]+')
-          echo "TALK_BUILD=${BUILD:-dev}" >> "$GITHUB_ENV"
+          BUILD="${BUILD:-dev}"
+
+          RAW_CHANNEL="${INPUT_CHANNEL}"
+          if [ -z "$RAW_CHANNEL" ]; then
+            if [ "${GITHUB_REF_TYPE}" = "tag" ] || [ "${GITHUB_REF_NAME}" = "main" ] || [ "${GITHUB_REF_NAME}" = "master" ]; then
+              RAW_CHANNEL=""
+            else
+              RAW_CHANNEL="${GITHUB_REF_NAME}"
+            fi
+          fi
+          CHANNEL=$(printf '%s' "$RAW_CHANNEL" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
+
+          if [ -n "$CHANNEL" ]; then
+            SUFFIX_PART="-${CHANNEL}"
+            RELEASE_TAG="apk-${CHANNEL}"
+            RELEASE_TITLE="talk. ${CHANNEL} APK (latest)"
+            IS_PRERELEASE="true"
+          elif [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            SUFFIX_PART=""
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            RELEASE_TITLE="talk. ${GITHUB_REF_NAME}"
+            IS_PRERELEASE="false"
+          else
+            SUFFIX_PART=""
+            RELEASE_TAG="apk-latest"
+            RELEASE_TITLE="talk. APK (latest)"
+            IS_PRERELEASE="false"
+          fi
+
+          {
+            echo "TALK_BUILD=${BUILD}"
+            echo "TALK_APP_SUFFIX=${CHANNEL}"
+            echo "TALK_SUFFIX_PART=${SUFFIX_PART}"
+            echo "TALK_RELEASE_TAG=${RELEASE_TAG}"
+            echo "TALK_RELEASE_TITLE=${RELEASE_TITLE}"
+            echo "TALK_RELEASE_PRERELEASE=${IS_PRERELEASE}"
+            echo "TALK_RELEASE_APK=talk-${BUILD}${SUFFIX_PART}-release.apk"
+            echo "TALK_DEBUG_APK=talk-${BUILD}${SUFFIX_PART}-debug.apk"
+            echo "TALK_ARTIFACT_NAME=talk-android-${BUILD}${SUFFIX_PART}"
+          } >> "$GITHUB_ENV"
+
+          echo "Resolved: build=${BUILD} channel=${CHANNEL:-prod} apk=talk-${BUILD}${SUFFIX_PART}-*.apk release=${RELEASE_TAG} prerelease=${IS_PRERELEASE}"
 
       - name: Assemble local web bundle
         run: npm run build:web
@@ -54,8 +102,8 @@ jobs:
       - name: Generate and configure Capacitor Android project
         run: |
           npx cap add android
-          node scripts/setup-android-native.mjs
           npx cap sync android
+          node scripts/setup-android-native.mjs
 
       - name: Decode release keystore
         if: env.KEYSTORE_B64 != ''
@@ -77,45 +125,56 @@ jobs:
             --ks-key-alias "$KEY_ALIAS" \
             --ks-pass env:STORE_PASS \
             --key-pass env:KEY_PASS \
-            --out "talk-${TALK_BUILD}-release.apk" \
+            --out "${TALK_RELEASE_APK}" \
             "$RUNNER_TEMP/talk-aligned.apk"
-          "$BT/apksigner" verify --print-certs "talk-${TALK_BUILD}-release.apk"
+          "$BT/apksigner" verify --print-certs "${TALK_RELEASE_APK}"
 
       - name: Build debug APK (no signing secrets configured)
         if: env.KEYSTORE_B64 == ''
         working-directory: android
         run: ./gradlew assembleDebug --no-daemon
 
+      - name: Name debug APK
+        if: env.KEYSTORE_B64 == ''
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk "${TALK_DEBUG_APK}"
+
       - name: Publish the APK to a GitHub Release
         if: env.KEYSTORE_B64 != ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            TAG="${GITHUB_REF_NAME}"
-            TITLE="talk. ${GITHUB_REF_NAME}"
-            NOTES="Built from ${GITHUB_SHA:0:7} · build ${TALK_BUILD}."
-          else
-            TAG="apk-latest"
-            TITLE="talk. APK (latest)"
-            NOTES="Built from ${GITHUB_SHA:0:7} · build ${TALK_BUILD} · $(date -u +%FT%TZ)"
+          TAG="${TALK_RELEASE_TAG}"
+          TITLE="${TALK_RELEASE_TITLE}"
+          CHANNEL_NOTE="${TALK_APP_SUFFIX:+ · channel ${TALK_APP_SUFFIX} (app.wundermiku.talk.${TALK_APP_SUFFIX})}"
+          NOTES="Built from ${GITHUB_SHA:0:7} · build ${TALK_BUILD}${CHANNEL_NOTE} · $(date -u +%FT%TZ)"
+
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            if [ "${TALK_RELEASE_PRERELEASE}" = "true" ]; then
+              gh release create "$TAG" --target "${GITHUB_SHA}" --prerelease --title "$TITLE" --notes "$NOTES"
+            else
+              gh release create "$TAG" --target "${GITHUB_SHA}" --title "$TITLE" --notes "$NOTES"
+            fi
           fi
-          gh release view "$TAG" >/dev/null 2>&1 || gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
-          gh release upload "$TAG" "talk-${TALK_BUILD}-release.apk" --clobber
-          # Keep only the newest APK attached to the rolling release.
+
+          gh release upload "$TAG" "${TALK_RELEASE_APK}" --clobber
+
+          # Keep only the newest APK attached to this channel's rolling release.
           gh release view "$TAG" --json assets --jq '.assets[].name' | while read -r asset; do
-            if [ "$asset" != "talk-${TALK_BUILD}-release.apk" ]; then
+            if [ "$asset" != "${TALK_RELEASE_APK}" ]; then
               gh release delete-asset "$TAG" "$asset" -y || true
             fi
           done
-          gh release edit "$TAG" --notes "$NOTES"
+
+          if [ "${TALK_RELEASE_PRERELEASE}" = "true" ]; then
+            gh release edit "$TAG" --prerelease --title "$TITLE" --notes "$NOTES"
+          else
+            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: talk-android-${{ env.TALK_BUILD }}
+          name: ${{ env.TALK_ARTIFACT_NAME }}
           path: |
             talk-*.apk
-            android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-          retention-days: 90

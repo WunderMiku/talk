@@ -262,3 +262,58 @@ if (existsSync(srcIcon)) {
   await writeFile(path.join(anydpiDir, "ic_launcher_round.xml"), adaptiveXml, "utf8");
   console.log("Replaced all Android mipmap & API 26+ Adaptive Icons");
 }
+
+// 4. Optional channel isolation & build versioning (e.g. TALK_APP_SUFFIX=neo, TALK_BUILD=295).
+//    Keeps Gradle `namespace` at app.wundermiku.talk so MainActivity.java stays untouched while
+//    giving channel APKs a distinct applicationId, launcher label, and FileProvider authority so
+//    they install side-by-side with the production app without overwriting it.
+const rawSuffix = String(process.env.TALK_APP_SUFFIX || "").trim().toLowerCase();
+const appSuffix = rawSuffix.replace(/[^a-z0-9]/g, "");
+const buildNum = Number.parseInt(String(process.env.TALK_BUILD || "").trim(), 10);
+
+if (appSuffix || Number.isInteger(buildNum) && buildNum > 0) {
+  const baseAppId = "app.wundermiku.talk";
+  const targetAppId = appSuffix ? `${baseAppId}.${appSuffix}` : baseAppId;
+  const targetAppName = appSuffix ? `talk. ${appSuffix}` : "talk.";
+
+  const gradlePath = path.join(ANDROID, "app/build.gradle");
+  if (existsSync(gradlePath)) {
+    let gradle = await readFile(gradlePath, "utf8");
+    if (appSuffix) {
+      gradle = gradle.replace(/applicationId\s+"[^"]+"/, `applicationId "${targetAppId}"`);
+    }
+    if (Number.isInteger(buildNum) && buildNum > 0) {
+      gradle = gradle.replace(/versionCode\s+\d+/, `versionCode ${buildNum}`);
+      const versionName = appSuffix ? `1.0.${buildNum}-${appSuffix}` : `1.0.${buildNum}`;
+      gradle = gradle.replace(/versionName\s+"[^"]+"/, `versionName "${versionName}"`);
+    } else if (appSuffix) {
+      gradle = gradle.replace(/versionName\s+"([^"]+)"/, (_, cur) => `versionName "${cur}-${appSuffix}"`);
+    }
+    await writeFile(gradlePath, gradle, "utf8");
+    console.log(`Patched build.gradle (applicationId=${targetAppId}${Number.isInteger(buildNum) && buildNum > 0 ? `, versionCode=${buildNum}` : ""})`);
+  }
+
+  if (appSuffix) {
+    const stringsPath = path.join(ANDROID, "app/src/main/res/values/strings.xml");
+    if (existsSync(stringsPath)) {
+      let stringsXml = await readFile(stringsPath, "utf8");
+      stringsXml = stringsXml
+        .replace(/(<string name="app_name">)[^<]*(<\/string>)/, `$1${targetAppName}$2`)
+        .replace(/(<string name="title_activity_main">)[^<]*(<\/string>)/, `$1${targetAppName}$2`)
+        .replace(/(<string name="package_name">)[^<]*(<\/string>)/, `$1${targetAppId}$2`)
+        .replace(/(<string name="custom_url_scheme">)[^<]*(<\/string>)/, `$1${targetAppId}$2`);
+      await writeFile(stringsPath, stringsXml, "utf8");
+      console.log(`Patched strings.xml (app_name=${targetAppName}, package_name=${targetAppId})`);
+    }
+
+    const assetConfigPath = path.join(ANDROID, "app/src/main/assets/capacitor.config.json");
+    if (existsSync(assetConfigPath)) {
+      const capCfg = JSON.parse(await readFile(assetConfigPath, "utf8"));
+      capCfg.appId = targetAppId;
+      capCfg.appName = targetAppName;
+      await writeFile(assetConfigPath, `${JSON.stringify(capCfg, null, 2)}\n`, "utf8");
+      console.log(`Patched assets/capacitor.config.json (appId=${targetAppId}, appName=${targetAppName})`);
+    }
+  }
+}
+
