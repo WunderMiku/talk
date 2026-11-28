@@ -75,10 +75,14 @@ import { createShareController } from "./features/share.js";
 import { createThemeSalon } from "./features/theme-salon.js";
 import { createTranslatorView } from "./views/translator.js";
 import { createStatusViews } from "./views/status.js";
-import { relationGloss, createWordView } from "./views/word.js";
+import { createWordView } from "./views/word.js";
 import { createChunkView } from "./views/chunk.js";
 import { createSentenceView } from "./views/sentence.js";
 import { createReverseView } from "./views/reverse.js";
+import { uniqueWords, createLayerController } from "./views/layers.js";
+import { createSheetController } from "./views/sheets.js";
+import { createSettingsSheet } from "./views/settings-sheet.js";
+import { createHistorySheet } from "./views/history-sheet.js";
 
 (() => {
   "use strict";
@@ -478,6 +482,28 @@ import { createReverseView } from "./views/reverse.js";
   });
   const { stopSpeech, getAudioStats, clearAudioCache, refreshTtsError, speakText, testTts } = tts;
 
+  const sheets = createSheetController({
+    state,
+    overlayRoot,
+    data: DATA,
+    reduceMotion,
+    updateScrollLock,
+    flushSettingsDraft: () => settingsSheet.flushSettingsDraft(),
+    renderSettingsContent: () => settingsSheet.renderSettingsContent(),
+    wordCacheStats,
+    wordCacheEstimate,
+    getAudioStats,
+    formatBytes,
+    clearWordStore,
+    clearAudioCache,
+    exportWordCache,
+    refreshCacheBorders,
+    activeWordData,
+    schedulePrefetch,
+    toast
+  });
+  const { openSheetShell, closeSheet, renderCacheContent, refreshCacheUi } = sheets;
+
   const share = createShareController({
     state,
     screen,
@@ -496,7 +522,7 @@ import { createReverseView } from "./views/reverse.js";
     hasModelConfig,
     openSheetShell,
     closeSheet,
-    renderSettingsContent,
+    renderSettingsContent: () => settingsSheet.renderSettingsContent(),
     formatBytes,
     toast
   });
@@ -569,14 +595,14 @@ import { createReverseView } from "./views/reverse.js";
     getActiveSurface,
     removeWordRecord,
     deleteWordCacheFor,
-    hydrateLayerWithModel,
+    hydrateLayerWithModel: (...args) => layers.hydrateLayerWithModel(...args),
     runSearch,
     scrollScreenTo,
     applyCacheDisplay,
     refreshCacheBorders,
     persistSettings,
     refreshThemedPage,
-    closeTopWordLayer: popWordLayer,
+    closeTopWordLayer: () => layers.popWordLayer(),
     goBack,
     toast
   });
@@ -593,9 +619,9 @@ import { createReverseView } from "./views/reverse.js";
     getActiveSurface,
     chunkCacheKey,
     removeWordRecord,
-    hydrateChunkLayer,
+    hydrateChunkLayer: (...args) => layers.hydrateChunkLayer(...args),
     runSearch,
-    closeTopWordLayer: popWordLayer,
+    closeTopWordLayer: () => layers.popWordLayer(),
     toast
   });
   const { chunkPage } = chunkView;
@@ -616,8 +642,8 @@ import { createReverseView } from "./views/reverse.js";
     sentenceKey,
     removeSentenceRecord,
     clearSentenceCache,
-    hydrateSentenceLayer,
-    closeTopWordLayer: popWordLayer,
+    hydrateSentenceLayer: (...args) => layers.hydrateSentenceLayer(...args),
+    closeTopWordLayer: () => layers.popWordLayer(),
     toast
   });
   const { sentencePage } = sentenceView;
@@ -630,12 +656,12 @@ import { createReverseView } from "./views/reverse.js";
     reverseBudget,
     reverseStyleName,
     modelLookup,
-    closeAllWordLayers,
+    closeAllWordLayers: (...args) => layers.closeAllWordLayers(...args),
     closeSheet,
     navigate,
     runSearch,
-    openHistorySheet,
-    renderHistoryContent,
+    openHistorySheet: (...args) => historySheet.openHistorySheet(...args),
+    renderHistoryContent: () => historySheet.renderHistoryContent(),
     toast
   });
   const {
@@ -649,8 +675,115 @@ import { createReverseView } from "./views/reverse.js";
     gotoReverseAnchor
   } = reverseView;
 
+  const layers = createLayerController({
+    state,
+    layerRoot,
+    data: DATA,
+    reduceMotion,
+    modelTimeoutText: MODEL_TIMEOUT_TEXT,
+    layerTopbar,
+    loadingBody,
+    wordPage,
+    chunkPage,
+    sentencePage,
+    getWord,
+    getSentence,
+    cacheGetWord,
+    cacheGetChunk,
+    cacheGetSentence,
+    sentenceLevelOf,
+    sentenceKey,
+    activeProfile,
+    applyProfileToSettings,
+    hasModelConfig,
+    lookupWordDeduped,
+    modelLookup,
+    addHistory,
+    closeSheet,
+    enhanceWordColumns,
+    applyCacheDisplay,
+    refreshCacheBorders,
+    schedulePrefetch,
+    updateCacheCorner,
+    hideCacheCorner,
+    updateScrollLock
+  });
+  const {
+    openWordLayer,
+    openChunkLayer,
+    openSentenceLayer,
+    popWordLayer,
+    closeAllWordLayers
+  } = layers;
+
+  const settingsSheet = createSettingsSheet({
+    state,
+    overlayRoot,
+    llm: LLM,
+    appVersion: APP_VERSION,
+    appBuild: APP_BUILD,
+    providerTemplates: PROVIDER_TEMPLATES,
+    customTemplate: CUSTOM_TEMPLATE,
+    detailLevels: DETAIL_LEVELS,
+    sentenceLevels: SENTENCE_LEVELS,
+    prefetchLimit: PREFETCH_LIMIT,
+    sentenceCache,
+    copyFor,
+    openSheetShell,
+    closeSheet,
+    activeProfile,
+    applyProfileToSettings,
+    syncDraftProfile,
+    profileSupportsThinking,
+    hasModelConfig,
+    persistSettings,
+    applyCacheDisplay,
+    refreshCacheBorders,
+    activeWordData,
+    schedulePrefetch,
+    hydrateLayerWithModel: (...args) => layers.hydrateLayerWithModel(...args),
+    sentenceLevelOf,
+    reverseZoneName,
+    exampleStyleFor,
+    saveExampleStyles,
+    wordCacheStats,
+    formatBytes,
+    diagText,
+    refreshTtsError,
+    renderThemeCacheStats,
+    applyContentCopy,
+    refreshThemedPage,
+    getWord,
+    scheduleThemeExamples,
+    toast
+  });
+  const { scheduleSettingsCommit } = settingsSheet;
+
+  const historySheet = createHistorySheet({
+    state,
+    data: DATA,
+    openSheetShell,
+    closeSheet,
+    listReverseThreads,
+    syncSavedFromWordbooks,
+    parseSavedEntry,
+    findSavedIndex,
+    persistSaved,
+    persistHistory,
+    cacheGetWord,
+    cacheGetChunk,
+    hasModelConfig,
+    callWordbookAi,
+    navigate,
+    runSearch,
+    openWordLayer,
+    toast
+  });
+  const { openHistorySheet, isTermLocallyCached, updateWordbookImportHint } = historySheet;
+
   actions.register({
     ...tts.actions,
+    ...sheets.actions,
     ...share.actions,
     ...themeSalon.actions,
     ...translator.actions,
@@ -658,8 +791,95 @@ import { createReverseView } from "./views/reverse.js";
     ...wordView.actions,
     ...chunkView.actions,
     ...sentenceView.actions,
-    ...reverseView.actions
+    ...reverseView.actions,
+    ...layers.actions,
+    ...settingsSheet.actions,
+    ...historySheet.actions,
+    home({ event }) {
+      event.preventDefault();
+      tapFeedback();
+      navigate({ name: "home" }, { direction: "back" });
+    },
+    back({ event }) {
+      event.preventDefault();
+      goBack();
+    },
+    "cache-status"({ event }) {
+      event.preventDefault();
+      toast(cacheCorner?.dataset.label || "缓存状态");
+    },
+    module({ event, target }) {
+      event.preventDefault();
+      const rawMod = target.dataset.module;
+      const module = rawMod === "translator" ? "translator" : rawMod === "reader" ? "reader" : "dictionary";
+      if (module === state.module) return;
+      const modOrder = { dictionary: 0, translator: 1, reader: 2 };
+      const dir = (modOrder[module] ?? 0) >= (modOrder[state.module] ?? 0) ? "next" : "prev";
+      document.documentElement.dataset.moduleDir = dir;
+      state.module = module;
+      updateModuleBar();
+      tapFeedback();
+      closeAllWordLayers({ immediate: true });
+      if (module === "translator") navigate({ name: "translator" }, { replace: false });
+      else if (module === "reader") navigate({ name: "reader" }, { replace: false });
+      else navigate({ name: "home" }, { replace: false });
+      if (!document.startViewTransition) {
+        screen.classList.remove("is-module-glide");
+        void screen.offsetWidth;
+        screen.classList.add("is-module-glide");
+      }
+      window.setTimeout(() => {
+        delete document.documentElement.dataset.moduleDir;
+        screen.classList.remove("is-module-glide");
+      }, 360);
+    },
+    mode({ event, target }) {
+      event.preventDefault();
+      state.mode = target.dataset.mode || "auto";
+      $$(".mode-btn", screen).forEach((button) => {
+        const active = button.dataset.mode === state.mode;
+        button.classList.toggle("active", active);
+        button.setAttribute("aria-pressed", String(active));
+      });
+      updateSearchMeta();
+    },
+    lookup({ event, target }) {
+      event.preventDefault();
+      tapFeedback();
+      closeSheet({ immediate: true });
+      runSearch(target.dataset.query || "", target.dataset.type || "auto");
+    },
+    word({ event, target }) {
+      event.preventDefault();
+      tapFeedback();
+      openWordRoute(target.dataset.word || "");
+    },
+    save({ event, target }) {
+      event.preventDefault();
+      toggleSaved(target);
+    },
+    copy({ event }) {
+      event.preventDefault();
+      copyCurrentPage();
+    },
+    "copy-text"({ event, target }) {
+      event.preventDefault();
+      const text = target.dataset.copy || "";
+      if (!text) return;
+      void copyText(text).then((copied) => toast(copied ? "已复制" : "这个浏览器不允许复制"));
+    },
+    "shuffle-moods"({ event }) {
+      event.preventDefault();
+      state.moodOffset += 3;
+      renderMoods();
+      tapFeedback();
+    }
   });
+
+  function updateScrollLock() {
+    if (!screen) return;
+    screen.classList.toggle("is-locked", state.sheetOpen || state.workspaceOpen || state.wordLayers.length > 0);
+  }
 
   /* ============================================================
      Small app-scoped helpers
@@ -2228,1662 +2448,6 @@ import { createReverseView } from "./views/reverse.js";
   }
 
   /* ============================================================
-     Sheets
-     ============================================================ */
-
-  /* ============================================================
-     Nested word layers
-     ============================================================ */
-
-  function updateScrollLock() {
-    if (!screen) return;
-    screen.classList.toggle("is-locked", state.sheetOpen || state.workspaceOpen || state.wordLayers.length > 0);
-  }
-
-  function currentLayerData() {
-    if (state.wordLayers.length) return state.wordLayers[state.wordLayers.length - 1].data;
-    if (state.route.name === "word") return getWord(state.route);
-    return null;
-  }
-
-  function currentLayerOrigin() {
-    if (state.wordLayers.length) return state.wordLayers[state.wordLayers.length - 1].word;
-    if (state.route.name === "word") return getWord(state.route)?.word || "当前词条";
-    if (state.route.name === "sentence") return "句子";
-    return "Talk";
-  }
-
-  function uniqueWords(items, exclude = "") {
-    const skip = normalizeWord(exclude);
-    const seen = new Set();
-    const out = [];
-    for (const item of items) {
-      const word = typeof item === "string" ? item : item?.word;
-      const key = normalizeWord(word);
-      if (!key || key === skip || seen.has(key)) continue;
-      seen.add(key);
-      out.push(String(word));
-    }
-    return out;
-  }
-
-  function siblingsFor(data, exclude = "") {
-    if (!data) return [];
-    return uniqueWords([
-      ...(data.family || []),
-      ...(data.synonyms || []),
-      ...(data.antonyms || []),
-      ...(data.related || [])
-    ], exclude).slice(0, 8);
-  }
-
-  function sentenceSiblings(exclude = "") {
-    const sentence = getSentence(state.route);
-    return uniqueWords(sentence?.keyWords?.map((item) => item.word) || [], exclude).slice(0, 8);
-  }
-
-  function makeMiniWord(word, options, origin, relation) {
-    const key = normalizeWord(word);
-    const stub = DATA.lexicon[key] || {};
-    const gloss = options.gloss || stub.gloss || "";
-    const zh = options.zh || stub.zh || "";
-    const context = options.context || null;
-    const siblings = options.siblings || [];
-    const shortMeaning = context?.meaning || gloss || "";
-    const chineseMeaning = context?.meaningZh || zh || "";
-    if (!shortMeaning && !chineseMeaning) return null;
-    return ensureWord({
-      word,
-      phonetic: options.ipa || stub.phonetic || "",
-      pos: options.pos || stub.pos || "",
-      level: "—",
-      register: "common",
-      short: shortMeaning,
-      translation: chineseMeaning || shortMeaning,
-      note: context?.why || `来自 ${origin} 的${relation}。`,
-      senses: [{
-        zh: chineseMeaning || shortMeaning,
-        en: shortMeaning,
-        tag: "关联词"
-      }],
-      family: [],
-      synonyms: [],
-      antonyms: [],
-      examples: [],
-      collocations: [],
-      related: siblings,
-      origin: null,
-      context
-    });
-  }
-
-  function layerLoadingPage(word, origin, relation, depth) {
-    return `
-      ${layerTopbar({ title: word, origin, relation, depth })}
-      ${loadingBody(word, "word", { statusText: "正在生成完整词条" })}`;
-  }
-
-  function layerConnectPage(word, origin, relation, depth) {
-    return `
-      ${layerTopbar({ title: word, origin, relation, depth })}
-      <main class="result-page state-page layer-state">
-        <div class="state-orb lavender reveal" style="--d:0">✦</div>
-        <h1 class="state-title reveal" style="--d:0.3">还没生成过这个词。</h1>
-        <p class="state-copy reveal" style="--d:0.5">Talk 的词义由模型实时生成。连接模型后，<b>${esc(word)}</b> 会补全中文释义、音标、同根词、近反义词和词源。</p>
-        <span class="state-query reveal" style="--d:0.7">${esc(shorten(origin ? `来自 ${origin} · ${relation}` : relation, 70))}</span>
-        <div class="state-actions reveal" style="--d:0.9">
-          <button class="btn btn-primary" type="button" data-action="settings">${icon("wand")} 连接模型</button>
-          <button class="btn btn-secondary" type="button" data-action="layer-back">返回</button>
-        </div>
-      </main>`;
-  }
-
-  function layerErrorPage(word, origin, relation, depth, message) {
-    return `
-      ${layerTopbar({ title: word, origin, relation, depth })}
-      <main class="result-page state-page layer-state">
-        <div class="state-orb coral reveal" style="--d:0">!</div>
-        <h1 class="state-title reveal" style="--d:0.3">这一层没生成出来。</h1>
-        <p class="state-copy reveal" style="--d:0.5">模型没有完成这个子词条。可以重试，或检查模型设置。</p>
-        ${message ? `<div class="error-detail reveal" style="--d:0.7">${esc(shorten(message, 260))}</div>` : ""}
-        <div class="state-actions reveal" style="--d:0.8">
-          <button class="btn btn-primary" type="button" data-action="retry-layer">${icon("refresh")} 重试这一层</button>
-          <button class="btn btn-secondary" type="button" data-action="settings">${icon("settings")} 模型设置</button>
-        </div>
-      </main>`;
-  }
-
-  function ensureLayerScrim() {
-    let scrim = $(".layer-scrim", layerRoot);
-    if (!scrim) {
-      scrim = document.createElement("div");
-      scrim.className = "layer-scrim";
-      layerRoot.appendChild(scrim);
-      requestAnimationFrame(() => scrim.classList.add("show"));
-    }
-    return scrim;
-  }
-
-  /**
-   * Unified surface renderer shared by initial layer mount and async hydration.
-   * Ensures data-page, reveal state, widescreen word columns, and cache borders
-   * are always applied through one single code path.
-   */
-  function mountResultSurface(container, { kind = "word", content = "", animate = false } = {}) {
-    if (!container) return;
-    const holder = document.createElement("div");
-    holder.innerHTML = content;
-    holder.querySelectorAll(".reveal, .reveal-item").forEach((node) => node.classList.add("is-in"));
-    container.replaceChildren(...holder.childNodes);
-    if (kind === "word") enhanceWordColumns(container);
-    applyCacheDisplay();
-    refreshCacheBorders(container);
-    container.scrollTop = 0;
-    if (animate && !reduceMotion) {
-      const first = $(".sheet-content, .result-page", container);
-      if (first) {
-        first.animate(
-          [
-            { opacity: 0, transform: "translateY(8px)" },
-            { opacity: 1, transform: "translateY(0)" }
-          ],
-          { duration: 320, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
-        );
-      }
-    }
-  }
-
-  function mountWordLayer({ word, data, origin, relation, depth, content, options = {}, kind = "word" }) {
-    const layerKind = kind || "word";
-    const layer = document.createElement("section");
-    layer.className = "word-layer";
-    layer.dataset.page = layerKind;
-    layer.dataset.layerKind = layerKind;
-    layer.style.setProperty("--depth", String(depth));
-    layer.style.zIndex = String(2 + depth);
-    layer.tabIndex = -1;
-    layer.setAttribute("role", "region");
-    layer.setAttribute("aria-label", `${word} 词条，第 ${depth} 层`);
-    const scroll = document.createElement("div");
-    scroll.className = "layer-scroll";
-    layer.appendChild(scroll);
-    mountResultSurface(scroll, { kind: layerKind, content, animate: false });
-
-    ensureLayerScrim();
-    const previous = state.wordLayers[state.wordLayers.length - 1];
-    if (previous) {
-      previous.el.classList.add("is-behind");
-      previous.el.setAttribute("aria-hidden", "true");
-    }
-
-    layerRoot.appendChild(layer);
-    const record = {
-      el: layer,
-      kind: layerKind,
-      word,
-      content,
-      data: data || null,
-      origin,
-      relation,
-      depth,
-      options,
-      loading: !data,
-      error: null
-    };
-    state.wordLayers.push(record);
-    shelveLayersBelow();
-    updateScrollLock();
-    if (data && layerKind === "word") schedulePrefetch(data);
-    else if (!data) updateCacheCorner(false, "正在生成本层词条");
-
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        layer.classList.add("is-open");
-        layer.focus({ preventScroll: true });
-      });
-    });
-    return record;
-  }
-
-  function replaceLayerContent(record, content) {
-    if (!record?.el?.isConnected) return;
-    const scroll = $(".layer-scroll", record.el);
-    if (!scroll) return;
-    record.content = content;
-    record.shelved = false;
-    mountResultSurface(scroll, { kind: record.kind || "word", content, animate: true });
-  }
-
-  async function hydrateLayerWithModel(record) {
-    if (!record || !record.el.isConnected) return;
-    if (!hasModelConfig()) {
-      replaceLayerContent(record, layerConnectPage(record.word, record.origin, record.relation, record.depth));
-      return;
-    }
-    record.loading = true;
-    record.error = null;
-    replaceLayerContent(record, layerLoadingPage(record.word, record.origin, record.relation, record.depth));
-    try {
-      const result = await lookupWordDeduped(record.word);
-      if (!record.el.isConnected) return;
-      let data = ensureWord(result.data);
-      if (!data) throw new Error("模型返回的词条为空。");
-      if (record.options?.context) data = { ...data, context: record.options.context };
-      if (!data.related?.length && record.options?.siblings?.length) {
-        data.related = record.options.siblings.slice(0, 6);
-      }
-      record.data = data;
-      record.word = data.word;
-      record.loading = false;
-      record.el.setAttribute("aria-label", `${data.word} 词条，第 ${record.depth} 层`);
-      addHistory("word", data.word);
-      replaceLayerContent(record, wordPage(data, {
-        origin: record.origin,
-        relation: record.relation,
-        depth: record.depth
-      }));
-      schedulePrefetch(data);
-    } catch (error) {
-      if (!record.el.isConnected) return;
-      const message = error?.name === "AbortError"
-        ? `${MODEL_TIMEOUT_TEXT}，已中断。`
-        : String(error?.message || "模型请求失败。");
-      record.loading = false;
-      record.error = message;
-      updateCacheCorner(false, "本层词条未缓存");
-      replaceLayerContent(record, layerErrorPage(record.word, record.origin, record.relation, record.depth, message));
-    }
-  }
-
-  async function openWordLayer(word, options = {}) {
-    const key = normalizeWord(word);
-    if (!key) return;
-    if (state.sheetOpen) closeSheet({ immediate: true });
-
-    const depth = state.wordLayers.length + 1;
-    const origin = options.origin || currentLayerOrigin();
-    const relation = options.relation || "相关词";
-    const entry = DATA.words[key];
-    const siblings = options.siblings !== undefined
-      ? options.siblings
-      : (state.route.name === "sentence" && !state.wordLayers.length
-          ? sentenceSiblings(key)
-          : siblingsFor(currentLayerData(), key));
-    const layerOptions = { ...options, siblings };
-
-    let data = entry ? ensureWord(entry) : null;
-    if (!data) {
-      const cached = cacheGetWord(key);
-      if (cached) data = ensureWord(cached);
-    }
-    if (data) {
-      if (options.context) data = { ...data, context: options.context };
-      if (!data.related?.length && siblings.length) data.related = siblings.slice(0, 6);
-      addHistory("word", data.word);
-      mountWordLayer({
-        word: data.word,
-        data,
-        origin,
-        relation,
-        depth,
-        options: layerOptions,
-        content: wordPage(data, { origin, relation, depth })
-      });
-      return;
-    }
-
-    const hasLocalMini = Boolean(DATA.lexicon[key] || options.gloss || options.context?.meaning);
-    if (!hasModelConfig()) {
-      if (hasLocalMini) {
-        const mini = makeMiniWord(word, { ...options, siblings }, origin, relation);
-        if (mini) {
-          mountWordLayer({
-            word: mini.word,
-            data: mini,
-            origin,
-            relation,
-            depth,
-            options: layerOptions,
-            content: wordPage(mini, { origin, relation, depth })
-          });
-          return;
-        }
-      }
-      mountWordLayer({
-        word: key,
-        data: null,
-        origin,
-        relation,
-        depth,
-        options: layerOptions,
-        content: layerConnectPage(key, origin, relation, depth)
-      });
-      return;
-    }
-
-    const record = mountWordLayer({
-      word: key,
-      data: null,
-      origin,
-      relation,
-      depth,
-      options: layerOptions,
-      content: layerLoadingPage(key, origin, relation, depth)
-    });
-    await hydrateLayerWithModel(record);
-  }
-
-  async function hydrateChunkLayer(record, phrase) {
-    if (!record || !record.el?.isConnected) return;
-    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
-    if (!hasModelConfig(cfg)) {
-      replaceLayerContent(record, layerConnectPage(phrase, record.origin, record.relation, record.depth));
-      return;
-    }
-    record.loading = true;
-    replaceLayerContent(record, layerLoadingPage(phrase, record.origin, record.relation, record.depth));
-    try {
-      const result = await modelLookup(phrase, "chunk", cfg);
-      if (!state.wordLayers.includes(record)) return;
-      const chunkData = ensureChunk(result.data);
-      if (!chunkData) throw new Error("模型返回的意群为空");
-      record.data = chunkData;
-      record.word = chunkData.chunk;
-      record.loading = false;
-      addHistory("chunk", chunkData.chunk);
-      replaceLayerContent(record, chunkPage(chunkData, { origin: record.origin, relation: record.relation, depth: record.depth }));
-    } catch (error) {
-      if (!state.wordLayers.includes(record)) return;
-      record.loading = false;
-      replaceLayerContent(record, layerErrorPage(phrase, record.origin, record.relation, record.depth, error?.message || "意群加载失败"));
-    }
-  }
-
-  async function openChunkLayer(phrase, options = {}) {
-    const clean = String(phrase || "").trim();
-    if (!clean) return;
-    if (state.sheetOpen) closeSheet({ immediate: true });
-    const depth = state.wordLayers.length + 1;
-    const origin = options.origin || currentLayerOrigin();
-    const relation = options.relation || "意群";
-    const slug = chunkSlug(clean);
-    let data = !options.skipCache && DATA.chunks?.[slug] ? ensureChunk(DATA.chunks[slug]) : null;
-    if (!data && !options.skipCache) {
-      const cached = cacheGetChunk(clean);
-      if (cached) data = ensureChunk(cached);
-    }
-    if (data) {
-      addHistory("chunk", data.chunk);
-      mountWordLayer({
-        word: data.chunk,
-        kind: "chunk",
-        data,
-        origin,
-        relation,
-        depth,
-        options,
-        content: chunkPage(data, { origin, relation, depth })
-      });
-      return;
-    }
-    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
-    if (!hasModelConfig(cfg)) {
-      mountWordLayer({
-        word: clean,
-        kind: "chunk",
-        data: null,
-        origin,
-        relation,
-        depth,
-        options,
-        content: layerConnectPage(clean, origin, relation, depth)
-      });
-      return;
-    }
-    const record = mountWordLayer({
-      word: clean,
-      kind: "chunk",
-      data: null,
-      origin,
-      relation,
-      depth,
-      options,
-      content: layerLoadingPage(clean, origin, relation, depth)
-    });
-    await hydrateChunkLayer(record, clean);
-  }
-
-  async function hydrateSentenceLayer(record, clean) {
-    if (!record || !record.el?.isConnected) return;
-    const titleShort = shorten(clean, 26);
-    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
-    if (!hasModelConfig(cfg)) {
-      replaceLayerContent(record, layerConnectPage(titleShort, record.origin, record.relation, record.depth));
-      return;
-    }
-    record.loading = true;
-    replaceLayerContent(record, layerLoadingPage(titleShort, record.origin, record.relation, record.depth));
-    try {
-      const result = await modelLookup(clean, "sentence", cfg);
-      if (!state.wordLayers.includes(record)) return;
-      const sentData = result.data;
-      if (!sentData) throw new Error("模型返回的拆句为空");
-      record.data = sentData;
-      record.word = shorten(sentData?.text || clean, 26);
-      record.loading = false;
-      addHistory("sentence", sentData?.text || clean);
-      replaceLayerContent(record, sentencePage(sentData, { origin: record.origin, relation: record.relation, depth: record.depth }));
-    } catch (error) {
-      if (!state.wordLayers.includes(record)) return;
-      record.loading = false;
-      replaceLayerContent(record, layerErrorPage(titleShort, record.origin, record.relation, record.depth, error?.message || "拆句加载失败"));
-    }
-  }
-
-  async function openSentenceLayer(text, options = {}) {
-    const clean = String(text || "").trim();
-    if (!clean) return;
-    if (state.sheetOpen) closeSheet({ immediate: true });
-    const depth = state.wordLayers.length + 1;
-    const origin = options.origin || currentLayerOrigin();
-    const relation = options.relation || "拆句";
-    const titleShort = shorten(clean, 26);
-
-    const localHit = !options.skipCache
-      ? DATA.sentences?.find((item) => String(item.text || "").trim().toLowerCase() === clean.toLowerCase())
-      : null;
-    if (localHit) {
-      addHistory("sentence", localHit.text || clean);
-      mountWordLayer({
-        word: titleShort,
-        kind: "sentence",
-        data: localHit,
-        origin,
-        relation,
-        depth,
-        options,
-        content: sentencePage(localHit, { origin, relation, depth })
-      });
-      return;
-    }
-
-    const detail = state.settings?.detailLevel || "standard";
-    const sKey = await sentenceKey(clean, sentenceLevelOf(state.settings?.sentenceLevel).id, detail);
-    const cached = !options.skipCache && sKey ? cacheGetSentence(sKey) : null;
-    if (cached) {
-      addHistory("sentence", cached.text || clean);
-      mountWordLayer({
-        word: titleShort,
-        kind: "sentence",
-        data: cached,
-        origin,
-        relation,
-        depth,
-        options,
-        content: sentencePage(cached, { origin, relation, depth })
-      });
-      return;
-    }
-
-    const cfg = applyProfileToSettings(state.settings, activeProfile(state.settings));
-    if (!hasModelConfig(cfg)) {
-      mountWordLayer({
-        word: titleShort,
-        kind: "sentence",
-        data: null,
-        origin,
-        relation,
-        depth,
-        options,
-        content: layerConnectPage(titleShort, origin, relation, depth)
-      });
-      return;
-    }
-
-    const record = mountWordLayer({
-      word: titleShort,
-      kind: "sentence",
-      data: null,
-      origin,
-      relation,
-      depth,
-      options,
-      content: layerLoadingPage(titleShort, origin, relation, depth)
-    });
-    await hydrateSentenceLayer(record, clean);
-  }
-
-  function openWordLayerFromButton(button) {
-    const word = button.dataset.word || "";
-    if (!word) return;
-    const relation = button.dataset.relation || "相关词";
-    const origin = currentLayerOrigin();
-    const contextLayer = state.wordLayers[state.wordLayers.length - 1];
-    const siblings = state.route.name === "sentence" && !contextLayer
-      ? sentenceSiblings(word)
-      : siblingsFor(contextLayer?.data || (state.route.name === "word" ? getWord(state.route) : null), word);
-    openWordLayer(word, {
-      gloss: button.dataset.gloss || "",
-      pos: button.dataset.pos || "",
-      relation,
-      origin,
-      siblings
-    });
-  }
-
-  function openKeyLayer(index) {
-    const sentence = getSentence(state.route);
-    const keyWord = sentence?.keyWords?.[index];
-    if (!keyWord) return;
-    openWordLayer(keyWord.word, {
-      context: keyWord,
-      gloss: keyWord.meaning,
-      zh: keyWord.meaningZh,
-      ipa: keyWord.phonetic,
-      pos: keyWord.pos,
-      relation: "重点词",
-      origin: "句子",
-      siblings: uniqueWords(sentence.keyWords.map((item) => item.word), keyWord.word)
-    });
-  }
-
-  /* Only the top layer is on screen; everything below it is a 14px strip of
-     background. Emptying those pages keeps long "word chains" from piling up
-     full entries in the document. The markup is kept on the record and put
-     back when the user walks back up the stack. */
-  function shelveLayersBelow() {
-    if (!state.wordLayers.length) return;
-    const top = state.wordLayers[state.wordLayers.length - 1];
-    state.wordLayers.forEach((layer) => {
-      if (layer === top || layer.shelved || layer.loading || !layer.data) return;
-      const scroll = $(".layer-scroll", layer.el);
-      if (!scroll) return;
-      layer.scrollTop = scroll.scrollTop;
-      scroll.replaceChildren();
-      layer.shelved = true;
-    });
-  }
-
-  function restoreLayerContent(record) {
-    if (!record?.shelved) return;
-    const scroll = $(".layer-scroll", record.el);
-    if (!scroll) return;
-    record.shelved = false;
-    scroll.innerHTML = record.content || "";
-    // The layer already played its entrance once; restoring it should not
-    // replay a cascade the reader has already seen.
-    scroll.querySelectorAll(".reveal, .reveal-item").forEach((element) => element.classList.add("is-in"));
-    enhanceWordColumns(scroll);
-    applyCacheDisplay();
-    refreshCacheBorders(scroll);
-    const offset = record.scrollTop || 0;
-    scroll.scrollTop = offset;
-    requestAnimationFrame(() => {
-      scroll.scrollTop = offset;
-    });
-  }
-
-  function popWordLayer() {
-    const item = state.wordLayers.pop();
-    if (!item) return;
-    item.el.classList.remove("is-open");
-    item.el.classList.add("is-closing");
-    item.el.setAttribute("aria-hidden", "true");
-    window.setTimeout(() => item.el.remove(), 540);
-
-    const previous = state.wordLayers[state.wordLayers.length - 1];
-    if (previous) {
-      previous.el.classList.remove("is-behind");
-      previous.el.removeAttribute("aria-hidden");
-      restoreLayerContent(previous);
-      previous.el.focus({ preventScroll: true });
-      refreshCacheBorders(previous.el);
-      if (previous.data) schedulePrefetch(previous.data);
-    } else {
-      const scrim = $(".layer-scrim", layerRoot);
-      if (scrim) {
-        scrim.classList.remove("show");
-        window.setTimeout(() => scrim.remove(), 420);
-      }
-      if (state.route.name === "word") {
-        const mainWord = getWord(state.route);
-        if (mainWord) schedulePrefetch(mainWord);
-        else hideCacheCorner();
-      } else {
-        hideCacheCorner();
-      }
-    }
-    updateScrollLock();
-  }
-
-  function closeAllWordLayers({ immediate = false } = {}) {
-    if (!state.wordLayers.length && !layerRoot.firstElementChild) return;
-    state.wordLayers = [];
-    if (immediate) {
-      layerRoot.innerHTML = "";
-    } else {
-      $$(".word-layer", layerRoot).forEach((layer) => {
-        layer.classList.remove("is-open");
-        layer.classList.add("is-closing");
-      });
-      const scrim = $(".layer-scrim", layerRoot);
-      if (scrim) scrim.classList.remove("show");
-      window.setTimeout(() => { layerRoot.innerHTML = ""; }, 540);
-    }
-    updateScrollLock();
-  }
-
-  function openKeySheet(index) {
-    openKeyLayer(index);
-  }
-
-  function openSheetShell({ kicker, title }) {
-    state.sheetOpenedAt = performance.now();
-    if (state.sheetCloseTimer) {
-      window.clearTimeout(state.sheetCloseTimer);
-      state.sheetCloseTimer = null;
-    }
-    overlayRoot.innerHTML = `
-      <div class="sheet-backdrop" data-action="close-sheet"></div>
-      <section class="sheet" role="dialog" aria-modal="true" aria-label="${attr(title)}" tabindex="-1">
-        <div class="sheet-handle" aria-hidden="true"></div>
-        <div class="sheet-head">
-          <div class="sheet-head-left">
-            <span class="mono">${esc(kicker)}</span>
-            <h2 class="sheet-title">${esc(title)}</h2>
-          </div>
-          <button class="sheet-close" type="button" data-action="close-sheet" aria-label="关闭">${icon("close")}</button>
-        </div>
-        <div class="sheet-scroll" id="sheet-scroll" data-lenis-prevent></div>
-      </section>`;
-
-    state.sheetOpen = true;
-    updateScrollLock();
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        $(".sheet-backdrop", overlayRoot)?.classList.add("show");
-        $(".sheet", overlayRoot)?.classList.add("show");
-        $(".sheet", overlayRoot)?.focus({ preventScroll: true });
-      });
-    });
-  }
-
-  function closeSheet({ immediate = false } = {}) {
-    if (!state.sheetOpen && !overlayRoot.firstElementChild) return;
-    if (state.settingsOpen) flushSettingsDraft();
-    state.settingsOpen = false;
-    state.sheetOpen = false;
-    state.sheetStack = [];
-    updateScrollLock();
-    const backdrop = $(".sheet-backdrop", overlayRoot);
-    const sheet = $(".sheet", overlayRoot);
-    if (immediate) {
-      overlayRoot.innerHTML = "";
-      return;
-    }
-    backdrop?.classList.remove("show");
-    sheet?.classList.remove("show");
-    if (state.sheetCloseTimer) window.clearTimeout(state.sheetCloseTimer);
-    state.sheetCloseTimer = window.setTimeout(() => {
-      overlayRoot.innerHTML = "";
-      state.sheetCloseTimer = null;
-    }, 520);
-  }
-
-  function renderSheetContent() {
-    const holder = $("#sheet-scroll");
-    if (!holder) return;
-    const payload = state.sheetStack[state.sheetStack.length - 1];
-    if (!payload) return;
-    holder.innerHTML = wordSheetContent(payload);
-    holder.scrollTop = 0;
-    const content = $(".sheet-content", holder);
-    if (content && !reduceMotion) {
-      content.animate(
-        [
-          { opacity: 0, transform: "translateY(12px)" },
-          { opacity: 1, transform: "translateY(0)" }
-        ],
-        { duration: 360, easing: "cubic-bezier(0.16, 1, 0.3, 1)" }
-      );
-    }
-  }
-
-  function sheetBackButton() {
-    if (state.sheetStack.length <= 1) return "";
-    return `<button class="sheet-back" type="button" data-action="sheet-back">${icon("arrowLeft")} 返回</button>`;
-  }
-
-  function wordSheetContent(payload) {
-    const entry = payload.entry || null;
-    const context = payload.context || null;
-    const word = payload.word || entry?.word || "";
-    const ipa = payload.ipa || entry?.phonetic || "";
-    const pos = payload.pos || entry?.pos || "";
-    const short = context?.meaning || entry?.short || payload.gloss || "这个词来自当前词条的关联词。";
-    const translation = entry?.translation || "";
-    const family = payload.family || context?.family || entry?.family || [];
-    const synonyms = payload.synonyms || context?.synonyms || entry?.synonyms || [];
-    const antonyms = payload.antonyms || context?.antonyms || entry?.antonyms || [];
-    const example = context?.example || (entry?.examples && entry.examples[0]) || null;
-    const isStub = !entry && !context;
-    const canOpen = entry || context;
-
-    const relGroup = (label, items, kind = "") => items.length ? `
-      <div class="sheet-section">
-        <span class="sheet-section-label">${esc(label)}</span>
-        <div class="sheet-rel-row">
-          ${items.map((item) => `
-            <button class="sheet-rel" type="button" data-action="sheet-word" data-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(posAbbr(item.pos))}">
-              ${esc(item.word)} ${item.gloss ? `<small>${esc(item.gloss)}</small>` : ""}
-            </button>`).join("")}
-        </div>
-      </div>` : "";
-
-    return `
-      <div class="sheet-content">
-        ${sheetBackButton()}
-        <div class="sheet-word-head">
-          <div>
-            <h3 class="sheet-word">${esc(word)}</h3>
-            <div class="sheet-sub">
-              ${ipa ? `<span class="ipa">${esc(ipa)}</span>` : ""}
-              ${pos ? `<span class="pos-pill">${esc(posLabel(pos))}</span>` : ""}
-            </div>
-          </div>
-          <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word)}">${icon("volume")}</button>
-        </div>
-        ${context ? "" : `<p class="sheet-definition">${esc(translation || short)}</p>`}
-        ${translation && short && !context ? `<p class="sheet-translation">${esc(short)}</p>` : ""}
-        ${context ? `
-          <div class="sheet-context">
-            <span class="mono">在本句中</span>
-            <p>${esc(context.meaningZh || context.meaning || short)}</p>
-            ${context.meaningZh && context.meaning ? `<span class="sheet-context-en">${esc(context.meaning)}</span>` : ""}
-            ${context.why ? `<span class="sheet-context-why">${esc(context.why)}</span>` : ""}
-          </div>` : ""}
-        ${relGroup("同根词", family)}
-        ${relGroup("近义词", synonyms)}
-        ${relGroup("反义词", antonyms)}
-        ${example?.en ? `
-          <div class="sheet-section">
-            <span class="sheet-section-label">例句</span>
-            <div class="sheet-example">
-              <p>${highlightPlain(example.en, word)}</p>
-              ${example.zh ? `<span>${esc(example.zh)}</span>` : ""}
-            </div>
-          </div>` : ""}
-        ${isStub ? `<div class="sheet-note">${icon("info")}<span>演示词条。连接模型后可补全。</span></div>` : ""}
-        ${entry?.note && !context ? `<div class="sheet-note">${icon("sparkle")}<span>${rich(entry.note)}</span></div>` : ""}
-        <div class="sheet-actions">
-          <button class="btn btn-primary" type="button" data-action="full-entry" data-word="${attr(word)}">${icon("arrowUpRight")} ${canOpen ? "查看完整词条" : "去查这个词"}</button>
-          <button class="btn btn-secondary" type="button" data-action="close-sheet">关闭</button>
-        </div>
-      </div>`;
-  }
-
-  function openWordSheet(word, options = {}) {
-    const key = normalizeWord(word);
-    const entry = DATA.words[key] || null;
-    const stub = !entry ? DATA.lexicon[key] : null;
-    const payload = {
-      word: word,
-      entry: entry || (stub ? { word, ...stub } : null),
-      gloss: options.gloss || "",
-      pos: options.pos || "",
-      ipa: options.ipa || "",
-      context: options.context || null
-    };
-    state.sheetStack = [payload];
-    openSheetShell({ kicker: "单词详解", title: "词义速览" });
-    renderSheetContent();
-  }
-
-  function pushSheetWord(button) {
-    const word = button.dataset.word || "";
-    if (!word) return;
-    const key = normalizeWord(word);
-    const entry = DATA.words[key] || null;
-    const stub = !entry ? DATA.lexicon[key] : null;
-    state.sheetStack.push({
-      word,
-      entry: entry || (stub ? { word, ...stub } : null),
-      gloss: button.dataset.gloss || "",
-      pos: button.dataset.pos || "",
-      ipa: "",
-      context: null
-    });
-    renderSheetContent();
-  }
-
-  function goBackInSheet() {
-    if (state.sheetStack.length > 1) {
-      state.sheetStack.pop();
-      renderSheetContent();
-    }
-  }
-
-  function openSettingsSheet() {
-    state.settingsOpen = true;
-    state.settingsDirty = false;
-    state.settingsTab = state.settingsTab || "model";
-    state.draft = {
-      ...state.settings,
-      profiles: (state.settings.profiles || []).map((profile) => ({ ...profile }))
-    };
-    const copy = copyFor("settings");
-    openSheetShell({ kicker: copy.kicker, title: copy.title });
-    renderSettingsContent();
-  }
-
-  function settingsStatus(text) {
-    const target = $("#settings-save-status");
-    if (target) target.textContent = text;
-  }
-
-  function scheduleSettingsCommit() {
-    if (!state.draft) return;
-    state.settingsDirty = true;
-    settingsStatus("正在保存…");
-    if (state.settingsSaveTimer) window.clearTimeout(state.settingsSaveTimer);
-    state.settingsSaveTimer = window.setTimeout(commitSettingsDraft, 240);
-  }
-
-  function commitSettingsDraft() {
-    if (!state.draft) return;
-    if (state.settingsSaveTimer) {
-      window.clearTimeout(state.settingsSaveTimer);
-      state.settingsSaveTimer = null;
-    }
-    syncDraftProfile(state.draft);
-    state.draft.apiKey = String(state.draft.apiKey || "").trim();
-    state.draft.baseUrl = String(state.draft.baseUrl || "").trim();
-    state.draft.model = String(state.draft.model || "").trim();
-    state.settings = {
-      ...state.draft,
-      profiles: state.draft.profiles.map((profile) => ({ ...profile }))
-    };
-    persistSettings(state.settings);
-    state.settingsDirty = false;
-    applyCacheDisplay();
-    refreshCacheBorders();
-    const active = activeWordData();
-    if (active) schedulePrefetch(active);
-    settingsStatus("已自动保存");
-  }
-
-  function flushSettingsDraft() {
-    if (!state.settingsDirty) return;
-    commitSettingsDraft();
-  }
-
-  function ttsSettingsHtml(draft) {
-    const engine = draft.ttsEngine === "qwen" ? "qwen" : "native";
-    return `
-      <div class="tts-head">
-        <span class="settings-subhead">发音</span>
-        <div class="tts-engine-switch" role="group" aria-label="发音引擎">
-          <button class="tts-engine-btn ${engine === "native" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="native" aria-pressed="${engine === "native"}">系统原生</button>
-          <button class="tts-engine-btn ${engine === "qwen" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="qwen" aria-pressed="${engine === "qwen"}">Qwen 语音</button>
-        </div>
-      </div>
-      ${engine === "qwen" ? (() => {
-        const qwen = qwenTtsProfile(draft);
-        return `<div class="qwen-tts-panel">
-          <div class="tts-row">
-            <input id="qwen-tts-model" type="text" data-setting="qwenTtsModel" value="${attr(draft.qwenTtsModel || "qwen-audio-3.1-tts-plus")}" placeholder="qwen-audio-3.1-tts-plus" spellcheck="false" aria-label="Qwen TTS 模型" />
-            <input id="qwen-tts-voice" type="text" data-setting="qwenTtsVoice" value="${attr(draft.qwenTtsVoice || "longanhuan_v3.1")}" placeholder="longanhuan_v3.1" spellcheck="false" aria-label="Qwen TTS 音色" />
-            <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
-          </div>
-          ${qwen ? `<p class="tts-line" id="qwen-tts-endpoint">使用「${esc(qwen.name)}」的 API 密钥 · ${esc(qwenTtsEndpoint(qwen, draft.qwenTtsModel))}</p>` : `<p class="tts-line tts-error">还没有可用的 Qwen 密钥。请先在「模型」里填写 Qwen 的 API 密钥。</p>`}
-          <p class="tts-line">模型默认 qwen-audio-3.1-tts-plus；音色可填 longanhuan_v3.1 或其他 Qwen 音色。</p>
-          <span class="tts-status" id="tts-test-status">${qwen ? "密钥已就绪" : "需要先配置 Qwen 密钥"}</span>
-          <p class="tts-line tts-https-warning">密钥只保存在本机；语音请求由浏览器直接发往 Qwen。公共设备建议关闭「记住密钥」。</p>
-        </div>`;
-      })() : `
-        <div class="tts-row">
-          <span class="tts-line">点击即读，无需下载</span>
-          <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
-        </div>
-        <span class="tts-status" id="tts-test-status"></span>
-        <p class="tts-error" id="tts-error" hidden></p>`}`;
-  }
-
-
-  const PROTOCOL_OPTIONS = [
-    { id: "openai", label: "OpenAI 兼容" },
-    { id: "google", label: "Google Gemini" }
-  ];
-
-  function profileHost(profile) {
-    try {
-      return new URL(String(profile.baseUrl || "")).host;
-    } catch (_) {
-      return String(profile.baseUrl || "").replace(/^https?:\/\//, "").split("/")[0] || "未填地址";
-    }
-  }
-
-  function fetchChannelModels(profile) {
-    return LLM.listModels(profile, { timeoutMs: 15_000 });
-  }
-
-  function testChannel(profile) {
-    return LLM.pingModel(profile, {
-      timeoutMs: 20_000,
-      prompt: "Reply with the single word: pong",
-      maxTokens: 16
-    });
-  }
-
-  function readProviderForm(previous = {}) {
-    const read = (name) => $(`[data-provider-field="${name}"]`)?.value;
-    const baseUrl = String(read("baseUrl") ?? previous.baseUrl ?? "").trim();
-    const name = String(read("name") ?? previous.name ?? "").trim();
-    return {
-      id: previous.id || `channel-${Date.now()}`,
-      name,
-      protocol: previous.protocol || "openai",
-      provider: previous.provider || ((previous.protocol === "google") ? "google" : "custom"),
-      baseUrl,
-      model: String(read("model") ?? previous.model ?? "").trim(),
-      apiKey: String(read("apiKey") || previous.apiKey || ""),
-      models: previous.models || [],
-      note: previous.note || "",
-      isNew: Boolean(previous.isNew)
-    };
-  }
-
-  const CHANNEL_PICKS = {
-    google: ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
-    openai: ["deepseek-chat", "gpt-4o-mini", "qwen3.7-flash", "moonshot-v1-8k"]
-  };
-
-  function channelPicks(profile, models) {
-    const picks = CHANNEL_PICKS[(profile.protocol || "openai") === "google" ? "google" : "openai"] || [];
-    return picks.filter((id) => models.includes(id));
-  }
-
-  function openProviderPicker() {
-    openSheetShell({ kicker: "MODEL SETUP", title: "选择供应商" });
-    const body = $("#sheet-scroll", overlayRoot);
-    if (!body) return;
-    body.innerHTML = `
-      <div class="template-list">
-        ${PROVIDER_TEMPLATES.map((template) => `
-          <button class="template-row" type="button" data-action="provider-template" data-template="${attr(template.id)}">
-            <span class="template-head">
-              <strong>${esc(template.name)}</strong>
-              <span class="template-badge">${(template.protocol || "openai") === "google" ? "Gemini" : "OpenAI 兼容"}</span>
-            </span>
-            <span class="template-url mono">${esc(template.baseUrl || "自行填写地址")}</span>
-            <span class="template-note">${esc(template.note || "")}</span>
-          </button>`).join("")}
-      </div>`;
-  }
-
-  function openProviderSheet(profileId, template = null) {
-    const draft = state.draft;
-    if (!draft) return;
-    const existing = profileId ? draft.profiles.find((item) => item.id === profileId) : null;
-    state.providerDraft = existing
-      ? { ...existing, isNew: false }
-      : {
-        id: `channel-${Date.now()}`,
-        name: template?.name || "",
-        protocol: template?.protocol || "openai",
-        provider: template?.provider || "custom",
-        baseUrl: template?.baseUrl || "",
-        model: template?.model || "",
-        apiKey: "",
-        models: [],
-        note: template?.note || "",
-        isNew: true
-      };
-    state.providerStatus = null;
-    openSheetShell({ kicker: "MODEL", title: existing ? "编辑模型" : "添加模型" });
-    renderProviderSheet();
-  }
-
-  function renderProviderSheet() {
-    const sheet = $("#sheet-scroll");
-    const d = state.providerDraft;
-    if (!sheet || !d) return;
-    const status = state.providerStatus || {};
-    sheet.innerHTML = `
-      <div class="provider-form">
-        <label class="provider-field"><span>名称</span>
-          <input data-provider-field="name" value="${attr(d.name || "")}" placeholder="例如 DeepSeek 主力" autocomplete="off" spellcheck="false" />
-        </label>
-        <div class="provider-field"><span>协议</span>
-          <div class="provider-protocols" role="group" aria-label="协议">
-            ${PROTOCOL_OPTIONS.map((item) => `<button class="provider-protocol ${(d.protocol || "openai") === item.id ? "active" : ""}" type="button" data-action="provider-protocol" data-protocol="${item.id}" aria-pressed="${(d.protocol || "openai") === item.id}">${esc(item.label)}</button>`).join("")}
-          </div>
-        </div>
-        <label class="provider-field"><span>Base URL</span>
-          <input data-provider-field="baseUrl" value="${attr(d.baseUrl || "")}" inputmode="url" placeholder="${d.protocol === "google" ? "https://generativelanguage.googleapis.com/v1beta" : "https://api.deepseek.com"}" autocomplete="off" spellcheck="false" />
-        </label>
-        <label class="provider-field"><span>API Key</span>
-          <input data-provider-field="apiKey" type="password" value="${attr(d.apiKey || "")}" placeholder="sk-…" autocomplete="off" />
-        </label>
-        <div class="provider-field"><span>模型</span>
-          <div class="provider-model-row">
-            <input data-provider-field="model" value="${attr(d.model || "")}" list="provider-model-options" placeholder="先获取，或手动填写" autocomplete="off" spellcheck="false" />
-            <button class="btn btn-secondary" type="button" data-action="provider-fetch">获取模型</button>
-          </div>
-          <datalist id="provider-model-options">
-            ${(d.models || []).map((id) => `<option value="${attr(id)}"></option>`).join("")}
-          </datalist>
-          <p class="provider-hint">${(d.models || []).length ? `${d.models.length} 个可用模型` : "填好地址与密钥后点「获取模型」"}</p>
-          ${channelPicks(d, d.models || []).length ? `<div class="provider-picks">${channelPicks(d, d.models || []).map((id, index) => `<button class="provider-pick ${index === 0 ? "primary" : ""}" type="button" data-action="provider-pick" data-model="${attr(id)}">${esc(id)}${index === 0 ? " · 推荐" : ""}</button>`).join("")}</div>` : ""}
-          ${(d.models || []).length ? `<div class="provider-models" role="listbox" aria-label="可选模型">
-            ${d.models.map((id) => `<button class="provider-model-option ${id === d.model ? "is-current" : ""}" type="button" role="option" aria-selected="${id === d.model}" data-action="provider-pick" data-model="${attr(id)}">${esc(id)}</button>`).join("")}
-          </div>` : ""}
-        </div>
-        <p class="provider-status ${status.tone || ""}">${esc(status.text || "先获取模型，再点测试确认能连通。")}</p>
-        <div class="provider-actions">
-          <button class="btn btn-secondary" type="button" data-action="provider-test">测试</button>
-          <button class="btn btn-primary" type="button" data-action="provider-save">保存</button>
-        </div>
-        ${d.isNew ? "" : '<button class="link-btn provider-delete" type="button" data-action="provider-delete">删除这个模型</button>'}
-      </div>`;
-  }
-
-  function modelSettingsHtml(draft) {
-    const current = activeProfile(draft);
-    return `
-      <div class="model-profile-head">
-        <span class="settings-subhead">可用模型</span>
-        <span class="mono">${draft.profiles.length} 个</span>
-      </div>
-      ${draft.profiles.length ? "" : '<p class="provider-empty">还没有可用的模型。点下面添加一个，填好密钥就能查词。</p>'}
-      <div class="provider-list" role="list" aria-label="模型渠道">
-        ${draft.profiles.map((profile) => `
-          <div class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" role="listitem">
-            <button class="provider-select" type="button" data-action="provider-select" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
-              <span class="provider-row-copy">
-                <strong>${esc(profile.model || "未选模型")}</strong>
-                <small class="mono">${esc(profile.name || "未命名")} · ${esc(profileHost(profile))}</small>
-              </span>
-              ${profile.id === draft.activeProfileId ? '<i class="provider-dot" aria-hidden="true"></i>' : ""}
-            </button>
-            <button class="provider-edit" type="button" data-action="provider-edit" data-profile="${attr(profile.id)}">编辑</button>
-          </div>`).join("")}
-        <button class="provider-add" type="button" data-action="provider-new">+ 添加模型</button>
-      </div>
-      <div class="field">
-        <label>生成深度</label>
-        <div class="detail-switch" role="group" aria-label="生成深度">
-          ${Object.entries(DETAIL_LEVELS).map(([id, item]) => `
-            <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
-        </div>
-      </div>
-      ${profileSupportsThinking(current) ? `
-      <div class="thinking-panel">
-        <label class="check-row">
-          <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
-          开启深度思考
-        </label>
-        <div class="thinking-budget-row">
-          <label for="thinking-budget">思考预算（tokens）</label>
-          <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
-        </div>
-      </div>` : ""}
-      <label class="check-row">
-        <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
-        在这台设备上记住密钥
-      </label>
-      <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
-        ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(current?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
-      </div>
-      <div class="settings-inline-actions">
-        <button class="btn btn-secondary" type="button" data-action="test-connection" ${draft.profiles.length ? "" : "disabled"}>${icon("sparkle")} 测试当前模型</button>
-      </div>
-      <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>`;
-  }
-
-  function dataSettingsHtml(draft) {
-    const stats = wordCacheStats();
-    const lang = window.TALK_I18N?.lang || "zh";
-    return `
-      <div class="setting-group">
-        <span class="settings-subhead">界面语言</span>
-        <div class="level-row">
-          <button class="level-chip${lang === "zh" ? " active" : ""}" type="button" data-action="lang" data-lang="zh" aria-pressed="${lang === "zh"}">中文</button>
-          <button class="level-chip${lang === "en" ? " active" : ""}" type="button" data-action="lang" data-lang="en" aria-pressed="${lang === "en"}">English</button>
-        </div>
-      </div>
-      <div class="theme-setting">
-        <span class="settings-subhead">外观主题</span>
-        <div class="theme-list" role="list" aria-label="外观主题">
-          ${Object.values(window.TALK_THEME.themes).map((theme) => {
-            const active = window.TALK_THEME.current().id === theme.id;
-            return `<div class="theme-row${active ? " is-active open" : ""}" role="listitem" data-theme-row="${attr(theme.id)}">
-              <button class="theme-row-head" type="button" data-action="theme-toggle" data-theme="${attr(theme.id)}" aria-expanded="${active}">
-                <span class="theme-swatch" aria-hidden="true"><i style="background:${attr(theme.themeColor || "#f3f0e7")}"></i><i style="background:${attr(theme.accentFill || theme.accent || "#171813")}"></i></span>
-                <span class="theme-row-copy"><strong>${esc(theme.label)}</strong><small>${esc(theme.description || "")}</small></span>
-                <span class="theme-row-state">${active ? "使用中" : ""}</span>
-                <span class="theme-row-chevron" aria-hidden="true">▾</span>
-              </button>
-              <div class="theme-row-body">
-                <div class="theme-row-inner">
-                  <div class="theme-row-actions">
-                    ${active
-                      ? '<span class="theme-row-current">当前正在使用</span>'
-                      : `<button class="btn btn-secondary theme-apply" type="button" data-action="theme" data-theme="${attr(theme.id)}">使用这套主题</button>`}
-                  </div>
-                </div>
-              </div>
-            </div>`;
-          }).join("")}
-        </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">学习阶段</span>
-        <p class="settings-note">只影响句子模式</p>
-        <div class="level-row">
-          ${SENTENCE_LEVELS.map((level) => `
-            <button class="level-chip${draft.sentenceLevel === level.id ? " active" : ""}" type="button"
-              data-action="sentence-level" data-level="${attr(level.id)}" aria-pressed="${draft.sentenceLevel === level.id}"
-              title="${attr(level.hint)}">${esc(level.label)}</button>`).join("")}
-        </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">从句展开方式</span>
-        <div class="level-row">
-          <button class="level-chip${(draft.foldMode || "block") === "block" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="block" aria-pressed="${(draft.foldMode || "block") === "block"}">缩进块</button>
-          <button class="level-chip${draft.foldMode === "inline" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="inline" aria-pressed="${draft.foldMode === "inline"}">句内插入</button>
-        </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">语境寻词长度</span>
-        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · <span id="reverse-token-zone">${reverseZoneName(Number(draft.reverseMaxTokens) || 1500)}</span></p>
-        <input class="setting-range" type="range" min="600" max="3000" step="100"
-          value="${Number(draft.reverseMaxTokens) || 1500}" data-setting="reverseMaxTokens" aria-label="语境寻词输出上限" />
-        <div class="token-scale" id="reverse-token-scale">
-          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) < 1000 ? " is-active" : ""}" style="flex:4">只给结论</span>
-          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) >= 1000 && (Number(draft.reverseMaxTokens) || 1500) < 2000 ? " is-active" : ""}" style="flex:10">分块讲解</span>
-          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) >= 2000 ? " is-active" : ""}" style="flex:10">成句拆解</span>
-        </div>
-        <div class="token-ticks">
-          <span style="left:0">600</span>
-          <span style="left:16.7%">1000</span>
-          <span style="left:58.3%">2000</span>
-          <span style="left:100%">3000</span>
-        </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">生成信息</span>
-        <div class="level-row">
-          <button class="level-chip${draft.showGenMeta !== false ? " active" : ""}" type="button" data-action="gen-meta" data-on="1" aria-pressed="${draft.showGenMeta !== false}">显示</button>
-          <button class="level-chip${draft.showGenMeta === false ? " active" : ""}" type="button" data-action="gen-meta" data-on="0" aria-pressed="${draft.showGenMeta === false}">隐藏</button>
-        </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">例句风格</span>
-        <p class="settings-note">只影响之后生成的例句</p>
-        <div class="example-style-list">
-          ${(window.TALK_THEME?.list?.() || []).map((theme) => `
-            <label class="example-style-row">
-              <span>${esc(theme.label)}</span>
-              <input type="text" data-example-style="${attr(theme.id)}" value="${attr(exampleStyleFor(theme.id))}" spellcheck="false" aria-label="${attr(theme.label)} 的例句风格" />
-            </label>`).join("")}
-        </div>
-        <button class="link-btn" type="button" data-action="reset-example-styles">恢复默认风格</button>
-      </div>
-      <label class="pref-toggle">
-        <span class="pref-copy">
-          <strong>预加载二级词条</strong>
-          <span>词页出现后，在后台生成最多 ${PREFETCH_LIMIT} 个相关词；会额外消耗模型额度。</span>
-        </span>
-        <span class="pref-switch">
-          <input type="checkbox" data-setting="prefetch" ${draft.prefetch ? "checked" : ""} />
-          <span class="pref-slider" aria-hidden="true"></span>
-        </span>
-      </label>
-      <div class="cache-display-setting">
-        <span class="pref-copy">
-          <strong>缓存提示方式</strong>
-          <span>虚线未缓存，实线已缓存</span>
-        </span>
-        <div class="cache-display-switch" role="group" aria-label="缓存提示方式">
-          <button class="cache-display-btn ${draft.cacheDisplay !== "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="borders" aria-pressed="${draft.cacheDisplay !== "corner"}">边框</button>
-          <button class="cache-display-btn ${draft.cacheDisplay === "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="corner" aria-pressed="${draft.cacheDisplay === "corner"}">三角标</button>
-        </div>
-      </div>
-      <div class="cache-settings-summary">
-        <span><strong>${stats.count}</strong> / ${stats.max} 个词条</span>
-        <span>${formatBytes(stats.bytes)} · ${stats.backend}</span>
-      </div>
-      <p class="field-hint">句子分析缓存 ${sentenceCache.size} 条（按原文、深度、水平区分），可单独删除或整表清空。</p>
-      <div class="cache-actions">
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-sentence-cache">清空句子</button>
-        <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
-      </div>
-      <div class="theme-cache-setting">
-        <span class="settings-subhead">主题库</span>
-        <div id="theme-cache-stats"><p class="api-note">正在读取主题缓存…</p></div>
-        <button class="link-btn" type="button" data-action="clear-theme-cache">清空主题库</button>
-      </div>
-      <div class="diag-card">
-        <span class="settings-subhead">运行日志</span>
-        <p class="api-note">只记录请求类型、字符数与错误文本；密钥、令牌和长串已脱敏。出问题时复制它发给开发者。</p>
-        <pre class="diag-preview" id="diag-preview">${esc(diagText().split("\n").slice(-9).join("\n"))}</pre>
-        <div class="cache-actions">
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="copy-diagnostics">${icon("copy")} 复制诊断</button>
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-diagnostics">清空日志</button>
-        </div>
-      </div>
-      <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
-`;
-  }
-
-  function renderSettingsContent() {
-    window.setTimeout(() => window.TALK_I18N?.apply(document.body), 0);
-    const holder = $("#sheet-scroll");
-    if (!holder || !state.draft) return;
-    const draft = state.draft;
-    const tab = state.settingsTab || "model";
-    const settingsCopy = copyFor("settings");
-    const tabs = settingsCopy.tabs;
-    const sheetTitle = $(".sheet-title", overlayRoot);
-    if (sheetTitle) sheetTitle.textContent = settingsCopy.title;
-    const sheetKicker = $(".sheet-head .mono", overlayRoot);
-    if (sheetKicker) sheetKicker.textContent = settingsCopy.kicker;
-    holder.innerHTML = `
-      <div class="sheet-content settings-sheet">
-        <div class="settings-tabs" role="tablist" aria-label="设置分类">
-          ${tabs.map(([id, label]) => `<button class="settings-tab ${tab === id ? "active" : ""}" type="button" role="tab" aria-selected="${tab === id}" data-action="settings-tab" data-tab="${id}">${label}</button>`).join("")}
-        </div>
-        <div class="settings-pane" role="tabpanel">
-          ${tab === "tts" ? ttsSettingsHtml(draft) : tab === "data" ? dataSettingsHtml(draft) : modelSettingsHtml(draft)}
-        </div>
-        <div class="settings-footer">
-          <span id="settings-save-status"><span data-app-version>v${APP_VERSION}</span> · build <span data-app-build>${APP_BUILD}</span> · ${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
-          <button class="btn btn-primary" type="button" data-action="save-settings">完成</button>
-        </div>
-      </div>`;
-    if (tab === "tts") requestAnimationFrame(refreshTtsError);
-    if (tab === "data") requestAnimationFrame(renderThemeCacheStats);
-  }
-
-  function refreshCacheUi() {
-    if ($("#cache-dashboard")) {
-      void renderCacheContent();
-    } else if (state.sheetOpen && $("#sheet-scroll .settings-intro")) {
-      renderSettingsContent();
-    }
-  }
-
-  function openCacheSheet() {
-    openSheetShell({ kicker: "本机数据", title: "缓存与空间" });
-    void renderCacheContent();
-  }
-
-  async function renderCacheContent() {
-    const holder = $("#sheet-scroll");
-    if (!holder) return;
-    holder.innerHTML = `<div class="sheet-content" id="cache-dashboard"><p class="settings-intro">正在读取本机缓存…</p></div>`;
-    const words = wordCacheStats();
-    const audio = await getAudioStats();
-    if (!holder.isConnected) return;
-    const estimate = wordCacheEstimate();
-    const percent = Math.min(100, words.max ? (words.count / words.max) * 100 : 0);
-    const totalBytes = words.bytes + audio.bytes;
-    const recent = words.entries.slice(0, 24);
-    holder.innerHTML = `
-      <div class="sheet-content" id="cache-dashboard">
-        <p class="settings-intro">只存本机；导出不含音频。</p>
-        <div class="cache-summary-grid">
-          <div class="cache-summary-card">
-            <span class="cache-summary-label">词条</span>
-            <strong>${words.count}<small> / ${words.max}</small></strong>
-            <span>${formatBytes(words.bytes)} · ${words.ttlDays} 天</span>
-          </div>
-          <div class="cache-summary-card">
-            <span class="cache-summary-label">语音</span>
-            <strong>${audio.count}</strong>
-            <span>${formatBytes(audio.bytes)}</span>
-          </div>
-          <div class="cache-summary-card accent">
-            <span class="cache-summary-label">合计</span>
-            <strong>${formatBytes(totalBytes)}</strong>
-            <span>${words.backend}</span>
-          </div>
-        </div>
-        <div class="cache-meter" aria-label="词条缓存占用 ${percent.toFixed(0)}%">
-          <span style="width:${percent}%"></span>
-        </div>
-        <div class="cache-limit-grid">
-          <label>词条上限
-            <input type="number" min="10" max="2000" step="10" value="${words.max}" data-cache-setting="cacheMax" inputmode="numeric" />
-          </label>
-          <label>保留天数
-            <input type="number" min="1" max="3650" step="1" value="${words.ttlDays}" data-cache-setting="cacheTtlDays" inputmode="numeric" />
-          </label>
-        </div>
-        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>。</p>
-        <div class="cache-list-head">
-          <span class="settings-subhead">已缓存词条</span>
-          <span class="mono">${words.count} 条</span>
-        </div>
-        ${recent.length ? `<div class="cache-word-list">
-          ${recent.map((entry) => `<button class="cache-word-item" type="button" data-action="word" data-word="${attr(entry.key)}">
-            <span><strong>${esc(entry.word)}</strong><small>${esc(entry.detail)} · ${formatBytes(entry.bytes)}</small></span>
-            <span class="cache-word-date">${entry.at ? new Date(entry.at).toLocaleDateString("zh-CN", { month: "numeric", day: "numeric" }) : "—"}</span>
-          </button>`).join("")}
-        </div>` : `<p class="field-hint">还没有缓存词条。查一个模型词条后，它会出现在这里。</p>`}
-        ${words.count > recent.length ? `<p class="field-hint">只显示最近 ${recent.length} 条，共 ${words.count} 条。</p>` : ""}
-        <div class="cache-actions">
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
-          <button class="link-btn" type="button" data-action="clear-word-cache">清空词条</button>
-          <button class="link-btn" type="button" data-action="clear-sentence-cache">清空句子</button>
-          <button class="link-btn" type="button" data-action="clear-audio-cache">清空语音</button>
-          <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
-        </div>
-      </div>`;
-  }
-
-  let historySheetTab = "history"; // "history" | "wordbooks"
-  let historySubTab = "recent";    // "recent" | "reverse"
-  let activeWordbookId = null;     // null = shelf list, string = book detail
-  let wordbookImportOpen = false;
-  let wordbookMenuOpen = false;
-  let wordbookAuditNote = "";
-  let wordbookSorting = false;
-  let wordbookExtracting = false;
-
-  function openHistorySheet(defaultTab) {
-    syncSavedFromWordbooks();
-    const translating = state.module === "translator";
-    if (defaultTab === "saved" || defaultTab === "wordbooks") {
-      historySheetTab = "wordbooks";
-    } else if (defaultTab === "reverse") {
-      historySheetTab = "history";
-      historySubTab = "reverse";
-    } else if (defaultTab === "recent" || defaultTab === "history") {
-      historySheetTab = "history";
-      historySubTab = "recent";
-    } else if (state.module === "reader" && state.saved.length) {
-      historySheetTab = "wordbooks";
-    } else {
-      historySheetTab = "history";
-    }
-    wordbookImportOpen = false;
-    openSheetShell({
-      kicker: translating ? "TRANSLATION" : "ARCHIVE",
-      title: translating ? "最近翻译" : "历史与书库"
-    });
-    renderHistoryContent();
-  }
-
-  function historyForCurrentModule() {
-    const translating = state.module === "translator";
-    return state.history.filter((item) =>
-      translating ? item.type === "translation" : item.type !== "translation"
-    );
-  }
-
-  function isTermLocallyCached(term) {
-    const entry = parseSavedEntry(term);
-    if (!entry.text) return false;
-    if (entry.kind === "chunk") return Boolean(cacheGetChunk(entry.text) || DATA.chunks?.[chunkSlug(entry.text)]);
-    if (entry.kind === "word") return Boolean(cacheGetWord(entry.text) || DATA.words?.[normalizeWord(entry.text)]);
-    return false;
-  }
-
-  function renderWordbooksPanel() {
-    const wb = window.TALK_WORDBOOKS;
-    if (!wb) return '<div class="history-empty">词汇书库模块未加载。</div>';
-    wb.loadStore(state.saved);
-    const books = wb.listBooks();
-    const st = wb.stats();
-
-    const importBox = wordbookImportOpen ? `
-      <div class="wb-import-box" data-surface="inset">
-        <div class="wb-import-head">
-          <span>导入到「${esc(wb.getBook(activeWordbookId)?.name || wb.DEFAULT_BOOK_NAME)}」</span>
-          <button class="wb-text-btn" type="button" data-action="wb-import-close" aria-label="关闭导入">取消</button>
-        </div>
-        <textarea id="wb-import-textarea" class="wb-import-ta" rows="3" placeholder="每行一词，或粘贴 CSV / JSON 备份"></textarea>
-        <p class="wb-import-hint" id="wb-import-hint" role="status"></p>
-        <div class="wb-import-actions">
-          <label class="wb-text-btn wb-file-btn">
-            选择文件
-            <input id="wb-import-file" type="file" accept=".txt,.csv,.json,text/plain,text/csv,application/json" hidden />
-          </label>
-          <div class="wb-text-actions">
-            ${hasModelConfig() ? `<button class="wb-text-btn" type="button" data-action="wb-import-extract" ${wordbookExtracting ? "disabled" : ""}>${wordbookExtracting ? "提取中…" : "AI 提取"}</button>` : ""}
-            <button class="wb-text-btn is-accent" type="button" data-action="wb-import-submit" ${wordbookExtracting ? "disabled" : ""}>导入</button>
-          </div>
-        </div>
-      </div>` : "";
-
-    const auditBanner = wordbookAuditNote ? `
-      <div class="wb-audit-strip">
-        <span>${esc(wordbookAuditNote)}</span>
-        <button class="wb-text-btn" type="button" data-action="wb-dismiss-audit">知道了</button>
-      </div>` : "";
-
-    // View A: Quiet editorial vertical list of books
-    if (!activeWordbookId) {
-      return `
-        ${auditBanner}
-        <div class="wb-list-header">
-          <span class="wb-list-meta">${st.bookCount} 本分册 · ${st.uniqueWords} 词</span>
-          <div class="wb-text-actions">
-            <button class="wb-text-btn" type="button" data-action="wb-create-book">+ 新建</button>
-            <div class="wb-menu-wrap">
-              <button class="wb-text-btn" type="button" data-action="wb-toggle-menu" aria-expanded="${wordbookMenuOpen}">···</button>
-              ${wordbookMenuOpen ? `
-                <div class="wb-pop-menu" role="menu">
-                  <button class="wb-pop-item" type="button" data-action="wb-import-open">批量导入</button>
-                  <button class="wb-pop-item" type="button" data-action="wb-export-json">导出 JSON</button>
-                </div>` : ""}
-            </div>
-          </div>
-        </div>
-        ${importBox}
-        <div class="wb-editorial-list">
-          ${books.map((book) => {
-            const cachedCount = book.items.filter((it) => isTermLocallyCached(it.term)).length;
-            return `
-              <button class="wb-list-row" type="button" data-action="wb-open-book" data-book-id="${attr(book.id)}">
-                <span class="wb-row-main">
-                  <strong class="wb-row-title">${esc(book.name)}</strong>
-                  ${book.system ? '<span class="wb-pin-tag">未分类</span>' : ""}
-                </span>
-                <span class="wb-row-right" title="已缓存 ${cachedCount} 词">
-                  <span>${book.items.length} 词</span>
-                  <span aria-hidden="true">›</span>
-                </span>
-              </button>`;
-          }).join("")}
-        </div>`;
-    }
-
-    // View B: Clean single-book detail with AI 分册 + ··· menu
-    const book = wb.getBook(activeWordbookId) || books[0];
-    if (!book) {
-      activeWordbookId = null;
-      return renderWordbooksPanel();
-    }
-    const otherBooks = books.filter((b) => b.id !== book.id);
-
-    return `
-      ${auditBanner}
-      <div class="wb-list-header">
-        <button class="wb-text-btn wb-back-link" type="button" data-action="wb-back-shelf">← ${esc(book.name)} <span class="wb-list-meta">${book.items.length}</span></button>
-        <div class="wb-text-actions">
-          ${book.items.length >= 2 && hasModelConfig() ? `<button class="wb-text-btn is-accent" type="button" data-action="wb-ai-sort" data-book-id="${attr(book.id)}" ${wordbookSorting ? "disabled" : ""}>${wordbookSorting ? "分册中…" : "AI 分册"}</button>` : ""}
-          <div class="wb-menu-wrap">
-            <button class="wb-text-btn" type="button" data-action="wb-toggle-menu" aria-expanded="${wordbookMenuOpen}">···</button>
-            ${wordbookMenuOpen ? `
-              <div class="wb-pop-menu" role="menu">
-                ${book.items.length >= 1 ? `<button class="wb-pop-item" type="button" data-action="wb-to-reader" data-book-id="${attr(book.id)}">生成精读</button>` : ""}
-                <button class="wb-pop-item" type="button" data-action="wb-import-open">导入词条</button>
-                ${book.items.length ? `<button class="wb-pop-item" type="button" data-action="wb-export-txt" data-book-id="${attr(book.id)}">导出 .txt</button>` : ""}
-                ${!book.system ? `<button class="wb-pop-item" type="button" data-action="wb-rename-book" data-book-id="${attr(book.id)}">重命名</button>` : ""}
-                ${!book.system ? `<button class="wb-pop-item is-danger" type="button" data-action="wb-delete-book" data-book-id="${attr(book.id)}">删除分册</button>` : ""}
-              </div>` : ""}
-          </div>
-        </div>
-      </div>
-      ${importBox}
-      ${book.items.length ? `
-        <div class="wb-editorial-list">
-          ${book.items.map((item) => {
-            const entry = parseSavedEntry(item.term);
-            const cached = isTermLocallyCached(item.term);
-            return `
-              <div class="wb-list-row wb-word-item">
-                <button class="wb-word-trigger" type="button" data-action="saved-item" data-term="${attr(item.term)}">
-                  <span class="wb-cache-dot ${cached ? "is-cached" : ""}" title="${cached ? "本机已有词条缓存" : "未查词（点开按需查询）"}"></span>
-                  <strong class="wb-row-title notranslate" translate="no" lang="en">${esc(shorten(entry.label, 42))}</strong>
-                </button>
-                <span class="wb-row-right">
-                  ${otherBooks.length ? `<button class="wb-text-btn wb-mini-act" type="button" data-action="wb-move-term" data-term="${attr(item.term)}" data-book-id="${attr(book.id)}" title="移到其他分册">换册</button>` : ""}
-                  <button class="wb-text-btn wb-mini-del" type="button" data-action="wb-remove-term" data-term="${attr(item.term)}" data-book-id="${attr(book.id)}" aria-label="移出本册" title="移出本册">×</button>
-                </span>
-              </div>`;
-          }).join("")}
-        </div>` : `
-        <div class="history-empty">「${esc(book.name)}」暂无词条</div>`}`;
-  }
-
-  function renderHistoryContent() {
-    const holder = $("#sheet-scroll");
-    if (!holder) return;
-    const items = historyForCurrentModule();
-    const translating = state.module === "translator";
-    const revThreads = listReverseThreads();
-    const wbStats = window.TALK_WORDBOOKS ? window.TALK_WORDBOOKS.stats() : { uniqueWords: state.saved.length };
-    const topTab = historySheetTab === "wordbooks" ? "wordbooks" : "history";
-    const subTab = historySubTab === "reverse" ? "reverse" : "recent";
-
-    const topTabsHtml = `
-      <div class="history-tabs" role="tablist">
-        <button class="history-tab ${topTab === "history" ? "active" : ""}" type="button" role="tab" aria-selected="${topTab === "history"}" data-action="history-tab" data-tab="history">${translating ? "最近翻译" : "历史记录"} (${items.length + revThreads.length})</button>
-        <button class="history-tab ${topTab === "wordbooks" ? "active" : ""}" type="button" role="tab" aria-selected="${topTab === "wordbooks"}" data-action="history-tab" data-tab="wordbooks">词汇书库 (${wbStats.uniqueWords})</button>
-      </div>`;
-
-    let bodyHtml = "";
-    if (topTab === "wordbooks") {
-      bodyHtml = renderWordbooksPanel();
-    } else {
-      const subPills = !translating ? `
-        <div class="wb-sub-pills" role="tablist">
-          <button class="wb-sub-pill${subTab === "recent" ? " active" : ""}" type="button" data-action="history-subtab" data-subtab="recent">最近查询 (${items.length})</button>
-          <button class="wb-sub-pill${subTab === "reverse" ? " active" : ""}" type="button" data-action="history-subtab" data-subtab="reverse">寻词记录 (${revThreads.length})</button>
-        </div>` : "";
-
-      const recentBody = items.length ? `
-        <div class="history-list">
-          ${items.map((item) => `
-            <button class="history-item" type="button" data-action="history-item" data-query="${attr(item.query)}" data-type="${attr(item.type)}">
-              <span class="history-icon ${item.type === "sentence" ? "sentence" : item.type === "translation" ? "translation" : ""}">${item.type === "sentence" ? icon("sentence") : item.type === "translation" ? icon("sparkle") : icon("book")}</span>
-              <span class="history-copy">
-                <strong>${esc(shorten(item.query, 44))}</strong>
-                <span>${item.type === "sentence" ? "句子" : item.type === "translation" ? "翻译" : "单词"} · ${esc(timeAgo(item.at))}</span>
-              </span>
-            </button>`).join("")}
-        </div>
-        <div class="settings-actions">
-          <button class="btn btn-secondary" type="button" data-action="clear-history" data-scope="${translating ? "translation" : "dictionary"}">${icon("trash")} ${translating ? "清空翻译记录" : "清空词典记录"}</button>
-        </div>` : `
-        <div class="history-empty">${translating ? "还没有翻译记录。<br />译一句，它会在这里等你。" : "还没有查询记录。<br />查一个词，它会在这里等你。"}</div>`;
-
-      const reverseBody = revThreads.length ? `
-        <div class="history-list">
-          ${revThreads.map((entry) => {
-            const turns = Math.max(1, Math.ceil((entry.messages?.length || 0) / 2));
-            const isCurrent = state.route?.name === "reverse" && state.reverseThreadId === entry.id;
-            return `
-              <div class="saved-row">
-                <button class="history-item saved-item-btn${isCurrent ? " is-current" : ""}" type="button" data-action="reverse-open-thread" data-id="${attr(entry.id)}">
-                  <span class="history-icon">${icon("sparkle")}</span>
-                  <span class="history-copy">
-                    <strong>${esc(shorten(entry.title || "语境寻词", 44))}</strong>
-                    <span>${turns} 轮对话 · ${esc(timeAgo(entry.updatedAt || Date.now()))}${isCurrent ? " · 当前" : ""}</span>
-                  </span>
-                </button>
-                <button class="saved-remove-btn" type="button" data-action="reverse-delete-thread" data-id="${attr(entry.id)}" aria-label="删除对话" title="删除对话">×</button>
-              </div>`;
-          }).join("")}
-        </div>
-        <div class="settings-actions">
-          <button class="btn btn-secondary" type="button" data-action="clear-reverse-threads">${icon("trash")} 清空寻词记录</button>
-        </div>` : `
-        <div class="history-empty">还没有语境寻词记录。<br />问一次 AI，对话会自动留在这里。</div>`;
-
-      bodyHtml = `${subPills}${subTab === "reverse" && !translating ? reverseBody : recentBody}`;
-    }
-
-    holder.innerHTML = `<div class="sheet-content">${topTabsHtml}${bodyHtml}</div>`;
-    const fileInput = $("#wb-import-file", holder);
-    if (fileInput) {
-      fileInput.addEventListener("change", async () => {
-        const f = fileInput.files?.[0];
-        if (!f || !window.TALK_WORDBOOKS) return;
-        try {
-          const text = await f.text();
-          const res = window.TALK_WORDBOOKS.importData(text, activeWordbookId || window.TALK_WORDBOOKS.DEFAULT_BOOK_ID);
-          syncSavedFromWordbooks();
-          wordbookImportOpen = false;
-          wordbookAuditNote = `导入核对：导入前 ${res.before.uniqueWords} 词 → 导入后 ${res.after.uniqueWords} 词（新增 ${res.added}，去重跳过 ${res.skipped}）`;
-          renderHistoryContent();
-          toast(`已导入 ${res.added} 词`);
-        } catch (err) {
-          toast(err?.message || "文件读取失败");
-        }
-      });
-    }
-  }
-
-  /* ============================================================
-     Settings actions
-     ============================================================ */
-
-  function saveSettings() {
-    if (!state.draft) return;
-    flushSettingsDraft();
-    closeSheet();
-    const topLayer = state.wordLayers[state.wordLayers.length - 1];
-    if (topLayer && !topLayer.data) void hydrateLayerWithModel(topLayer);
-    const active = activeWordData();
-    if (active) schedulePrefetch(active);
-    toast(hasModelConfig() ? "设置已保存" : "已切换到演示模式");
-  }
-
-  async function testConnection() {
-    if (!state.draft) return;
-    const status = $("#api-test-status");
-    if (!status) return;
-    if (!hasModelConfig(state.draft)) {
-      status.className = "key-status off";
-      status.innerHTML = "<span>填入密钥，或把地址指向本地服务。</span>";
-      return;
-    }
-    status.className = "key-status";
-    status.innerHTML = `<span>正在测试 ${esc(state.draft.model || "模型")}…</span>`;
-    const result = await LLM.pingModel(state.draft, {
-      timeoutMs: 30_000,
-      prompt: "Reply with exactly: OK",
-      maxTokens: 16
-    });
-    if (result.ok) {
-      status.className = "key-status";
-      status.innerHTML = `${icon("check")} <span>已连接 ${esc(state.draft.model || "模型")} · ${result.ms} ms</span>`;
-    } else {
-      status.className = "key-status off";
-      status.innerHTML = `<span>${esc(shorten(result.text, 140))}</span>`;
-    }
-  }
-
-  /* ============================================================
      Search & API
      ============================================================ */
 
@@ -4512,896 +3076,7 @@ import { createReverseView } from "./views/reverse.js";
     }
     const target = event.target.closest("[data-action]");
     if (!target) return;
-    const action = target.dataset.action;
-
-    if (actions.has(action)) {
-      await actions.dispatch(action, { event, target });
-      return;
-    }
-
-    switch (action) {
-      case "home":
-        event.preventDefault();
-        tapFeedback();
-        navigate({ name: "home" }, { direction: "back" });
-        break;
-
-      case "back":
-        event.preventDefault();
-        goBack();
-        break;
-
-      case "layer-back":
-        event.preventDefault();
-        popWordLayer();
-        break;
-
-      case "retry-layer":
-        event.preventDefault();
-        tapFeedback();
-        if (state.wordLayers.length) void hydrateLayerWithModel(state.wordLayers[state.wordLayers.length - 1]);
-        break;
-
-      case "cache-status":
-        event.preventDefault();
-        toast(cacheCorner?.dataset.label || "缓存状态");
-        break;
-
-      case "settings":
-        event.preventDefault();
-        tapFeedback();
-        openSettingsSheet();
-        break;
-
-      case "history":
-        event.preventDefault();
-        tapFeedback();
-        openHistorySheet();
-        break;
-
-      case "module": {
-        event.preventDefault();
-        const rawMod = target.dataset.module;
-        const module = rawMod === "translator" ? "translator" : rawMod === "reader" ? "reader" : "dictionary";
-        if (module === state.module) break;
-        const modOrder = { dictionary: 0, translator: 1, reader: 2 };
-        const dir = (modOrder[module] ?? 0) >= (modOrder[state.module] ?? 0) ? "next" : "prev";
-        document.documentElement.dataset.moduleDir = dir;
-        state.module = module;
-        updateModuleBar();
-        tapFeedback();
-        closeAllWordLayers({ immediate: true });
-        if (module === "translator") navigate({ name: "translator" }, { replace: false });
-        else if (module === "reader") navigate({ name: "reader" }, { replace: false });
-        else navigate({ name: "home" }, { replace: false });
-        if (!document.startViewTransition) {
-          screen.classList.remove("is-module-glide");
-          void screen.offsetWidth;
-          screen.classList.add("is-module-glide");
-        }
-        window.setTimeout(() => {
-          delete document.documentElement.dataset.moduleDir;
-          screen.classList.remove("is-module-glide");
-        }, 360);
-        break;
-      }
-
-      case "mode": {
-        event.preventDefault();
-        state.mode = target.dataset.mode || "auto";
-        $$(".mode-btn", screen).forEach((button) => {
-          const active = button.dataset.mode === state.mode;
-          button.classList.toggle("active", active);
-          button.setAttribute("aria-pressed", String(active));
-        });
-        updateSearchMeta();
-        break;
-      }
-
-      case "lookup":
-        event.preventDefault();
-        tapFeedback();
-        closeSheet({ immediate: true });
-        runSearch(target.dataset.query || "", target.dataset.type || "auto");
-        break;
-
-      case "word":
-        event.preventDefault();
-        tapFeedback();
-        openWordRoute(target.dataset.word || "");
-        break;
-
-      case "open-key":
-        event.preventDefault();
-        tapFeedback();
-        openKeySheet(Number(target.dataset.index || 0));
-        break;
-
-      case "word-layer":
-        event.preventDefault();
-        tapFeedback();
-        openWordLayerFromButton(target);
-        break;
-
-      case "sheet-word":
-        event.preventDefault();
-        tapFeedback();
-        openWordLayerFromButton(target);
-        break;
-
-      case "sheet-back":
-        event.preventDefault();
-        goBackInSheet();
-        break;
-
-      case "close-sheet":
-        event.preventDefault();
-        if (target.classList.contains("sheet-backdrop") && performance.now() - state.sheetOpenedAt < 480) break;
-        closeSheet();
-        break;
-
-      case "full-entry":
-        event.preventDefault();
-        openWordLayerFromButton(target);
-        break;
-
-      case "save":
-        event.preventDefault();
-        toggleSaved(target);
-        break;
-
-      case "sentence-level": {
-        event.preventDefault();
-        const level = sentenceLevelOf(target.dataset.level);
-        if (state.draft) state.draft.sentenceLevel = level.id;
-        scheduleSettingsCommit();
-        $$(".level-chip").forEach((chip) => {
-          const active = chip.dataset.level === level.id;
-          chip.classList.toggle("active", active);
-          chip.setAttribute("aria-pressed", String(active));
-        });
-        break;
-      }
-
-      case "gen-meta": {
-        event.preventDefault();
-        const on = target.dataset.on === "1";
-        if (state.draft) state.draft.showGenMeta = on;
-        scheduleSettingsCommit();
-        break;
-      }
-
-      case "fold-mode": {
-        event.preventDefault();
-        const mode = target.dataset.mode === "inline" ? "inline" : "block";
-        if (state.draft) state.draft.foldMode = mode;
-        scheduleSettingsCommit();
-        $$('[data-action="fold-mode"]').forEach((chip) => {
-          const active = chip.dataset.mode === mode;
-          chip.classList.toggle("active", active);
-          chip.setAttribute("aria-pressed", String(active));
-        });
-        if (state.route?.name === "sentence") refreshThemedPage();
-        break;
-      }
-
-      case "reset-example-styles": {
-        event.preventDefault();
-        saveExampleStyles({});
-        $$("[data-example-style]").forEach((input) => {
-          input.value = exampleStyleFor(input.dataset.exampleStyle);
-        });
-        toast("已恢复默认例句风格");
-        break;
-      }
-
-      case "copy":
-        event.preventDefault();
-        copyCurrentPage();
-        break;
-
-      case "copy-text": {
-        event.preventDefault();
-        const text = target.dataset.copy || "";
-        if (!text) break;
-        void copyText(text).then((copied) => toast(copied ? "已复制" : "这个浏览器不允许复制"));
-        break;
-      }
-
-      case "theme-toggle": {
-        event.preventDefault();
-        const row = target.closest(".theme-row");
-        if (!row) break;
-        const willOpen = !row.classList.contains("open");
-        $$(".theme-row.open").forEach((other) => {
-          other.classList.remove("open");
-          const head = other.querySelector(".theme-row-head");
-          if (head) head.setAttribute("aria-expanded", "false");
-        });
-        row.classList.toggle("open", willOpen);
-        target.setAttribute("aria-expanded", String(willOpen));
-        break;
-      }
-
-      case "lang": {
-        event.preventDefault();
-        const next = target.dataset.lang === "en" ? "en" : "zh";
-        window.TALK_I18N?.set(next);
-        if (state.draft) state.draft.lang = next;
-        renderSettingsContent();
-        window.TALK_I18N?.apply(document.body);
-        toast(next === "en" ? "Interface set to English" : "界面已切换为中文");
-        break;
-      }
-
-      case "theme":
-        event.preventDefault();
-        window.TALK_THEME.apply(target.dataset.theme);
-        applyContentCopy();
-        refreshThemedPage();
-        if (state.route?.name === "word") {
-          const current = getWord(state.route);
-          if (current) scheduleThemeExamples(current);
-        }
-        renderSettingsContent();
-        break;
-
-      case "settings-tab":
-        event.preventDefault();
-        state.settingsTab = target.dataset.tab || "model";
-        renderSettingsContent();
-        $("#sheet-scroll")?.scrollTo({ top: 0 });
-        break;
-
-      case "select-profile": {
-        event.preventDefault();
-        if (!state.draft) break;
-        syncDraftProfile(state.draft);
-        const profile = state.draft.profiles.find((item) => item.id === target.dataset.profile);
-        if (!profile) break;
-        state.draft = applyProfileToSettings(state.draft, profile);
-        scheduleSettingsCommit();
-        renderSettingsContent();
-        break;
-      }
-
-      case "provider-new":
-        event.preventDefault();
-        if (!state.draft) break;
-        syncDraftProfile(state.draft);
-        openProviderPicker();
-        break;
-
-      case "provider-template": {
-        event.preventDefault();
-        const template = PROVIDER_TEMPLATES.find((item) => item.id === target.dataset.template) || CUSTOM_TEMPLATE;
-        openProviderSheet(null, template);
-        break;
-      }
-
-      case "provider-select": {
-        event.preventDefault();
-        const profile = state.draft?.profiles.find((item) => item.id === target.dataset.profile);
-        if (!profile || profile.id === state.draft.activeProfileId) break;
-        syncDraftProfile(state.draft);
-        state.draft = applyProfileToSettings(state.draft, profile);
-        commitSettingsDraft();
-        renderSettingsContent();
-        toast(`已切换到 ${profile.model || profile.name}`);
-        break;
-      }
-
-      case "provider-edit":
-        event.preventDefault();
-        if (!state.draft) break;
-        syncDraftProfile(state.draft);
-        openProviderSheet(target.dataset.profile || null);
-        break;
-
-      case "provider-protocol": {
-        event.preventDefault();
-        const next = readProviderForm(state.providerDraft);
-        next.protocol = target.dataset.protocol || "openai";
-        next.provider = next.protocol === "google" ? "google" : (next.provider === "google" ? "custom" : next.provider);
-        next.models = [];
-        state.providerDraft = next;
-        renderProviderSheet();
-        break;
-      }
-
-      case "provider-pick":
-        event.preventDefault();
-        if (state.providerDraft && target.dataset.model) {
-          state.providerDraft.model = target.dataset.model;
-          const input = $('[data-provider-field="model"]');
-          if (input) input.value = target.dataset.model;
-        }
-        break;
-
-      case "provider-fetch": {
-        event.preventDefault();
-        const profile = readProviderForm(state.providerDraft);
-        if (!profile.baseUrl) { toast("先填 Base URL"); break; }
-        state.providerDraft = profile;
-        state.providerStatus = { tone: "", text: "正在获取模型…" };
-        renderProviderSheet();
-        try {
-          const models = await fetchChannelModels(profile);
-          state.providerDraft = { ...profile, models, model: profile.model || models[0] || "" };
-          state.providerStatus = models.length
-            ? { tone: "ok", text: `找到 ${models.length} 个模型，选一个再测试。` }
-            : { tone: "bad", text: "没有取到模型；可以手动填写模型名。" };
-        } catch (error) {
-          state.providerStatus = { tone: "bad", text: `获取失败：${error.message}` };
-        }
-        renderProviderSheet();
-        break;
-      }
-
-      case "provider-test": {
-        event.preventDefault();
-        const profile = readProviderForm(state.providerDraft);
-        if (!profile.baseUrl || !profile.model) { toast("地址与模型都要填"); break; }
-        state.providerDraft = profile;
-        state.providerStatus = { tone: "", text: "正在测试…" };
-        renderProviderSheet();
-        const result = await testChannel(profile);
-        state.providerStatus = result.ok
-          ? { tone: "ok", text: `连通 · ${result.ms} ms · 回复「${result.text}」` }
-          : { tone: "bad", text: `失败 · ${result.ms} ms · ${result.text}` };
-        renderProviderSheet();
-        break;
-      }
-
-      case "provider-save": {
-        event.preventDefault();
-        const profile = readProviderForm(state.providerDraft);
-        if (!profile.baseUrl || !profile.model) { toast("地址与模型都要填"); break; }
-        const clean = { ...profile };
-        delete clean.isNew;
-        if (!clean.name) clean.name = profileHost(clean);
-        const draft = state.draft;
-        const index = draft.profiles.findIndex((item) => item.id === clean.id);
-        if (index >= 0) draft.profiles[index] = clean;
-        else draft.profiles.push(clean);
-        state.draft = applyProfileToSettings(draft, clean);
-        commitSettingsDraft();
-        closeSheet();
-        openSettingsSheet();
-        renderSettingsContent();
-        toast("模型已保存");
-        break;
-      }
-
-      case "provider-delete": {
-        event.preventDefault();
-        const profile = state.providerDraft;
-        if (!profile || !state.draft) break;
-        if (!window.confirm(`删除「${profile.model || profile.name || "这个模型"}」？`)) break;
-        state.draft.profiles = state.draft.profiles.filter((item) => item.id !== profile.id);
-        state.draft = state.draft.profiles.length
-          ? applyProfileToSettings(state.draft, state.draft.profiles[0])
-          : { ...state.draft, activeProfileId: "", baseUrl: "", model: "", apiKey: "" };
-        commitSettingsDraft();
-        closeSheet();
-        openSettingsSheet();
-        renderSettingsContent();
-        break;
-      }
-
-      case "delete-profile": {
-        event.preventDefault();
-        if (!state.draft || state.draft.profiles.length <= 1) break;
-        const current = activeProfile(state.draft);
-        if (!current) break;
-        if (!window.confirm(`删除「${current.name}」？`)) break;
-        state.draft.profiles = state.draft.profiles.filter((item) => item.id !== current.id);
-        const next = state.draft.profiles[0];
-        state.draft = applyProfileToSettings(state.draft, next);
-        scheduleSettingsCommit();
-        renderSettingsContent();
-        break;
-      }
-
-      case "shuffle-moods":
-        event.preventDefault();
-        state.moodOffset += 3;
-        renderMoods();
-        tapFeedback();
-        break;
-
-      case "detail-level":
-        event.preventDefault();
-        if (!state.draft) break;
-        state.draft.detailLevel = target.dataset.level || "standard";
-        scheduleSettingsCommit();
-        renderSettingsContent();
-        break;
-
-      case "tts-engine":
-        event.preventDefault();
-        if (!state.draft) break;
-        state.draft.ttsEngine = target.dataset.engine === "qwen" ? "qwen" : "native";
-        scheduleSettingsCommit();
-        renderSettingsContent();
-        break;
-
-      case "cache-display":
-        event.preventDefault();
-        if (!state.draft) break;
-        state.draft.cacheDisplay = target.dataset.display === "corner" ? "corner" : "borders";
-        scheduleSettingsCommit();
-        renderSettingsContent();
-        break;
-
-      case "save-settings":
-        event.preventDefault();
-        saveSettings();
-        break;
-
-      case "test-connection":
-        event.preventDefault();
-        testConnection();
-        break;
-
-      case "history-item":
-        event.preventDefault();
-        closeSheet({ immediate: true });
-        if (target.dataset.type === "translation") {
-          const text = String(target.dataset.query || "").trim();
-          navigate({ name: "translator", text });
-          break;
-        }
-        runSearch(target.dataset.query || "", target.dataset.type || "auto");
-        break;
-
-      case "history-tab": {
-        event.preventDefault();
-        historySheetTab = target.dataset.tab === "wordbooks" ? "wordbooks" : "history";
-        wordbookAuditNote = "";
-        renderHistoryContent();
-        break;
-      }
-
-      case "history-subtab": {
-        event.preventDefault();
-        historySubTab = target.dataset.subtab === "reverse" ? "reverse" : "recent";
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-toggle-menu": {
-        event.preventDefault();
-        wordbookMenuOpen = !wordbookMenuOpen;
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-dismiss-audit": {
-        event.preventDefault();
-        wordbookAuditNote = "";
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-open-book": {
-        event.preventDefault();
-        activeWordbookId = target.dataset.bookId || window.TALK_WORDBOOKS?.DEFAULT_BOOK_ID || null;
-        wordbookMenuOpen = false;
-        wordbookImportOpen = false;
-        wordbookAuditNote = "";
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-back-shelf": {
-        event.preventDefault();
-        activeWordbookId = null;
-        wordbookImportOpen = false;
-        wordbookMenuOpen = false;
-        wordbookAuditNote = "";
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-create-book": {
-        event.preventDefault();
-        const name = window.prompt("新建主题词汇书名称（如：科技与产品、外刊高频）");
-        if (!name || !name.trim() || !window.TALK_WORDBOOKS) break;
-        const created = window.TALK_WORDBOOKS.createBook(name.trim());
-        if (created) {
-          activeWordbookId = created.id;
-          renderHistoryContent();
-          toast(`已新建「${created.name}」`);
-        }
-        break;
-      }
-
-      case "wb-rename-book": {
-        event.preventDefault();
-        wordbookMenuOpen = false;
-        const bid = target.dataset.bookId;
-        const book = window.TALK_WORDBOOKS?.getBook(bid);
-        if (!book || book.system) break;
-        const next = window.prompt("重命名词汇书", book.name);
-        if (next && next.trim() && window.TALK_WORDBOOKS.renameBook(bid, next.trim())) {
-          renderHistoryContent();
-          toast("已重命名");
-        }
-        break;
-      }
-
-      case "wb-delete-book": {
-        event.preventDefault();
-        wordbookMenuOpen = false;
-        const bid = target.dataset.bookId;
-        const book = window.TALK_WORDBOOKS?.getBook(bid);
-        if (!book || book.system) break;
-        if (!window.confirm(`删除「${book.name}」？里面的 ${book.items.length} 个词会自动退回「密集书库」，不会丢失。`)) break;
-        const res = window.TALK_WORDBOOKS.deleteBook(bid, { rescueToDense: true });
-        if (res.ok) {
-          syncSavedFromWordbooks();
-          activeWordbookId = null;
-          wordbookAuditNote = `已删除分册，${res.rescued} 个词已安全退回「密集书库」（0 丢失）`;
-          renderHistoryContent();
-        }
-        break;
-      }
-
-      case "wb-import-open": {
-        event.preventDefault();
-        wordbookImportOpen = true;
-        wordbookMenuOpen = false;
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-import-close": {
-        event.preventDefault();
-        wordbookImportOpen = false;
-        renderHistoryContent();
-        break;
-      }
-
-      case "wb-import-submit": {
-        event.preventDefault();
-        const ta = $("#wb-import-textarea");
-        const raw = ta ? ta.value : "";
-        if (!raw.trim() || !window.TALK_WORDBOOKS) {
-          toast("请先粘贴词表或选择文件");
-          break;
-        }
-        const res = window.TALK_WORDBOOKS.importData(raw, activeWordbookId || window.TALK_WORDBOOKS.DEFAULT_BOOK_ID);
-        if (res?.storageFull) {
-          toast("存储空间不够导入这些词：先导出 JSON 备份，再删掉一些词条。");
-          break;
-        }
-        syncSavedFromWordbooks();
-        wordbookImportOpen = false;
-        wordbookAuditNote = `导入核对：导入前 ${res.before.uniqueWords} 词 → 导入后 ${res.after.uniqueWords} 词（新增 ${res.added}，去重跳过 ${res.skipped}）`;
-        renderHistoryContent();
-        toast(`已导入 ${res.added} 词`);
-        break;
-      }
-
-      case "wb-import-extract": {
-        event.preventDefault();
-        if (wordbookExtracting) break;
-        const ta = $("#wb-import-textarea");
-        const raw = ta ? ta.value.trim() : "";
-        if (!raw || !window.TALK_WORDBOOKS) {
-          toast("请先粘贴一段包含英文词句的文本");
-          break;
-        }
-        if (!hasModelConfig()) {
-          toast("请先在设置中配置模型 API");
-          break;
-        }
-        wordbookExtracting = true;
-        renderHistoryContent();
-        try {
-          const aiRes = await callWordbookAi("extract", { text: raw.slice(0, 6000) });
-          const extracted = Array.isArray(aiRes?.words)
-            ? aiRes.words.map((w) => String(w || "").trim()).filter(Boolean)
-            : [];
-          if (!extracted.length) {
-            toast("未从文本中提取到可收录的英文词条");
-          } else {
-            const res = window.TALK_WORDBOOKS.importData(
-              extracted.join("\n"),
-              activeWordbookId || window.TALK_WORDBOOKS.DEFAULT_BOOK_ID
-            );
-            if (res?.storageFull) {
-              toast("存储空间不够导入这些词：先导出 JSON 备份，再删掉一些词条。");
-              break;
-            }
-            syncSavedFromWordbooks();
-            wordbookImportOpen = false;
-            const truncated = Math.max(0, raw.length - 6000);
-            wordbookAuditNote = `AI 提取核对：导入前 ${res.before.uniqueWords} 词 → 导入后 ${res.after.uniqueWords} 词（提取 ${extracted.length}，新增 ${res.added}，去重跳过 ${res.skipped}）${truncated ? `；已按前 6,000 字提取，截断 ${truncated.toLocaleString()} 字` : ""}`;
-            toast(`已提取并导入 ${res.added} 词`);
-          }
-        } catch (err) {
-          toast(err?.message || "AI 提取失败，请重试");
-        } finally {
-          wordbookExtracting = false;
-          renderHistoryContent();
-        }
-        break;
-      }
-
-      case "wb-export-txt": {
-        event.preventDefault();
-        wordbookMenuOpen = false;
-        const bid = target.dataset.bookId;
-        const book = window.TALK_WORDBOOKS?.getBook(bid);
-        if (!book || !book.items.length) { toast("这本词册为空"); break; }
-        const text = window.TALK_WORDBOOKS.exportBookTxt(bid);
-        const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = `talk-${book.name}.txt`;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-        toast(`已导出「${book.name}」${book.items.length} 词`);
-        break;
-      }
-
-      case "wb-export-json": {
-        event.preventDefault();
-        wordbookMenuOpen = false;
-        if (!window.TALK_WORDBOOKS) break;
-        const json = window.TALK_WORDBOOKS.exportAllJson();
-        const st = window.TALK_WORDBOOKS.stats();
-        const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "talk-wordbooks-backup.json";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-        toast(`已导出 ${st.bookCount} 本词汇书（共 ${st.uniqueWords} 词）`);
-        break;
-      }
-
-      case "wb-remove-term": {
-        event.preventDefault();
-        const term = target.dataset.term || "";
-        const bid = target.dataset.bookId || "";
-        if (!term || !window.TALK_WORDBOOKS) break;
-        window.TALK_WORDBOOKS.removeTerm(term, bid || null);
-        syncSavedFromWordbooks();
-        renderHistoryContent();
-        toast("已移出本册");
-        break;
-      }
-
-      case "wb-move-term": {
-        event.preventDefault();
-        const term = target.dataset.term || "";
-        const fromId = target.dataset.bookId || "";
-        const wb = window.TALK_WORDBOOKS;
-        if (!term || !fromId || !wb) break;
-        const others = wb.listBooks().filter((b) => b.id !== fromId);
-        if (!others.length) break;
-        const menu = others.map((b, i) => `${i + 1}. ${b.name}`).join("\n");
-        const pick = window.prompt(`把「${term}」移到哪本分册？请输入序号：\n${menu}`, "1");
-        const idx = Number(pick) - 1;
-        if (!Number.isInteger(idx) || !others[idx]) break;
-        wb.moveTerm(term, fromId, others[idx].id);
-        syncSavedFromWordbooks();
-        renderHistoryContent();
-        toast(`已移至「${others[idx].name}」`);
-        break;
-      }
-
-      case "wb-ai-sort": {
-        event.preventDefault();
-        wordbookMenuOpen = false;
-        const bid = target.dataset.bookId;
-        const wb = window.TALK_WORDBOOKS;
-        const book = wb?.getBook(bid);
-        if (!book || book.items.length < 2 || wordbookSorting) break;
-        wordbookSorting = true;
-        const beforeTotal = wb.stats().uniqueWords;
-        const allWords = book.items.map((it) => it.term);
-        const BATCH_SIZE = 60;
-        const totalBatches = Math.ceil(allWords.length / BATCH_SIZE);
-        let totalMoved = 0;
-        const createdAll = new Set();
-        wordbookAuditNote = `整理前 ${beforeTotal} 词 · 正在分批归类（1/${totalBatches}）…`;
-        renderHistoryContent();
-        try {
-          for (let i = 0; i < totalBatches; i++) {
-            const batchWords = allWords.slice(i * BATCH_SIZE, (i + 1) * BATCH_SIZE);
-            if (totalBatches > 1) {
-              wordbookAuditNote = `整理前 ${beforeTotal} 词 · 正在分批归类（${i + 1}/${totalBatches}，共 ${allWords.length} 词）…`;
-              renderHistoryContent();
-            }
-            const existingBooks = wb.listBooks().filter((b) => !b.system).map((b) => b.name);
-            const aiRes = await callWordbookAi("classify", { existingBooks, words: batchWords });
-            const audit = wb.applyAiClassification(bid, aiRes?.groups || []);
-            totalMoved += audit.moved;
-            audit.createdBooks.forEach((n) => createdAll.add(n));
-            syncSavedFromWordbooks();
-          }
-          const afterTotal = wb.stats().uniqueWords;
-          const remaining = wb.getBook(bid)?.items.length || 0;
-          const lost = Math.max(0, beforeTotal - afterTotal);
-          const createdList = [...createdAll];
-          const newInfo = createdList.length ? ` · 新建「${createdList.slice(0, 6).join(" / ")}${createdList.length > 6 ? "…" : ""}」` : "";
-          wordbookAuditNote = `整理核对：整理前 ${beforeTotal} 词 → 整理后 ${afterTotal} 词（归类 ${totalMoved}，留守 ${remaining}，丢失 ${lost}）${newInfo}`;
-          toast(`分册完成 · 0 丢失`);
-        } catch (err) {
-          const afterTotal = wb.stats().uniqueWords;
-          wordbookAuditNote = `分册中断（已完成部分已保存，当前全库 ${afterTotal}/${beforeTotal} 词）：${err?.message || "请求失败"}`;
-        } finally {
-          wordbookSorting = false;
-          renderHistoryContent();
-        }
-        break;
-      }
-
-      case "wb-to-reader": {
-        event.preventDefault();
-        wordbookMenuOpen = false;
-        const bid = target.dataset.bookId || "";
-        window.__TALK_BRIDGE__?.openReaderWithBook?.(bid);
-        break;
-      }
-
-      case "saved-item": {
-        event.preventDefault();
-        const raw = String(target.dataset.term || "").trim();
-        if (!raw) break;
-        const entry = parseSavedEntry(raw);
-        if (!entry.text) break;
-        closeSheet({ immediate: true });
-        if (entry.kind === "sentence") runSearch(entry.text, "sentence");
-        else if (entry.kind === "chunk") runSearch(entry.text, "chunk");
-        else openWordLayer(entry.text, { relation: "收藏词册", origin: "收藏" });
-        break;
-      }
-
-      case "remove-saved": {
-        event.preventDefault();
-        const raw = String(target.dataset.term || "").trim();
-        const idx = findSavedIndex(raw);
-        if (idx >= 0) {
-          state.saved.splice(idx, 1);
-        } else {
-          const lower = raw.toLowerCase();
-          state.saved = state.saved.filter((w) => String(w).toLowerCase() !== lower);
-        }
-        persistSaved();
-        renderHistoryContent();
-        if (state.route.name === "reader" && window.TALK_READER?.refreshTheme) {
-          window.TALK_READER.refreshTheme();
-        }
-        toast("已移出收藏词册");
-        break;
-      }
-
-      case "export-saved": {
-        event.preventDefault();
-        if (!state.saved.length) {
-          toast("收藏词册为空");
-          break;
-        }
-        const blob = new Blob([state.saved.map((item) => parseSavedEntry(item).label).join("\n") + "\n"], { type: "text/plain;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "talk-saved-words.txt";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-        toast(`已导出 ${state.saved.length} 条收藏`);
-        break;
-      }
-
-      case "clear-saved": {
-        event.preventDefault();
-        state.saved = [];
-        persistSaved();
-        renderHistoryContent();
-        if (state.route.name === "reader" && window.TALK_READER?.refreshTheme) {
-          window.TALK_READER.refreshTheme();
-        }
-        toast("收藏词册已清空");
-        break;
-      }
-
-      case "clear-history": {
-        event.preventDefault();
-        const scope = target.dataset.scope || "all";
-        if (scope === "all") {
-          state.history = [];
-          toast("记录已清空");
-        } else if (scope === "translation") {
-          state.history = state.history.filter((item) => item.type !== "translation");
-          toast("翻译记录已清空");
-        } else {
-          state.history = state.history.filter((item) => item.type === "translation");
-          toast("词典记录已清空");
-        }
-        persistHistory();
-        renderHistoryContent();
-        break;
-      }
-
-      case "copy-diagnostics": {
-        const text = diagText();
-        try {
-          await navigator.clipboard.writeText(text);
-          toast("诊断日志已复制（已脱敏）");
-        } catch (_) {
-          toast("复制失败，可在设置里手动查看");
-        }
-        break;
-      }
-      case "clear-diagnostics":
-        localStorage.removeItem("talk.diagnostics.v1");
-        renderSettingsContent();
-        toast("运行日志已清空");
-        break;
-
-      case "clear-word-cache":
-        event.preventDefault();
-        await clearWordStore();
-        refreshCacheBorders();
-        {
-          const active = activeWordData();
-          if (active) schedulePrefetch(active);
-        }
-        refreshCacheUi();
-        toast("词条缓存已清除");
-        break;
-
-      case "export-word-cache":
-        event.preventDefault();
-        exportWordCache();
-        break;
-
-      case "import-word-cache":
-        event.preventDefault();
-        $("#word-cache-file")?.click();
-        break;
-
-      case "install-app":
-        event.preventDefault();
-        if (!state.installPrompt) {
-          toast("请用浏览器菜单安装到主屏幕");
-          break;
-        }
-        state.installPrompt.prompt();
-        await state.installPrompt.userChoice.catch(() => null);
-        state.installPrompt = null;
-        target.hidden = true;
-        break;
-
-      case "open-cache":
-        event.preventDefault();
-        openCacheSheet();
-        break;
-
-      case "clear-audio-cache":
-        event.preventDefault();
-        if (!window.confirm("清空所有已生成的语音缓存？")) break;
-        await clearAudioCache();
-        refreshCacheUi();
-        toast("语音缓存已清空");
-        break;
-
-      default:
-        break;
-    }
+    await actions.dispatch(target.dataset.action, { event, target });
   }
 
   function handleInput(event) {
@@ -5761,19 +3436,6 @@ import { createReverseView } from "./views/reverse.js";
     toast("词汇书库存储已满，这次改动可能没保存。先导出 JSON 备份，再删掉一些词条。");
   });
 
-  function updateWordbookImportHint() {
-    const field = $("#wb-import-textarea");
-    const hint = $("#wb-import-hint");
-    if (!field || !hint) return;
-    const length = field.value.length;
-    if (length <= 6000) {
-      hint.textContent = "";
-      hint.hidden = true;
-      return;
-    }
-    hint.hidden = false;
-    hint.textContent = `AI 提取只读前 6,000 字：将截断 ${(length - 6000).toLocaleString()} 字（其余内容仍会导入）。`;
-  }
   document.addEventListener("input", (event) => {
     if (event.target?.id === "wb-import-textarea") updateWordbookImportHint();
   });
