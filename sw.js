@@ -25,6 +25,14 @@ const SHELL = [
   "./js/native-bridge.js?v=295",
   "./js/app.js?v=295",
   // @shell-esm-start
+  "./js/core/actions.js",
+  "./js/core/diagnostics.js",
+  "./js/core/icons.js",
+  "./js/core/utils.js",
+  "./js/model/markdown.js",
+  "./js/model/normalize.js",
+  "./js/model/stream-preview.js",
+  "./js/storage/vault.js",
   // @shell-esm-end
   "./vendor/idb.js",
   "./vendor/html-to-image.js?v=295",

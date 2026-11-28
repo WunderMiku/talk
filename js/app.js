@@ -1,7 +1,77 @@
 /* ============================================================
    talk. — interactive dictionary prototype
-   Vanilla JS. No build step.
+   Vanilla ES Modules. No build step.
    ============================================================ */
+
+import {
+  $,
+  $$,
+  esc,
+  attr,
+  rich,
+  shorten,
+  sanitizeQuery,
+  normalizeWord,
+  normalizeSentence,
+  normalizeChunk,
+  chunkSlug,
+  chunkFromSlug,
+  hasCJK,
+  detectSourceLanguage,
+  hashText,
+  countWords,
+  detectParadigm,
+  detectType,
+  escapeRegExp,
+  wait,
+  tapFeedback,
+  blockHead,
+  letterTitle,
+  highlightPlain,
+  timeAgo,
+  titleCase,
+  registerLabel,
+  posAbbr,
+  posLabel,
+  tagLabel,
+  asArray,
+  normalizeStrings,
+  secureRemoteUrl,
+  copyText
+} from "./core/utils.js";
+import { icon } from "./core/icons.js";
+import {
+  DIAG_KEY,
+  diagLog,
+  formatDiagText,
+  installGlobalErrorLogging
+} from "./core/diagnostics.js";
+import { createActionRegistry } from "./core/actions.js";
+import {
+  SEAL_PREFIX,
+  canSeal,
+  sealText,
+  unlockSettingsKeys
+} from "./storage/vault.js";
+import { streamPreviewFromJson } from "./model/stream-preview.js";
+import {
+  REVERSE_ANCHOR_RE,
+  reverseAnchorWords,
+  stripReverseAnchors,
+  markdownLite
+} from "./model/markdown.js";
+import {
+  isHallucinatedWord,
+  SEGMENT_ROLE_LABELS,
+  normalizeExamplesByTheme,
+  splitSentences,
+  alignSentenceParts,
+  normalizeModelWord,
+  normalizeModelSentence,
+  ensureWord,
+  ensureChunk,
+  ensureSentence
+} from "./model/normalize.js";
 
 (() => {
   "use strict";
@@ -11,6 +81,7 @@
   const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
   const APP_BUILD = "295"; // cache-busting build, kept in step with ?v= and sw.js
+  const actions = createActionRegistry();
 
   function copyFor(section) {
     const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
@@ -45,59 +116,15 @@
     { id: "toefl", label: "托福", maxKeyWords: 8, hint: "托福学术句与抽象概念" }
   ];
   const SENTENCE_LEVEL_DEFAULT = "gaokao";
-  // --- diagnostics -------------------------------------------------------
-  // Keep a small, redacted trail of what the model layer actually did so a
-  // reader can paste it back when something breaks. Never store prompts whole:
-  // only shapes, sizes and error text.
-  const DIAG_KEY = "talk.diagnostics.v1";
-  const DIAG_LIMIT = 120;
-  function redact(value) {
-    let text = typeof value === "string" ? value : JSON.stringify(value || "");
-    text = String(text)
-      .replace(/sk-[A-Za-z0-9_-]{6,}/g, "sk-***")
-      .replace(/Bearer\s+[A-Za-z0-9._-]{6,}/gi, "Bearer ***")
-      .replace(/("?(?:apiKey|authorization|token)"?\s*[:=]\s*")([^"]{4,})(")/gi, "$1***$3")
-      .replace(/[A-Za-z0-9_-]{32,}/g, "***");
-    return text.length > 600 ? text.slice(0, 600) + "…" : text;
-  }
-  function diagLog(level, code, message, meta = {}) {
-    try {
-      const entry = {
-        at: new Date().toISOString().slice(5, 23),
-        level,
-        code,
-        message: redact(String(message || "")).slice(0, 400),
-        meta: redact(meta).slice(0, 600)
-      };
-      const list = JSON.parse(localStorage.getItem(DIAG_KEY) || "[]");
-      list.push(entry);
-      while (list.length > DIAG_LIMIT) list.shift();
-      localStorage.setItem(DIAG_KEY, JSON.stringify(list));
-    } catch (_) { /* never let logging break the app */ }
-  }
   function diagText() {
-    let list = [];
-    try { list = JSON.parse(localStorage.getItem(DIAG_KEY) || "[]"); } catch (_) { list = []; }
-    const head = [
-      `talk ${typeof APP_VERSION !== "undefined" ? APP_VERSION : "?"} · ${navigator.userAgent}`,
-      `time ${new Date().toISOString()}`,
-      `model ${redact(state.settings?.model || "")} · ${redact(state.settings?.baseUrl || "")}`
-    ].join("\n");
-    const body = list.map((e) => `${e.at} ${e.level.toUpperCase()} ${e.code} · ${e.message}${e.meta && e.meta !== "{}" ? " · " + e.meta : ""}`).join("\n");
-    const raw = state.lastModelRaw;
-    const rawBlock = raw
-      ? `\n\n--- last model reply (${raw.type} · ${raw.detail} · ${raw.chars} chars${raw.cut ? ", truncated" : ""}) ---\n${redact(raw.text)}`
-      : "";
-    return head + "\n" + body + rawBlock;
+    return formatDiagText({
+      version: APP_VERSION,
+      model: state.settings?.model || "",
+      baseUrl: state.settings?.baseUrl || "",
+      lastModelRaw: state.lastModelRaw
+    });
   }
-  window.addEventListener("error", (event) => diagLog("error", "window", event.message || "script error", { source: event.filename, line: event.lineno }));
-  window.addEventListener("unhandledrejection", (event) => {
-    const message = event.reason?.message || String(event.reason || "");
-    // Starting a new view transition aborts the previous one; that rejection is
-    // expected and would otherwise drown the diagnostics in noise.
-    if (/Transition was (skipped|aborted)/i.test(message)) return;
-    diagLog("error", "promise", message);
-  });
+  installGlobalErrorLogging();
 
   // Sentences now carry a summary, a parse tree and level-tagged key words,
   // which no longer fits in the old per-detail ceiling.
@@ -137,104 +164,11 @@
   let wordStoreFallback = false;
   const wordCache = new Map();
 
-  /* ---- key vault -------------------------------------------------------
-     API keys are never written as plain text when WebCrypto is available.
-     A non-extractable AES-GCM key lives in IndexedDB (it cannot be read
-     back out), and the settings blob stores only ciphertext. This keeps
-     keys out of a casual devtools/localStorage inspection and out of
-     storage backups; it is not a defence against someone who can run code
-     in this origin, because the page itself can decrypt. */
-  const VAULT_DB_NAME = "talk.vault.v1";
-  const VAULT_STORE = "keys";
-  const VAULT_KEY_ID = "api-key-wrap";
-  const SEAL_PREFIX = "sealed:v1:";
-  const vault = { db: null, key: null, broken: false };
   let storedKeysPlain = false;
   let storageChain = Promise.resolve();
 
-  const canSeal = () => Boolean(window.crypto?.subtle && window.idb?.openDB && "indexedDB" in window);
-
-  function toBase64(bytes) {
-    let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    return btoa(binary);
-  }
-
-  function fromBase64(text) {
-    const binary = atob(text);
-    const bytes = new Uint8Array(binary.length);
-    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-    return bytes;
-  }
-
-  async function vaultKey() {
-    if (vault.key) return vault.key;
-    if (vault.broken || !canSeal()) return null;
-    try {
-      if (!vault.db) {
-        vault.db = await window.idb.openDB(VAULT_DB_NAME, 1, {
-          upgrade(db) {
-            if (!db.objectStoreNames.contains(VAULT_STORE)) db.createObjectStore(VAULT_STORE);
-          }
-        });
-      }
-      let key = await vault.db.get(VAULT_STORE, VAULT_KEY_ID);
-      if (!key || key.type !== "secret") {
-        key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-        await vault.db.put(VAULT_STORE, key, VAULT_KEY_ID);
-      }
-      vault.key = key;
-      return key;
-    } catch (error) {
-      vault.broken = true;
-      console.warn("Key vault unavailable; settings will fall back to plain storage.", error);
-      return null;
-    }
-  }
-
-  async function sealText(text) {
-    if (!text) return text;
-    const key = await vaultKey();
-    if (!key) return text;
-    try {
-      const iv = crypto.getRandomValues(new Uint8Array(12));
-      const sealed = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(text));
-      return `${SEAL_PREFIX}${toBase64(iv)}.${toBase64(new Uint8Array(sealed))}`;
-    } catch (error) {
-      console.warn("Could not seal an API key; storing it unsealed.", error);
-      return text;
-    }
-  }
-
-  async function unsealText(value) {
-    const text = String(value || "");
-    if (!text.startsWith(SEAL_PREFIX)) return text;
-    const key = await vaultKey();
-    if (!key) return "";
-    try {
-      const [ivPart, bodyPart] = text.slice(SEAL_PREFIX.length).split(".");
-      if (!ivPart || !bodyPart) return "";
-      const plain = await crypto.subtle.decrypt(
-        { name: "AES-GCM", iv: fromBase64(ivPart) },
-        key,
-        fromBase64(bodyPart)
-      );
-      return new TextDecoder().decode(plain);
-    } catch (error) {
-      console.warn("A stored API key could not be decrypted; it has been dropped.", error);
-      return "";
-    }
-  }
-
-  async function unlockStoredKeys() {
-    if (!canSeal()) return;
-    const settings = state.settings;
-    settings.apiKey = await unsealText(settings.apiKey);
-    for (const profile of settings.profiles || []) {
-      profile.apiKey = await unsealText(profile.apiKey);
-    }
-    const active = activeProfile(settings);
-    if (active) settings.apiKey = active.apiKey || "";
+  function unlockStoredKeys() {
+    return unlockSettingsKeys(state.settings, activeProfile);
   }
 
   // A still-sealed key means unsealing failed (e.g. no WebCrypto here).
@@ -534,302 +468,15 @@
   };
 
   /* ============================================================
-     Small utilities
+     Small app-scoped helpers
      ============================================================ */
-
-  const $ = (sel, root = document) => root.querySelector(sel);
-  const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
-
-  function esc(value) {
-    return String(value ?? "")
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#39;");
-  }
-
-  function attr(value) {
-    return esc(value).replace(/`/g, "&#96;");
-  }
-
-  function rich(value) {
-    return esc(value)
-      .replace(/&lt;em&gt;/gi, "<em>")
-      .replace(/&lt;\/em&gt;/gi, "</em>");
-  }
-
-  function sanitizeQuery(value) {
-    let query = String(value ?? "")
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (!query) return "";
-
-    // A pasted word often arrives with a stray quote or repeated punctuation.
-    query = query.replace(/^[\p{P}\p{S}]+/u, "").trim();
-    if (!query) return "";
-
-    const tokens = query.split(" ").filter(Boolean);
-    if (tokens.length <= 1) {
-      // For a single word, everything after the word is noise: assessment...
-      return query.replace(/[\p{P}\p{S}]+$/u, "").trim();
-    }
-
-    const trailing = query.match(/[\p{P}\p{S}]+$/u);
-    if (trailing) {
-      const terminal = trailing[0].match(/[.!?。！？]/)?.[0] || "";
-      query = query.slice(0, -trailing[0].length).trimEnd() + terminal;
-    }
-    return query;
-  }
-
-  function normalizeWord(value) {
-    return String(value ?? "")
-      .trim()
-      .toLowerCase()
-      .replace(/^["'“”‘’]+|["'“”‘’]+$/g, "")
-      .replace(/[.,!?;:]+$/g, "")
-      .replace(/\s+/g, " ");
-  }
-
-  function normalizeSentence(value) {
-    return String(value ?? "")
-      .trim()
-      .replace(/[“”]/g, '"')
-      .replace(/[‘’]/g, "'")
-      .replace(/\s+/g, " ")
-      .toLowerCase();
-  }
-
-  function normalizeChunk(value) {
-    let query = String(value ?? "")
-      .replace(/[\u200B-\u200D\uFEFF]/g, "")
-      .replace(/[“”]/g, '"')
-      .replace(/[‘’]/g, "'")
-      .replace(/\s+/g, " ")
-      .trim();
-    query = query.replace(/^["'“”‘’]+|["'“”‘’]+$/g, "").trim();
-    return query.toLowerCase();
-  }
-
-  function chunkSlug(value) {
-    return normalizeChunk(value).replace(/\s+/g, "+");
-  }
-
-  function chunkFromSlug(slug) {
-    let raw = String(slug || "");
-    try {
-      raw = decodeURIComponent(raw);
-    } catch (_) {
-      /* keep the raw slug */
-    }
-    return normalizeChunk(raw.replace(/\+/g, " "));
-  }
 
   function chunkCacheKey(value) {
     return CHUNK_CACHE_PREFIX + normalizeChunk(value);
   }
 
-  function hasCJK(value) {
-    return /[\u3400-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/.test(String(value || ""));
-  }
-
-  function hashText(value) {
-    let hash = 2166136261;
-    const text = String(value ?? "");
-    for (let index = 0; index < text.length; index += 1) {
-      hash ^= text.charCodeAt(index);
-      hash = Math.imul(hash, 16777619);
-    }
-    return (hash >>> 0).toString(36);
-  }
-
   function reverseIdFor(text) {
     return `r${hashText(normalizeSentence(text))}${uiLang() === "en" ? "e" : ""}`;
-  }
-
-  function countWords(value) {
-    return String(value || "").split(/\s+/).filter(Boolean).length;
-  }
-
-  // 三范式分流：中文/情境描述 → 语境寻词；单词 → 词；完整句 → 句子；
-  // 其余 2-5 个词、无句末标点 → 意群。启发式，不引入 NLP；手动 chip 可覆盖。
-  function detectParadigm(value) {
-    const query = sanitizeQuery(value);
-    if (!query) return "word";
-    if (hasCJK(query)) return "reverse";
-    if (/^(how (?:do|can|could|would) (?:you|i|we) (?:say|express|put)|what(?:'s| is) the (?:word|phrase|english) for|how to say)/i.test(query)) {
-      return "reverse";
-    }
-    const words = query.split(/\s+/).filter(Boolean);
-    if (words.length <= 1) return "word";
-    if (/[.!?…]$/.test(query) || words.length >= 6) return "sentence";
-    return "chunk";
-  }
-
-  function detectType(value) {
-    const paradigm = detectParadigm(value);
-    return paradigm === "chunk" ? "word" : paradigm === "reverse" ? "sentence" : paradigm;
-  }
-
-  function escapeRegExp(value) {
-    return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  }
-
-  function wait(ms) {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
-
-  function tapFeedback() {
-    if (navigator.vibrate) {
-      try { navigator.vibrate(7); } catch (_) { /* no-op */ }
-    }
-  }
-
-  function icon(name, className = "") {
-    const svg = ICONS[name] || "";
-    return svg.replace("<svg", `<svg class="${className}"`);
-  }
-
-  function blockHead(index, title, note = "") {
-    return `
-      <div class="block-head">
-        <span class="block-index">${esc(index)}</span>
-        <h2>${esc(title)}</h2>
-        <span class="rule"></span>
-        ${note ? `<span class="block-note">${esc(note)}</span>` : ""}
-      </div>`;
-  }
-
-  function letterTitle(value) {
-    const chars = Array.from(String(value ?? ""));
-    return chars.map((char, i) => {
-      if (char === " ") return `<span class="letter" style="--i:${i}">&nbsp;</span>`;
-      return `<span class="letter" style="--i:${i}">${esc(char)}</span>`;
-    }).join("");
-  }
-
-  function highlightPlain(text, term) {
-    if (!text) return "";
-    if (!term) return esc(text);
-    const source = String(text);
-    const target = String(term);
-    let re;
-    try {
-      re = new RegExp(`(${escapeRegExp(target)})(?![\\w])`, "ig");
-    } catch (_) {
-      return esc(source);
-    }
-    let out = "";
-    let last = 0;
-    for (const match of source.matchAll(re)) {
-      out += esc(source.slice(last, match.index));
-      out += `<mark>${esc(match[0])}</mark>`;
-      last = match.index + match[0].length;
-    }
-    out += esc(source.slice(last));
-    return out;
-  }
-
-  function timeAgo(ts) {
-    if (!ts) return "已保存";
-    const diff = Date.now() - ts;
-    if (diff < 60_000) return "刚刚";
-    if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} 分钟前`;
-    if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)} 小时前`;
-    return `${Math.floor(diff / 86_400_000)} 天前`;
-  }
-
-  function titleCase(value) {
-    const s = String(value ?? "");
-    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
-  }
-
-  function registerLabel(value) {
-    const key = String(value || "").toLowerCase();
-    return ({
-      common: "常用",
-      neutral: "通用",
-      spoken: "口语",
-      slang: "俚语",
-      formal: "正式",
-      literary: "书面",
-      informal: "口语",
-      technical: "专业"
-    })[key] || value || "通用";
-  }
-
-  /* Part of speech is always the English abbreviation, everywhere: the entry,
-     relation cards, the sentence key words and the detail sheets. Models tend
-     to answer with "noun" one time and "名词" the next, so both spellings are
-     folded into the same short form here instead of at each call site. */
-  const POS_ABBREVIATIONS = {
-    n: "n.",
-    noun: "n.",
-    v: "v.",
-    verb: "v.",
-    adj: "adj.",
-    adjective: "adj.",
-    adv: "adv.",
-    adverb: "adv.",
-    prep: "prep.",
-    preposition: "prep.",
-    pron: "pron.",
-    pronoun: "pron.",
-    conj: "conj.",
-    conjunction: "conj.",
-    num: "num.",
-    numeral: "num.",
-    int: "int.",
-    interjection: "int.",
-    art: "art.",
-    article: "art.",
-    det: "det.",
-    determiner: "det.",
-    phr: "phr.",
-    phrase: "phr.",
-    "名词": "n.",
-    "动词": "v.",
-    "形容词": "adj.",
-    "副词": "adv.",
-    "介词": "prep.",
-    "代词": "pron.",
-    "连词": "conj.",
-    "数词": "num.",
-    "感叹词": "int.",
-    "冠词": "art.",
-    "短语": "phr."
-  };
-
-  function posAbbr(value) {
-    const raw = String(value || "").trim();
-    if (!raw) return "";
-    const parts = raw.split(/\s*[/、,·]\s*|\s+or\s+|\s+and\s+/i).map((part) => part.trim()).filter(Boolean);
-    const mapped = parts.map((part) => POS_ABBREVIATIONS[part.toLowerCase().replace(/\.$/, "")] || POS_ABBREVIATIONS[part] || "");
-    if (!mapped.length || mapped.some((item) => !item)) return raw;
-    return [...new Set(mapped)].join(" / ");
-  }
-
-  function posLabel(value) {
-    return posAbbr(value) || "—";
-  }
-
-  function tagLabel(value) {
-    const key = String(value || "").toLowerCase();
-    return ({
-      "most common": "最常用",
-      core: "核心义",
-      "second sense": "第二义",
-      formal: "正式",
-      literary: "书面",
-      literal: "字面义",
-      figurative: "比喻义",
-      movement: "动作",
-      mind: "思绪",
-      uncountable: "不可数",
-      technical: "专业"
-    })[key] || value;
   }
 
   /* ============================================================
@@ -1172,17 +819,6 @@
   function clearSentenceCache() {
     sentenceCache.clear();
     if (wordDb) wordDb.clear(SENTENCE_DB_STORE).catch(() => {});
-  }
-
-  // Model sometimes echoes a parameter value (e.g. "standard") instead of the requested word.
-  // Only that narrow mistake is treated as a hallucination; inflections and irregular forms
-  // (went -> go, mice -> mouse) are legitimate answers and must pass.
-  const PARAM_WORDS = new Set(["standard", "detail", "fast", "deep", "word", "query", "json", "english", "chinese"]);
-  function isHallucinatedWord(returnedWord, requestedWord) {
-    const got = normalizeWord(returnedWord);
-    const req = normalizeWord(requestedWord);
-    if (!got || !req || got === req) return false;
-    return PARAM_WORDS.has(got) && !PARAM_WORDS.has(req);
   }
 
   function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
@@ -1551,37 +1187,6 @@
     const base = String(cfg.baseUrl || "").trim();
     return Boolean(base) && (Boolean(key) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(base));
   }
-
-  /* ============================================================
-     Icons
-     ============================================================ */
-
-  const ICONS = {
-    arrowLeft: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m11 18-6-6 6-6"/></svg>`,
-    arrowUpRight: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7"/><path d="M8 7h9v9"/></svg>`,
-    arrowRight: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg>`,
-    search: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 5 5"/></svg>`,
-    settings: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h9"/><path d="M17 7h3"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="15" cy="7" r="2"/><circle cx="8" cy="17" r="2"/></svg>`,
-    clock: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>`,
-    speaker: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/><path d="M18.5 6.5a7.8 7.8 0 0 1 0 11"/></svg>`,
-    bookmark: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4h12v17l-6-4-6 4V4Z"/></svg>`,
-    chevronDown: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>`,
-    close: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>`,
-    share: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="m8.4 10.7 7.2-4.2"/><path d="m8.4 13.3 7.2 4.2"/></svg>`,    copy: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="11" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h2"/></svg>`,
-    info: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 10.5V16"/><circle cx="12" cy="7.8" r=".8" fill="currentColor" stroke="none"/></svg>`,
-    refresh: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14-4L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14 4l2-2"/><path d="M20 20v-5h-5"/></svg>`,
-    trash: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="m6 7 1 13h10l1-13"/><path d="M10 11v5M14 11v5"/></svg>`,
-    check: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg>`,
-    quote: `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true"><path d="M5 11h5v6H4v-5c0-3.2 1.7-5.4 4.6-6.3l.8 2C7.6 8.3 6.5 9.4 6.2 11H8v-.1H5Zm10 0h5v6h-6v-5c0-3.2 1.7-5.4 4.6-6.3l.8 2c-1.8.6-2.9 1.7-3.2 3.3h1.8v-.1Z"/></svg>`,
-    book: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5v-16Z"/><path d="M4 18.5A2.5 2.5 0 0 1 6.5 16H20"/></svg>`,
-    sentence: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M4 11h16M4 16h11"/><path d="M18 16h2"/></svg>`,
-    sparkle: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3c.5 4.2 2.6 6.4 7 7-4.4.6-6.5 2.8-7 7-.5-4.2-2.6-6.4-7-7 4.4-.6 6.5-2.8 7-7Z"/><path d="M19 16.5c.2 1.7 1 2.6 2.7 2.9-1.7.3-2.5 1.2-2.7 2.9-.2-1.7-1-2.6-2.7-2.9 1.7-.3 2.5-1.2 2.7-2.9Z"/></svg>`,
-    wand: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 19 9-9"/><path d="m13 5 1.2 3.3L17.5 9.5l-3.3 1.2L13 14l-1.2-3.3L8.5 9.5l3.3-1.2L13 5Z"/><path d="M18 14.5v4M16 16.5h4"/></svg>`,
-    external: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="m20 4-9 9"/><path d="M19 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h5"/></svg>`,
-    shield: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 2.8 8.1 7 10 4.2-1.9 7-5.5 7-10V6l-7-3Z"/><path d="m9 12 2 2 4-5"/></svg>`,
-    archive: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16v13H4z"/><path d="M3 4h18v3H3z"/><path d="M9 11h6"/></svg>`,
-    volume: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4V5Z"/><path d="M15.5 9.5a3.5 3.5 0 0 1 0 5"/></svg>`
-  };
 
   /* ============================================================
      Routing & transitions
@@ -2787,13 +2392,6 @@
     try { localStorage.setItem(translationCacheKey(), JSON.stringify(Object.fromEntries(entries))); } catch (_) { /* no-op */ }
   }
 
-  function detectSourceLanguage(text) {
-    const source = String(text || "");
-    const chinese = (source.match(/[\u3400-\u9fff]/g) || []).length;
-    const latin = (source.match(/[A-Za-z]/g) || []).length;
-    return chinese > 0 && chinese * 2 >= latin ? "zh" : "en";
-  }
-
   function translatorEmptyHtml() {
     const copy = copyFor("translator");
     return `<div class="translator-empty">
@@ -3694,11 +3292,6 @@
       </footer>`;
   }
 
-  function shorten(value, length) {
-    const s = String(value ?? "").replace(/\s+/g, " ").trim();
-    return s.length > length ? `${s.slice(0, length).trim()}…` : s;
-  }
-
   /* ============================================================
      Theme-aware examples
      ============================================================ */
@@ -3730,16 +3323,6 @@
     try { localStorage.setItem(EXAMPLE_STYLE_KEY, JSON.stringify(next || {})); } catch (_) { /* no-op */ }
   }
 
-  function normalizeExamplesByTheme(value) {
-    if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-    const out = {};
-    for (const [id, list] of Object.entries(value)) {
-      const examples = normalizeExamples(list);
-      if (examples.length) out[id] = examples;
-    }
-    return Object.keys(out).length ? out : null;
-  }
-
   function exampleForTheme(word, themeId = window.TALK_THEME?.current?.().id) {
     if (!word) return [];
     const themed = word.examplesByTheme?.[themeId];
@@ -3759,252 +3342,6 @@
   /* ============================================================
      Word page
      ============================================================ */
-
-  const CHUNK_FORMS = ["idiom", "phrasal-verb", "collocation", "chunk-skeleton"];
-
-  function ensureChunk(raw) {
-    if (!raw) return null;
-    const chunk = normalizeChunk(raw.chunk || raw.query || raw.word || "");
-    if (!chunk) return null;
-    const form = CHUNK_FORMS.includes(raw.form) ? raw.form : "collocation";
-    const senses = (Array.isArray(raw.senses) ? raw.senses : [])
-      .map((sense) => ({
-        zh: String(sense?.zh || sense?.translation || "").trim(),
-        en: String(sense?.en || sense?.definition || "").trim(),
-        when: String(sense?.when || sense?.usage || "").trim()
-      }))
-      .filter((sense) => sense.zh || sense.en)
-      .slice(0, 3);
-    const keyWords = (Array.isArray(raw.keyWords) ? raw.keyWords : [])
-      .map((item) => ({
-        word: String(item?.word || "").trim(),
-        pos: posAbbr(item?.pos),
-        gloss: String(item?.gloss || item?.zh || "").trim(),
-        why: String(item?.why || "").trim()
-      }))
-      .filter((item) => item.word && chunk.includes(item.word.toLowerCase()))
-      .slice(0, 2);
-    const example = (value) => {
-      if (!value || (!value.en && !value.zh)) return null;
-      return { en: String(value.en || "").trim(), zh: String(value.zh || "").trim() };
-    };
-    const slots = (Array.isArray(raw.slots) ? raw.slots : [])
-      .map((item) => ({
-        slot: String(item?.slot || "").trim(),
-        role: String(item?.role || item?.why || "").trim(),
-        example: example(item?.example)
-      }))
-      .filter((item) => item.slot)
-      .slice(0, 3);
-    const variants = (Array.isArray(raw.variants) ? raw.variants : [])
-      .map((item) => ({
-        form: String(item?.form || "").trim(),
-        example: example(item?.example)
-      }))
-      .filter((item) => item.form)
-      .slice(0, 3);
-    const origin = raw.origin && (raw.origin.story || raw.origin.era)
-      ? { story: String(raw.origin.story || "").trim(), era: String(raw.origin.era || "").trim() }
-      : null;
-    return {
-      kind: "chunk",
-      chunk,
-      form,
-      phonetic: String(raw.phonetic || "").trim(),
-      translation: String(raw.translation || senses[0]?.zh || "").trim(),
-      short: String(raw.short || senses[0]?.en || "").trim(),
-      register: String(raw.register || "neutral").trim(),
-      note: String(raw.note || "").trim(),
-      senses,
-      keyWords,
-      slots,
-      variants,
-      origin,
-      examples: normalizeExamples(raw.examples).slice(0, 4),
-      cached: Boolean(raw.cached),
-      source: raw.source || ""
-    };
-  }
-
-  const ANCHOR_TYPES = { s: "sentence", c: "chunk", w: "word" };
-
-  /* The reverse reply arrives as prose with <s>/<c>/<w> anchors followed by a
-     json:cards block. This splitter is pure so the stream can call it on every
-     delta without touching the DOM. */
-  /* Reverse replies are plain Markdown with [[expression]] anchors. The
-     renderer runs on every streamed frame, so it has to be cheap and it has to
-     tolerate a half-written [[ at the tail. */
-  const REVERSE_ANCHOR_RE = /\[\[([^\n]{1,140}?)\]\]/g;
-
-  function reverseAnchorWords(text) {
-    return String(text || "").trim().split(/\s+/).filter(Boolean).length;
-  }
-
-  function stripReverseAnchors(text) {
-    return String(text || "").replace(REVERSE_ANCHOR_RE, "$1");
-  }
-
-  function inlineMarkup(text) {
-    const slots = [];
-    const working = String(text || "").replace(REVERSE_ANCHOR_RE, (_match, expression) => {
-      const index = slots.push(String(expression).trim()) - 1;
-      return `\u0000${index}\u0000`;
-    });
-    let html = esc(working);
-    html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
-    html = html.replace(/`([^`\n]+)`/g, "<code>$1</code>");
-    html = html.replace(/\u0000(\d+)\u0000/g, (_match, index) => {
-      const expression = slots[Number(index)] || "";
-      const cls = reverseAnchorWords(expression) <= 2 ? "is-word" : "is-phrase";
-      return `<span class="rev-anchor ${cls}" role="button" tabindex="0" data-action="reverse-anchor" data-text="${attr(expression)}">${esc(expression)}</span>`;
-    });
-    return html;
-  }
-
-  function ensureMarkdownAnchors(source) {
-    const englishSentence = (text) => {
-      const value = String(text || "").trim();
-      if (value.length < 8 || /[\u4e00-\u9fff]/.test(value)) return "";
-      const words = value.split(/\s+/).filter(Boolean);
-      if (words.length < 3 || !/^[A-Za-z"'“(]/.test(value)) return "";
-      return value;
-    };
-    return String(source || "").split("\n").map((line) => {
-      if (line.includes("[[") || /^\s*#{1,4}\s/.test(line)) return line;
-      const pair = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n—–]{1,90}?)(\s+[—–]\s+)(.+)$/);
-      if (pair) return `${pair[1]}[[${pair[2].trim()}]]${pair[3]}${pair[4]}`;
-      const solo = line.match(/^(\s*[-*]\s+)([A-Za-z][^\n]{1,140}?[.!?])\s*$/);
-      if (solo) return `${solo[1]}[[${solo[2].trim()}]]`;
-      const quote = line.match(/^(\s*>\s*)(.+)$/);
-      if (quote) {
-        const body = englishSentence(quote[2]);
-        return body ? `${quote[1]}[[${body}]]` : line;
-      }
-      const plain = englishSentence(line);
-      return plain ? `[[${plain}]]` : line;
-    }).join("\n");
-  }
-
-  function markdownLite(source, final = true) {
-    let text = String(source || "").replace(/\r\n/g, "\n");
-    if (final) text = ensureMarkdownAnchors(text);
-    if (!final) {
-      const open = text.lastIndexOf("[[");
-      if (open !== -1 && text.indexOf("]]", open) === -1) text = text.slice(0, open);
-    }
-    const out = [];
-    let paragraph = [];
-    let quote = [];
-    let list = "";
-    let listItems = [];
-    let code = null;
-
-    const flushParagraph = () => {
-      if (!paragraph.length) return;
-      out.push(`<p>${paragraph.join("<br>")}</p>`);
-      paragraph = [];
-    };
-    const flushQuote = () => {
-      if (!quote.length) return;
-      out.push(`<blockquote>${quote.map((line) => `<p>${line}</p>`).join("")}</blockquote>`);
-      quote = [];
-    };
-    const flushList = () => {
-      if (!list) return;
-      out.push(`<${list}>${listItems.join("")}</${list}>`);
-      list = "";
-      listItems = [];
-    };
-
-    for (const raw of text.split("\n")) {
-      const line = raw.replace(/\s+$/, "");
-      if (/^```/.test(line)) {
-        flushParagraph(); flushQuote(); flushList();
-        if (code === null) code = [];
-        else { out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`); code = null; }
-        continue;
-      }
-      if (code !== null) { code.push(raw); continue; }
-      if (!line.trim()) { flushParagraph(); flushQuote(); flushList(); continue; }
-      if (/^ {0,3}([-*_])(?: *\1){2,} *$/.test(line)) {
-        flushParagraph(); flushQuote(); flushList();
-        out.push('<hr class="rev-rule">');
-        continue;
-      }
-      const heading = line.match(/^(#{1,4})\s+(.*)$/);
-      if (heading) {
-        flushParagraph(); flushQuote(); flushList();
-        const level = Math.min(6, heading[1].length + 2);
-        out.push(`<h${level}>${inlineMarkup(heading[2])}</h${level}>`);
-        continue;
-      }
-      const quoted = line.match(/^>\s?(.*)$/);
-      if (quoted) {
-        flushParagraph(); flushList();
-        quote.push(inlineMarkup(quoted[1]));
-        continue;
-      }
-      const bullets = line.match(/^[-*]\s+(.*)$/);
-      if (bullets) {
-        flushParagraph(); flushQuote();
-        if (list !== "ul") { flushList(); list = "ul"; }
-        listItems.push(`<li>${inlineMarkup(bullets[1])}</li>`);
-        continue;
-      }
-      const numbered = line.match(/^\d+[.)]\s+(.*)$/);
-      if (numbered) {
-        flushParagraph(); flushQuote();
-        if (list !== "ol") { flushList(); list = "ol"; }
-        listItems.push(`<li>${inlineMarkup(numbered[1])}</li>`);
-        continue;
-      }
-      flushList(); flushQuote();
-      paragraph.push(inlineMarkup(line));
-    }
-    if (code !== null) out.push(`<pre><code>${esc(code.join("\n"))}</code></pre>`);
-    flushParagraph(); flushQuote(); flushList();
-    return out.join("");
-  }
-
-  function ensureWord(raw) {
-    if (!raw) return null;
-    const senses = Array.isArray(raw.senses) && raw.senses.length
-      ? raw.senses.map((sense) => ({
-          en: String(sense.en || sense.definition || sense.meaning || ""),
-          zh: String(sense.zh || sense.translation || ""),
-          tag: String(sense.tag || "")
-        }))
-      : [{ en: String(raw.short || raw.definition || ""), zh: String(raw.translation || ""), tag: "" }];
-    const posGroups = normalizePosGroups(raw.posGroups, raw.pos || raw.partOfSpeech, senses);
-    const mainGroup = posGroups[0] || { pos: "", senses };
-    const mainSenses = mainGroup.senses.length ? mainGroup.senses : senses;
-
-    return {
-      ...raw,
-      word: String(raw.word || ""),
-      phonetic: String(raw.phonetic || raw.ipa || ""),
-      pos: String(raw.pos || raw.partOfSpeech || mainGroup.pos || ""),
-      level: String(raw.level || "—"),
-      register: String(raw.register || "common"),
-      short: String(raw.short || mainSenses[0]?.en || ""),
-      translation: String(raw.translation || mainSenses[0]?.zh || ""),
-      note: String(raw.note || ""),
-      senses: mainSenses,
-      posGroups,
-      family: normalizeRelations(raw.family || raw.derivatives),
-      synonyms: normalizeRelations(raw.synonyms),
-      antonyms: normalizeRelations(raw.antonyms),
-      examples: normalizeExamples(raw.examples),
-      examplesByTheme: normalizeExamplesByTheme(raw.examplesByTheme || raw.examples_by_theme),
-      collocations: normalizeStrings(raw.collocations),
-      related: normalizeStrings(raw.related),
-      origin: normalizeOrigin(raw.origin || raw.etymology),
-      spelling: normalizeSpelling(raw.spelling, raw.word),
-      source: raw.source || "demo",
-      cached: Boolean(raw.cached),
-      model: raw.model || ""
-    };
-  }
 
   function spellingBanner(spelling) {
     return `
@@ -4887,199 +4224,6 @@
   /* ============================================================
      Sentence page
      ============================================================ */
-
-  const STRUCTURE_KINDS = ["main", "clause", "phrase", "modifier"];
-
-  /* The sentence tree is model-authored. The client only normalises it so a
-     partial or malformed tree still renders, and so a future node kind can be
-     added without breaking old data. */
-  function normalizeStructureNodes(value, depth = 0, out = { count: 0 }) {
-    if (!Array.isArray(value) || depth > 4) return [];
-    return value.map((node, index) => {
-      if (!node || typeof node !== "object") return null;
-      const text = String(node.text || node.en || "").trim();
-      if (!text) return null;
-      out.count += 1;
-      const kind = STRUCTURE_KINDS.includes(node.kind) ? node.kind : (depth === 0 ? "main" : "clause");
-      const children = normalizeStructureNodes(node.children || node.items, depth + 1, out);
-      return {
-        id: String(node.id || `n${depth}-${index}`),
-        kind,
-        depth,
-        anchor: String(node.anchor || node.attachAfter || "").trim(),
-        label: String(node.label || node.role || "").trim(),
-        text,
-        role: String(node.role || node.function || "").trim(),
-        gloss: String(node.gloss || node.meaningZh || node.zh || "").trim(),
-        note: String(node.note || node.explain || "").trim(),
-        children
-      };
-    }).filter(Boolean);
-  }
-
-  function normalizeStructureTree(value) {
-    if (!value) return [];
-    if (Array.isArray(value)) return normalizeStructureNodes(value);
-    if (typeof value !== "object") return [];
-    const nodes = value.tree || value.nodes || value.root;
-    if (Array.isArray(nodes)) return normalizeStructureNodes(nodes);
-    if (nodes && typeof nodes === "object") return normalizeStructureNodes([nodes]);
-    return [];
-  }
-
-  function splitSentences(text) {
-    const value = String(text || "").replace(/\s+/g, " ").trim();
-    if (!value) return [];
-    const ABBR = /^(mr|mrs|ms|dr|prof|st|jr|sr|vs|etc|e\.g|i\.e|fig|no|approx|dept|est|al)$/i;
-    const edges = /[.!?。！？…]["”’')」』]?$/;
-    const mergePiece = (prev, next) => {
-      if (!prev) return next;
-      const bare = prev.replace(/[)"”’」』]+$/, "");
-      const lastWord = (bare.split(/[\s(]/).pop() || "").replace(/\.$/, "");
-      if (ABBR.test(lastWord)) return `${prev} ${next}`;
-      if (/^[A-Z]$/.test(lastWord)) return `${prev} ${next}`;
-      if (!edges.test(bare)) return `${prev} ${next}`;
-      return null;
-    };
-    const collect = (input) => {
-      const out = [];
-      try {
-        if (typeof Intl !== "undefined" && Intl.Segmenter) {
-          const segmenter = new Intl.Segmenter("en", { granularity: "sentence" });
-          return [...segmenter.segment(input)].map((item) => item.segment.trim()).filter(Boolean);
-        }
-      } catch (_) { /* fall through to the regex */ }
-      return input.split(/(?<=[.!?。！？…])\s+|(?<=[。！？])/).map((item) => item.trim()).filter(Boolean);
-    };
-    const merged = [];
-    collect(value).forEach((piece) => {
-      if (!merged.length) { merged.push(piece); return; }
-      const joined = mergePiece(merged[merged.length - 1], piece);
-      if (joined) merged[merged.length - 1] = joined;
-      else merged.push(piece);
-    });
-    return merged.map((item) => item.trim()).filter(Boolean).slice(0, 8);
-  }
-
-  function normalizeSentenceParts(value) {
-    if (!Array.isArray(value)) return [];
-    return value.map((part) => {
-      const text = String(part?.text || part?.sentence || "").trim();
-      const index = Number.isInteger(part?.index) ? part.index : null;
-      if (!text && index === null) return null;
-      return {
-        text,
-        index,
-        translation: String(part.translation || "").trim(),
-        summary: String(part.summary || "").trim(),
-        tree: normalizeStructureTree(part.tree || part.structure),
-        segments: normalizeSegments(part.segments, text),
-        orderNote: String(part.orderNote || part.order_note || "").trim(),
-        contrast: normalizeContrast(part.contrast),
-        keyWords: normalizeKeyWords(part.keyWords || part.key_words || part.words)
-      };
-    }).filter(Boolean);
-  }
-
-  const SEGMENT_ROLES = ["theme", "rheme", "focus", "modifier"];
-  const SEGMENT_ROLE_LABELS = { theme: "起点", rheme: "推进", focus: "焦点", modifier: "背景" };
-
-  function normalizeContrast(value) {
-    if (!value || typeof value !== "object" || !value.text) return null;
-    return {
-      label: String(value.label || "结构对照").trim(),
-      text: String(value.text).trim(),
-      zh: String(value.zh || "").trim()
-    };
-  }
-
-  function normalizeSegments(value, text = "") {
-    const source = String(text || "").trim();
-    if (!Array.isArray(value) || !source) return [];
-    const items = value.map((item) => ({
-      text: String(item?.text ?? ""),
-      role: SEGMENT_ROLES.includes(item?.role) ? item.role : "rheme",
-      gloss: String(item?.gloss || "").trim(),
-      chunk: String(item?.chunk || "").trim()
-    })).filter((item) => item.text.trim());
-    // A one-word function segment ("was", "is", "of") makes a stub of a rule;
-    // fold it into its neighbour so the tray always carries a phrase.
-    const LONE_FUNCTION = /^(is|am|are|was|were|be|been|being|do|does|did|has|have|had|will|would|can|could|may|might|must|shall|should|of|to|in|on|at|by|for|with|and|but|or|so|that|which|who)$/i;
-    for (let index = items.length - 1; index >= 0; index -= 1) {
-      const item = items[index];
-      if (!LONE_FUNCTION.test(String(item.text).trim())) continue;
-      if (index > 0) {
-        items[index - 1].text += item.text;
-        items.splice(index, 1);
-      } else if (items.length > 1) {
-        items[1].text = item.text + items[1].text;
-        items.splice(0, 1);
-      }
-    }
-    if (items.length < 1 || items.length > 6) return [];
-    const squeeze = (value) => String(value).replace(/\s+/g, " ").replace(/\s+([,.;:!?])/g, "$1").trim();
-    const tail = (source.match(/[.!?…]+$/) || [""])[0];
-    const body = tail ? source.slice(0, -tail.length) : source;
-    const joined = squeeze(items.map((item) => item.text).join(""));
-    if (joined === squeeze(source)) return items;
-    if (joined !== squeeze(body)) return [];
-    if (tail) items[items.length - 1].text += tail;
-    return items;
-  }
-
-  function alignSentenceParts(parts, pieces) {
-    if (!pieces.length) return parts;
-    const byText = new Map();
-    parts.forEach((part, index) => {
-      const key = normalizeWord(part.text);
-      if (key && !byText.has(key)) byText.set(key, part);
-      if (index < pieces.length && !byText.has(normalizeWord(pieces[index]))) byText.set(normalizeWord(pieces[index]), part);
-    });
-    return pieces.map((text, index) => {
-      const key = normalizeWord(text);
-      const hit = byText.get(key)
-        || parts.find((part) => part.index === index || part.index === index + 1)
-        || parts[index]
-        || null;
-      const matches = hit && (!hit.text || normalizeWord(hit.text) === key);
-      return {
-        text,
-        translation: matches ? hit.translation || "" : "",
-        summary: matches ? hit.summary || "" : "",
-        tree: matches ? hit.tree || [] : [],
-        segments: matches ? hit.segments || [] : [],
-        orderNote: matches ? hit.orderNote || "" : "",
-        contrast: matches ? hit.contrast || null : null,
-        keyWords: matches ? hit.keyWords || [] : [],
-        incomplete: Boolean(hit && !matches)
-      };
-    });
-  }
-
-  function ensureSentence(raw) {
-    if (!raw) return null;
-    const keyWords = normalizeKeyWords(raw.keyWords || raw.key_words || raw.words);
-    if (!keyWords.length) return null;
-    return {
-      ...raw,
-      id: String(raw.id || `model-${Date.now()}`),
-      text: String(raw.text || raw.sentence || ""),
-      translation: String(raw.translation || ""),
-      tone: String(raw.tone || ""),
-      structure: String(raw.structure || ""),
-      source: String(raw.source || "Talk demo corpus"),
-      summary: String(raw.summary || raw.gist || "").trim(),
-      syntax: String(raw.syntax || "").trim(),
-      segments: normalizeSegments(raw.segments, String(raw.text || raw.sentence || "")),
-      orderNote: String(raw.orderNote || raw.order_note || "").trim(),
-      contrast: normalizeContrast(raw.contrast),
-      tree: normalizeStructureTree(raw.tree || raw.structureTree || (raw.structure && raw.structure.tree)),
-      sentences: normalizeSentenceParts(raw.sentences || raw.parts),
-      keyWords,
-      sourceType: raw.sourceType || raw.source || "demo",
-      model: raw.model || ""
-    };
-  }
 
   function treeKindLabel(kind) {
     return ({ main: "主干", clause: "从句", phrase: "短语", modifier: "修饰" })[kind] || "结构";
@@ -6579,14 +5723,6 @@
       || profiles[0];
   }
 
-  function secureRemoteUrl(url) {
-    const value = String(url || "");
-    if (location.protocol === "https:" && /^http:\/\//i.test(value)) {
-      return value.replace(/^http:\/\//i, "https://");
-    }
-    return value;
-  }
-
   function qwenTtsEndpoint(profile, model = state.settings?.qwenTtsModel) {
     const base = String(profile?.baseUrl || "").trim();
     if (!base) return "";
@@ -7919,43 +7055,6 @@
     return { type: "sentence", data };
   }
 
-  function partialJsonString(text, key) {
-    const pattern = new RegExp(`"${key}"\\s*:\\s*"((?:\\\\.|[^"\\\\])*)"`);
-    const match = String(text || "").match(pattern);
-    if (!match) return "";
-    try { return JSON.parse(`"${match[1]}"`); } catch (_) { return ""; }
-  }
-
-  function streamPreviewFromJson(text, type, query) {
-    if (type === "reverse") {
-      let clean = String(text || "").replace(/```[\s\S]*$/, "");
-      const open = clean.lastIndexOf("[[");
-      if (open !== -1 && clean.indexOf("]]", open) === -1) clean = clean.slice(0, open);
-      clean = clean.trim();
-      if (!clean) return null;
-      return { kind: "reverse", narrative: clean, received: String(text).length };
-    }
-    if (type === "chunk") return null;
-    if (type === "sentence") {
-      const translation = partialJsonString(text, "translation");
-      const tone = partialJsonString(text, "tone");
-      const structure = partialJsonString(text, "structure");
-      if (!translation && !tone && !structure) return null;
-      return { kind: "sentence", text: query, translation, tone, structure, received: String(text).length };
-    }
-    const word = partialJsonString(text, "word") || query;
-    const phonetic = partialJsonString(text, "phonetic");
-    const translation = partialJsonString(text, "translation");
-    const short = partialJsonString(text, "short");
-    const pos = partialJsonString(text, "pos");
-    const senses = Array.from(String(text).matchAll(/"zh"\s*:\s*"((?:\\.|[^"\\])*)"/g))
-      .map((match) => { try { return JSON.parse(`"${match[1]}"`); } catch (_) { return ""; } })
-      .filter(Boolean)
-      .slice(0, 3);
-    if (!word && !translation && !short && !senses.length) return null;
-    return { kind: "word", word, phonetic, translation, short, pos, senses, received: String(text).length };
-  }
-
   function tossWrongPreview(host, wrongWord, targetWord) {
     if (!host) return;
     const skeleton = $(".skeleton-stack");
@@ -8022,289 +7121,6 @@
       ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理第一段…</p>`}
       ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}
       ${(preview.senses || []).length ? `<ul class="live-preview-senses">${preview.senses.map((sense) => `<li>${esc(shorten(sense, 42))}</li>`).join("")}</ul>` : ""}`;
-  }
-
-  function unwrapModel(raw) {
-    if (!raw || typeof raw !== "object") return {};
-    if (raw.data && typeof raw.data === "object") return raw.data;
-    if (raw.result && typeof raw.result === "object") return raw.result;
-    return raw;
-  }
-
-  function normalizeModelWord(raw, fallbackWord) {
-    const base = unwrapModel(raw);
-    const senses = normalizeSenses(base.senses);
-    const posGroups = normalizePosGroups(base.posGroups, base.pos || base.partOfSpeech, senses);
-    const mainGroup = posGroups[0] || { pos: "", senses };
-    const mainSenses = mainGroup.senses.length ? mainGroup.senses : senses;
-    const first = mainSenses[0] || {};
-    const word = String(base.word || base.headword || fallbackWord || "").trim().toLowerCase();
-    if (!word) throw new Error("模型返回的内容里没有词头。");
-    const result = {
-      word,
-      phonetic: String(base.phonetic || base.ipa || ""),
-      pos: String(base.pos || base.partOfSpeech || mainGroup.pos || ""),
-      level: String(base.level || "—"),
-      register: String(base.register || "common"),
-      short: String(base.short || base.definition || first.en || ""),
-      translation: String(base.translation || first.zh || ""),
-      note: String(base.note || base.usageNote || ""),
-      senses: mainSenses.length ? mainSenses : [{ en: String(base.definition || ""), zh: String(base.translation || ""), tag: "" }],
-      posGroups,
-      family: normalizeRelations(base.family || base.derivatives),
-      synonyms: normalizeRelations(base.synonyms),
-      antonyms: normalizeRelations(base.antonyms),
-      examples: normalizeExamples(base.examples),
-      examplesByTheme: normalizeExamplesByTheme(base.examplesByTheme || base.examples_by_theme),
-      collocations: normalizeStrings(base.collocations),
-      memory: String(base.memory || base.memoryHook || ""),
-      related: normalizeStrings(base.related),
-      origin: normalizeOrigin(base.origin || base.etymology),
-      spelling: normalizeSpelling(base.spelling || base.correction, base.word || fallbackWord)
-    };
-    if (result.spelling?.corrected) result.word = normalizeWord(result.spelling.corrected);
-    if (!result.short) result.short = "";
-    return result;
-  }
-
-  function normalizeModelSentence(raw, fallbackSentence) {
-    const base = unwrapModel(raw);
-    const text = String(base.text || base.sentence || fallbackSentence || "").trim();
-    let keyWords = normalizeKeyWords(base.keyWords || base.key_words || base.words);
-    const sentences = normalizeSentenceParts(base.sentences || base.parts);
-    if (sentences.length) {
-      const bySentence = new Map();
-      keyWords.forEach((item) => {
-        const index = Number(item.sentenceIndex) || 0;
-        if (!index) return;
-        if (!bySentence.has(index)) bySentence.set(index, []);
-        bySentence.get(index).push(item);
-      });
-      sentences.forEach((part, index) => {
-        if (!part.keyWords?.length) part.keyWords = bySentence.get(index + 1) || bySentence.get(part.index || -1) || [];
-      });
-    }
-    if (!keyWords.length && sentences.length) {
-      const seen = new Set();
-      keyWords = sentences.flatMap((part, index) => part.keyWords.map((item) => ({ ...item, sentenceIndex: index })))
-        .filter((item) => {
-          const key = `${normalizeWord(item.word)}:${item.sentenceIndex}`;
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
-        })
-        .slice(0, 12);
-    }
-    if (!text) throw new Error("模型返回的内容里没有原句。");
-    const joinedTranslation = sentences.map((part) => part.translation).filter(Boolean).join(" ");
-    // A sentence with no key words is still a valid page (short or plain
-    // sentences happen); only a missing sentence is fatal.
-    return {
-      id: `model-${Date.now()}`,
-      text,
-      translation: String(base.translation || joinedTranslation || ""),
-      tone: String(base.tone || ""),
-      structure: typeof base.structure === "string" ? base.structure : String(base.structure?.note || ""),
-      summary: String(base.summary || base.gist || "").trim(),
-      syntax: String(base.syntax || "").trim(),
-      segments: normalizeSegments(base.segments, text),
-      orderNote: String(base.orderNote || base.order_note || "").trim(),
-      contrast: normalizeContrast(base.contrast),
-      tree: normalizeStructureTree(base.tree || base.structureTree || (base.structure && base.structure.tree)),
-      sentences,
-      keyWords,
-      source: "语境分析",
-      sourceType: "model"
-    };
-  }
-
-
-  const PROTECTED_SPELLING = new Set([
-    "google", "standard", "apple", "amazon", "microsoft", "openai", "qwen",
-    "deepseek", "github", "android", "iphone", "chatgpt", "twitter", "youtube"
-  ]);
-
-  function normalizeSpelling(value, fallbackWord = "") {
-    if (!value || typeof value !== "object") return null;
-    const input = String(value.input || value.query || "").trim();
-    const corrected = String(value.corrected || value.correction || value.word || fallbackWord || "").trim();
-    if (!input || !corrected) return null;
-    // Multi-word input is a phrase/idiom, never a spelling mistake.
-    if (/\s/.test(input.trim())) return null;
-    const changed = value.changed !== undefined
-      ? Boolean(value.changed)
-      : normalizeWord(input) !== normalizeWord(corrected);
-    const inputKey = normalizeWord(input);
-    if (!changed || inputKey === normalizeWord(corrected)) return null;
-    const confidence = Number(value.confidence || 0);
-    if (PROTECTED_SPELLING.has(inputKey)) return null;
-    return {
-      input,
-      corrected,
-      confidence,
-      note: String(value.note || value.reason || "").trim()
-    };
-  }
-
-  function localizeTimelineWhen(value) {
-    const text = String(value || "").trim();
-    if (!text || /[\u3400-\u9fff]/.test(text)) return text;
-    const lower = text.toLowerCase().replace(/[._-]+/g, " ").replace(/\s+/g, " ").trim();
-    const map = {
-      "old english": "古英语时期",
-      "middle english": "中古英语时期",
-      "early modern english": "早期现代英语",
-      "modern english": "现代英语",
-      "ancient greek": "古希腊时期",
-      "latin": "拉丁语时期",
-      "old norse": "古诺斯语时期",
-      "proto germanic": "原始日耳曼语时期",
-      "today": "今天",
-      "present": "今天",
-      "now": "今天"
-    };
-    if (map[lower]) return map[lower];
-    let match = lower.match(/^(early|mid|late)?\s*(?:the\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+century$/);
-    if (match) {
-      const prefix = match[1] === "early" ? "早期" : match[1] === "mid" ? "中期" : match[1] === "late" ? "晚期" : "";
-      return `${match[2]} 世纪${prefix}`;
-    }
-    match = lower.match(/^(?:c\.?\s*)?(\d{3,4})$/);
-    if (match) return `${match[1]} 年`;
-    match = lower.match(/^(?:before|prior to)\s+(\d{3,4})$/);
-    if (match) return `${match[1]} 年以前`;
-    match = lower.match(/^(\d{3,4})\s*[-–—]\s*(\d{3,4})$/);
-    if (match) return `${match[1]}–${match[2]} 年`;
-    return text;
-  }
-
-  function normalizeOrigin(value) {
-    if (!value || typeof value !== "object") return null;
-    const stages = asArray(value.stages).map((stage) => ({
-      when: localizeTimelineWhen(stage.when || stage.time || stage.period || ""),
-      label: String(stage.label || stage.title || ""),
-      text: String(stage.text || stage.description || "")
-    })).filter((stage) => stage.when || stage.text);
-    const origin = {
-      root: String(value.root || value.rootWord || ""),
-      original: String(value.original || value.originalMeaning || ""),
-      story: String(value.story || value.etymology || ""),
-      stages
-    };
-    return origin.root || origin.story || origin.original || stages.length ? origin : null;
-  }
-
-  function normalizeSenses(value) {
-    return asArray(value).map((item) => {
-      if (typeof item === "string") return { en: item, zh: "", tag: "" };
-      return {
-        en: String(item.en || item.definition || item.meaning || ""),
-        zh: String(item.zh || item.translation || item.meaningZh || ""),
-        tag: String(item.tag || item.label || "")
-      };
-    }).filter((item) => item.en || item.zh);
-  }
-
-  function normalizePosGroups(value, fallbackPos, fallbackSenses) {
-    const groups = asArray(value).map((item) => {
-      if (!item || typeof item !== "object") return null;
-      const senses = normalizeSenses(item.senses || item.meanings || item.definitions);
-      if (!senses.length) return null;
-      return {
-        pos: String(item.pos || item.partOfSpeech || "").trim().toLowerCase(),
-        senses
-      };
-    }).filter(Boolean);
-    if (!groups.length) {
-      groups.push({ pos: String(fallbackPos || "").trim().toLowerCase(), senses: fallbackSenses });
-    }
-    const wanted = String(fallbackPos || "").trim().toLowerCase();
-    const mainIndex = groups.findIndex((group) => group.pos === wanted);
-    if (mainIndex > 0) {
-      const [main] = groups.splice(mainIndex, 1);
-      groups.unshift(main);
-    }
-    return groups;
-  }
-
-  function normalizeKeyWords(value) {
-    return asArray(value).map((item) => {
-      if (typeof item === "string") {
-        return {
-          word: item,
-          surface: item,
-          phonetic: "",
-          pos: "",
-          meaning: "",
-          why: "",
-          level: "",
-          sentenceIndex: 0,
-          family: [],
-          synonyms: [],
-          antonyms: [],
-          example: null,
-          externalExample: null
-        };
-      }
-      const word = String(item.word || item.term || item.surface || "").trim();
-      const exampleRaw = item.example || item.examples;
-      const example = Array.isArray(exampleRaw) ? exampleRaw[0] : exampleRaw;
-      return {
-        word,
-        surface: String(item.surface || item.text || word),
-        phonetic: String(item.phonetic || item.ipa || ""),
-        pos: String(item.pos || item.partOfSpeech || ""),
-        meaning: String(item.meaning || item.definition || item.meaningInContext || ""),
-        meaningZh: String(item.meaningZh || item.meaning_zh || item.zh || ""),
-        why: String(item.why || item.whyItMatters || item.nuance || ""),
-        level: String(item.level || item.stage || "").trim().toLowerCase(),
-        sentenceIndex: Number.isFinite(Number(item.sentenceIndex)) ? Number(item.sentenceIndex) : 0,
-        family: normalizeRelations(item.family || item.derivatives),
-        synonyms: normalizeRelations(item.synonyms),
-        antonyms: normalizeRelations(item.antonyms),
-        example: normalizeExample(example),
-        externalExample: normalizeExample(item.externalExample || item.outsideExample || item.extraExample)
-      };
-    }).filter((item) => item.word);
-  }
-
-  function normalizeRelations(value) {
-    return asArray(value).map((item) => {
-      if (typeof item === "string") return { word: item, pos: "", gloss: "" };
-      return {
-        word: String(item.word || item.term || item.text || ""),
-        pos: posAbbr(item.pos || item.partOfSpeech || ""),
-        gloss: String(item.gloss || item.meaning || item.definition || item.nuance || ""),
-        zh: String(item.zh || item.glossZh || item.meaningZh || item.translation || "")
-      };
-    }).filter((item) => item.word);
-  }
-
-  function normalizeExamples(value) {
-    return asArray(value).map((item) => normalizeExample(item)).filter((item) => item?.en);
-  }
-
-  function normalizeExample(item) {
-    if (!item) return null;
-    if (typeof item === "string") return { en: item, zh: "", source: "" };
-    return {
-      en: String(item.en || item.sentence || item.text || item.example || ""),
-      zh: String(item.zh || item.translation || ""),
-      source: String(item.source || "")
-    };
-  }
-
-  function normalizeStrings(value) {
-    return asArray(value).map((item) => {
-      if (typeof item === "string") return item;
-      return String(item.word || item.text || item.value || "");
-    }).filter(Boolean);
-  }
-
-  function asArray(value) {
-    if (Array.isArray(value)) return value;
-    if (value == null) return [];
-    return [value];
   }
 
   /* ============================================================
@@ -10362,36 +9178,6 @@
         : `Qwen 语音失败，已回退系统语音：${lastTtsError || "未知错误"}`;
     }
     refreshTtsError();
-  }
-
-  async function copyText(text) {
-    const value = String(text ?? "");
-    if (!value) return false;
-    try {
-      if (window.isSecureContext && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-        return true;
-      }
-    } catch (_) {
-      // Fall through to the selection fallback (HTTP LAN preview, etc.).
-    }
-    try {
-      const area = document.createElement("textarea");
-      area.value = value;
-      area.setAttribute("readonly", "");
-      area.style.position = "fixed";
-      area.style.left = "-9999px";
-      area.style.top = "0";
-      document.body.appendChild(area);
-      area.focus({ preventScroll: true });
-      area.select();
-      area.setSelectionRange(0, area.value.length);
-      const copied = document.execCommand("copy");
-      area.remove();
-      return Boolean(copied);
-    } catch (_) {
-      return false;
-    }
   }
 
   async function copyCurrentPage() {
