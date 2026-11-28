@@ -249,6 +249,68 @@ suite("ui stability · bug & twitch regressions", { timeout: 60_000 }, (s) => {
     t.expect(page.errors).toEqual([]);
   });
 
+  s.test("display headwords reserve descender clearance above phonetic subrow across chunk, word, and nested drawer", async (state, t) => {
+    state.env.server.mock.on({ task: "word", query: "take" }, { fixture: "word-take" });
+    const page = await state.env.newPage({ viewport: { width: 390, height: 844 } });
+    await page.open("/");
+
+    // 1) Chunk page (formerly 0px gap between .chunk-title and .word-subrow)
+    await page.fill("#search-input", "take off");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("chunk");
+    await page.waitForSelector(".chunk-title");
+
+    const chunkGeo = await page.evaluate(() => {
+      const h1 = document.querySelector(".chunk-title");
+      const sub = document.querySelector(".word-subrow");
+      const topStrong = document.querySelector(".topbar-context strong");
+      const hs = getComputedStyle(h1);
+      const ts = topStrong ? getComputedStyle(topStrong) : null;
+      return {
+        ratio: parseFloat(hs.lineHeight) / parseFloat(hs.fontSize),
+        gap: sub.getBoundingClientRect().top - h1.getBoundingClientRect().bottom,
+        topbarRatio: ts ? parseFloat(ts.lineHeight) / parseFloat(ts.fontSize) : 0
+      };
+    });
+    t.expect(chunkGeo.ratio).toBeGreaterThanOrEqual(1.18);
+    t.expect(chunkGeo.gap).toBeGreaterThanOrEqual(10);
+    t.expect(chunkGeo.topbarRatio).toBeGreaterThanOrEqual(1.3);
+
+    // 2) Secondary word drawer (.word-layer) opened from chunk keyeye
+    await page.locator(".keyeye").first().click();
+    await page.waitForSelector(".word-layer .word-title");
+    const layerGeo = await page.evaluate(() => {
+      const h1 = document.querySelector(".word-layer .word-title");
+      const sub = document.querySelector(".word-layer .word-subrow");
+      const hs = getComputedStyle(h1);
+      return {
+        ratio: parseFloat(hs.lineHeight) / parseFloat(hs.fontSize),
+        gap: sub.getBoundingClientRect().top - h1.getBoundingClientRect().bottom
+      };
+    });
+    t.expect(layerGeo.ratio).toBeGreaterThanOrEqual(1.16);
+    t.expect(layerGeo.gap).toBeGreaterThanOrEqual(10);
+
+    // 3) Main word page
+    await page.open("/");
+    await page.fill("#search-input", "serendipity");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("word");
+    await page.waitForSelector(".word-title");
+    const wordGeo = await page.evaluate(() => {
+      const h1 = document.querySelector(".word-title");
+      const sub = document.querySelector(".word-subrow");
+      const hs = getComputedStyle(h1);
+      return {
+        ratio: parseFloat(hs.lineHeight) / parseFloat(hs.fontSize),
+        gap: sub.getBoundingClientRect().top - h1.getBoundingClientRect().bottom
+      };
+    });
+    t.expect(wordGeo.ratio).toBeGreaterThanOrEqual(1.16);
+    t.expect(wordGeo.gap).toBeGreaterThanOrEqual(10);
+    t.expect(page.errors).toEqual([]);
+  });
+
   s.test("desktop word page and theme switch keep .screen scroll auto and 0 unrevealed above-fold blocks", async (state, t) => {
     const page = await state.env.newPage({
       viewport: { width: 1280, height: 800 },

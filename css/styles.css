@@ -25,6 +25,12 @@
   --display: var(--font);
   --sans: var(--font);
   --mono: "SF Mono", ui-monospace, "SFMono-Regular", "Roboto Mono", Menlo, Consolas, monospace;
+  /* Display headword metrics: keep editorial tightness while reserving full
+     ascender/descender room (g/j/p/q/y) across iOS, Android MiSans/Noto, and desktop fonts. */
+  --lh-display: 1.18;
+  --lh-display-phrase: 1.22;
+  --lh-ui-single: 1.38;
+  --hero-subrow-gap: 12px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
@@ -377,6 +383,7 @@ textarea:focus-visible,
   font-family: var(--sans);
   font-size: 17px;
   font-weight: 650;
+  line-height: var(--lh-ui-single);
   letter-spacing: -0.02em;
 }
 
@@ -907,7 +914,7 @@ textarea:focus-visible,
   font-family: var(--sans);
   font-size: 39px;
   font-weight: 800;
-  line-height: 0.98;
+  line-height: var(--lh-display);
   letter-spacing: -0.055em;
   color: var(--lime);
 }
@@ -1122,11 +1129,11 @@ textarea:focus-visible,
 }
 
 .word-title {
-  margin: 6px 0 10px;
+  margin: 6px 0 0;
   font-family: var(--sans);
   font-size: clamp(38px, 11vw, 50px);
   font-weight: 780;
-  line-height: 1.02;
+  line-height: var(--lh-display);
   letter-spacing: -0.055em;
   overflow-wrap: anywhere;
 }
@@ -1144,6 +1151,7 @@ textarea:focus-visible,
   align-items: center;
   flex-wrap: wrap;
   gap: 9px;
+  margin-top: var(--hero-subrow-gap);
 }
 
 .word-gloss {
@@ -2629,10 +2637,15 @@ textarea:focus-visible,
 
 .sheet-word-head {
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding-top: 4px;
+}
+
+.sheet-word-head > div {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .sheet-word {
@@ -2640,7 +2653,7 @@ textarea:focus-visible,
   font-family: var(--sans);
   font-size: 34px;
   font-weight: 780;
-  line-height: 1.05;
+  line-height: var(--lh-display-phrase);
   letter-spacing: -0.05em;
   overflow-wrap: anywhere;
 }
@@ -2650,7 +2663,7 @@ textarea:focus-visible,
   align-items: center;
   flex-wrap: wrap;
   gap: 7px;
-  margin-top: 8px;
+  margin-top: 10px;
 }
 
 .sheet-definition {
@@ -3021,7 +3034,7 @@ textarea:focus-visible,
   font-family: var(--sans);
   font-size: 15px;
   font-weight: 650;
-  line-height: 1.2;
+  line-height: var(--lh-ui-single);
 }
 
 .history-copy span {
@@ -7028,7 +7041,7 @@ html.motion-ready .reveal.is-in .reveal {
 .poster-lead {
   display: grid;
   grid-template-columns: 1fr auto;
-  gap: 3px 12px;
+  gap: 6px 12px;
   width: 100%;
   padding: 11px 0 13px;
   border: 0;
@@ -7053,7 +7066,7 @@ html.motion-ready .reveal.is-in .reveal {
   font-size: clamp(37px, 12vw, 56px);
   font-weight: 800;
   letter-spacing: -0.07em;
-  line-height: 0.92;
+  line-height: var(--lh-display);
 }
 
 .poster-lead-pos {
@@ -7113,7 +7126,7 @@ html.motion-ready .reveal.is-in .reveal {
   font-size: 23px;
   font-weight: 760;
   letter-spacing: -0.05em;
-  line-height: 1;
+  line-height: var(--lh-display-phrase);
   overflow-wrap: anywhere;
 }
 
@@ -8854,9 +8867,9 @@ html.motion-ready .reveal.reveal-soft.is-in {
    ============================================================ */
 
 .chunk-title {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   font-size: clamp(34px, 9.4vw, 56px);
-  line-height: 1.08;
+  line-height: var(--lh-display-phrase);
   letter-spacing: -0.02em;
   overflow-wrap: anywhere;
   text-wrap: balance;
