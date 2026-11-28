@@ -263,7 +263,7 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 ## 自动化测试
 
-`npm test` 运行 `tests/` 里的完整离线测试套件（单元测试 + Playwright 端到端，共 **15 组 62 例**）：静态站点与假模型同源（`tests/lib/server.mjs`），桩数据在 `tests/fixtures/`。覆盖统一模型传输层（OpenAI / Anthropic Claude / Gemini）、核心工具与数据归一化、SW 外壳与语法一致性、查词、意群、语境寻词、句子三视角切分、长文精读、词汇书库、缓存导入导出、分享图、离线降级、主题覆盖，以及设置四页签/幂等性/500 词条缓存耗时与词头排版几何回归。细节见 [TESTING.md](TESTING.md)。
+`npm test` 运行 `tests/` 里的完整离线测试套件（单元测试 + Playwright 端到端，共 **15 组 63 例**）：静态站点与假模型同源（`tests/lib/server.mjs`），桩数据在 `tests/fixtures/`。覆盖统一模型传输层（OpenAI / Anthropic Claude / Gemini）、核心工具与数据归一化、SW 外壳与文档同步校验、查词、意群、语境寻词、句子三视角切分、长文精读、词汇书库、缓存导入导出、分享图、离线降级、主题覆盖，以及设置四页签/幂等性/500 词条缓存耗时与词头排版几何回归。细节见 [TESTING.md](TESTING.md)。
 
 ## 手工验收清单
 

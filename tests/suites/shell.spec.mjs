@@ -96,4 +96,44 @@ suite("shell · build versions, SW precache & static integrity (unit)", { timeou
       execFileSync(process.execPath, ["--check", file], { stdio: "pipe" });
     }
   });
+
+  s.test("docs stay synchronized with README assets, themes, ESM submodules, and test suites", async (_state, t) => {
+    const readme = fs.readFileSync(path.join(ROOT, "README.md"), "utf8");
+    const arch = fs.readFileSync(path.join(ROOT, "docs/ARCHITECTURE.md"), "utf8");
+    const testing = fs.readFileSync(path.join(ROOT, "docs/TESTING.md"), "utf8");
+    const themeDoc = fs.readFileSync(path.join(ROOT, "THEME.md"), "utf8");
+    const themeJs = fs.readFileSync(path.join(ROOT, "js/theme.js"), "utf8");
+
+    // 1) Every local image & relative markdown link in README.md must exist on disk.
+    const readmeAssets = [
+      ...[...readme.matchAll(/src="([^"]+)"/g)].map((m) => m[1]),
+      ...[...readme.matchAll(/\]\(([^)"\s#]+)/g)].map((m) => m[1])
+    ].filter((u) => !/^https?:\/\//.test(u));
+    const missingAssets = readmeAssets.filter((rel) => !fs.existsSync(path.join(ROOT, rel)));
+    t.expect(missingAssets).toEqual([]);
+
+    // 2) Every theme registered in js/theme.js must be documented in README.md and THEME.md.
+    const themeIds = [...themeJs.matchAll(/\bid:\s*"([a-z0-9-]+)"/g)].map((m) => m[1]);
+    t.expect(themeIds.length).toBeGreaterThanOrEqual(7);
+    const missingThemes = [];
+    for (const id of themeIds) {
+      if (!themeDoc.includes(`\`${id}\``)) missingThemes.push(`THEME.md:${id}`);
+      const labelMatch = themeJs.match(new RegExp(`id:\\s*"${id}"[\\s\\S]{0,120}?label:\\s*"([^"]+)"`));
+      const label = labelMatch ? labelMatch[1] : id;
+      if (!readme.includes(label)) missingThemes.push(`README.md:${label}`);
+    }
+    t.expect(missingThemes).toEqual([]);
+
+    // 3) Every ESM submodule under js/*/*.js must be listed in docs/ARCHITECTURE.md.
+    const submodules = collectEsmSubmodules(ROOT).map((p) => path.basename(p));
+    const missingModules = submodules.filter((name) => !arch.includes(name));
+    t.expect(missingModules).toEqual([]);
+
+    // 4) Every test suite under tests/suites/*.spec.mjs must be listed in docs/TESTING.md.
+    const suiteFiles = fs
+      .readdirSync(path.join(ROOT, "tests/suites"))
+      .filter((name) => name.endsWith(".spec.mjs"));
+    const missingSuites = suiteFiles.filter((name) => !testing.includes(name));
+    t.expect(missingSuites).toEqual([]);
+  });
 });

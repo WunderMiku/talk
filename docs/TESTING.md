@@ -49,7 +49,7 @@ server.mock.requestsOf("word");   // 抓到的请求，用来断言"没有重复
 
 加一个场景 = 加一个 fixture，或在套件里用 `{ content: "..." }` 直接给字符串。
 
-## 套件（共 15 组 62 例）
+## 套件（共 15 组 63 例）
 
 | 套件 | 类型 | 覆盖 |
 | --- | --- | --- |
@@ -57,7 +57,7 @@ server.mock.requestsOf("word");   // 抓到的请求，用来断言"没有重复
 | `llm-client.spec.mjs` | 单元 | OpenAI 兼容 / Anthropic (Claude) / Google Gemini 协议、SSE 流式、重试与扩展思考 |
 | `reader-parser.spec.mjs` | 单元 | 长文解析、标题提取、SHA-1 hash 与 `registerParser` 扩展点 |
 | `wordbooks.spec.mjs` | 单元 | 多书库迁移、导入导出与 AI 零丢失分册不变式 |
-| `shell.spec.mjs` | 单元 | 构建号同步、`sw.js` 预缓存覆盖完整性与全量 JS 语法校验 |
+| `shell.spec.mjs` | 单元 | 构建号同步、`sw.js` 预缓存覆盖完整性、全量 JS 语法校验与文档同步防漂移校验 |
 | `word.spec.mjs` | E2E | 查词、义项与例句渲染、刷新命中缓存、嵌套词层、生成脚注 |
 | `chunk.spec.mjs` | E2E | 多词短语判为意群、全部区块渲染、刷新命中缓存 |
 | `sentence.spec.mjs` | E2E | 三视角切换（原句 / 意群切分 / 信息焦点）、行几何不变、点击意群与旧缓存降级 |
