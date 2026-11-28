@@ -72,6 +72,15 @@ import {
   ensureChunk,
   ensureSentence
 } from "./model/normalize.js";
+import {
+  isQwenProfile,
+  qwenTtsProfile,
+  qwenTtsEndpoint,
+  createTtsController
+} from "./features/tts.js";
+import { createShareController } from "./features/share.js";
+import { createThemeSalon } from "./features/theme-salon.js";
+import { createTranslatorView } from "./views/translator.js";
 
 (() => {
   "use strict";
@@ -421,10 +430,7 @@ import {
   const wordRequests = new Map();
   const wordPreviewListeners = new Map();
   let prefetchToken = 0;
-  let currentAudio = null;
-  let ttsAudio = null;
   let suppressNextPopstate = false;
-  const SILENT_AUDIO = "data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YaAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
   let activeViewTransition = null;
   let queuedRender = null;
@@ -451,7 +457,7 @@ import {
     module: "dictionary",
     translatorSeq: 0,
     translatorMode: "auto",
-    translatorStyles: [],
+    translatorStyles: (CONTENT.translator?.styles || []).map((style) => style.id),
     workspaceOpen: false,
     themeDeck: null,
     themeDecks: [],
@@ -466,6 +472,83 @@ import {
     moodOffset: 0,
     installPrompt: null
   };
+
+  const tts = createTtsController({
+    state,
+    usableApiKey,
+    toast
+  });
+  const { stopSpeech, getAudioStats, clearAudioCache, refreshTtsError, speakText, testTts } = tts;
+
+  const share = createShareController({
+    state,
+    screen,
+    activeWordData,
+    exampleForTheme,
+    openSheetShell,
+    toast
+  });
+  const { openShareSheet, renderShareChooser, renderSharePreview } = share;
+
+  const themeSalon = createThemeSalon({
+    state,
+    content: CONTENT,
+    llm: LLM,
+    copyFor,
+    hasModelConfig,
+    openSheetShell,
+    closeSheet,
+    renderSettingsContent,
+    formatBytes,
+    toast
+  });
+  const {
+    initThemeStore,
+    currentThemeDeck,
+    themeSalonMarkup,
+    renderThemeSalon,
+    renderThemeCacheStats,
+    themeCacheStats,
+    clearThemeStore
+  } = themeSalon;
+
+  const translator = createTranslatorView({
+    state,
+    workspaceRoot,
+    overlayRoot,
+    llm: LLM,
+    styles: CONTENT.translator?.styles || [],
+    systemPrompt: window.TALK_PROMPTS.translator,
+    modelTimeoutMs: MODEL_TIMEOUT_MS,
+    modelTimeoutText: MODEL_TIMEOUT_TEXT,
+    copyFor,
+    uiLang,
+    englishDirective,
+    hasModelConfig,
+    homeTopbar,
+    applyInputMode,
+    updateScrollLock,
+    queueReveal,
+    openSheetShell,
+    addHistory,
+    toast
+  });
+  const {
+    translatorPage,
+    openTranslationWorkspace,
+    closeTranslationWorkspace,
+    syncTranslatorInputsFromWorkspace,
+    updateTranslatorLanguage,
+    updateTranslatorStyleControls,
+    runTranslation
+  } = translator;
+
+  actions.register({
+    ...tts.actions,
+    ...share.actions,
+    ...themeSalon.actions,
+    ...translator.actions
+  });
 
   /* ============================================================
      Small app-scoped helpers
@@ -1809,478 +1892,6 @@ import {
   }
 
 
-  /* ============================================================
-     Share card
-     ============================================================ */
-
-  function sharePageData() {
-    const route = state.route;
-    const theme = window.TALK_THEME?.current?.() || { label: "Talk" };
-    const topLayer = state.wordLayers[state.wordLayers.length - 1];
-    if (topLayer?.kind === "sentence" && topLayer.data) {
-      const sentence = topLayer.data;
-      return {
-        kind: "句子",
-        title: shorten(sentence.text || "", 36),
-        phonetic: "",
-        pos: "",
-        translation: sentence.translation || "",
-        note: sentence.summary || sentence.tone || "",
-        example: sentence.text || "",
-        exampleZh: sentence.translation || "",
-        senses: (sentence.keyWords || []).map((k) => `${k.word} · ${k.meaningZh || k.meaning || ""}`).slice(0, 3),
-        theme: theme.label || "Talk"
-      };
-    }
-    if (topLayer?.kind === "chunk" && topLayer.data) {
-      const chunk = topLayer.data;
-      const example = chunk.examples?.[0] || null;
-      return {
-        kind: "意群",
-        title: chunk.chunk,
-        phonetic: chunk.phonetic || "",
-        pos: chunk.form || "",
-        translation: chunk.translation || "",
-        note: chunk.short || "",
-        example: example?.en || "",
-        exampleZh: example?.zh || "",
-        senses: (chunk.senses || []).map((x) => x.zh).filter(Boolean).slice(0, 3),
-        theme: theme.label || "Talk"
-      };
-    }
-    if (state.wordLayers.length || route.name === "word") {
-      const word = activeWordData();
-      if (!word?.word) return null;
-      const example = exampleForTheme(word) || word.examples?.[0] || null;
-      return {
-        kind: "单词",
-        title: word.word,
-        phonetic: word.phonetic || "",
-        pos: posLabel(word.posGroups?.[0]?.pos || word.pos),
-        translation: word.translation || "",
-        note: word.short || "",
-        example: example?.en || "",
-        exampleZh: example?.zh || "",
-        senses: (word.posGroups || []).flatMap((group) => group.senses || []).map((sense) => sense.zh).filter(Boolean).slice(0, 3),
-        collocations: (word.collocations || []).map((item) => item.phrase || item.text || item).filter(Boolean).slice(0, 4),
-        family: (word.family || []).map((item) => item.word).filter(Boolean).slice(0, 4),
-        theme: theme.label || "Talk"
-      };
-    }
-    if (route.name === "chunk") {
-      const chunk = route.result;
-      if (!chunk?.chunk) return null;
-      const example = chunk.examples?.[0] || null;
-      return {
-        kind: "意群",
-        title: chunk.chunk,
-        phonetic: chunk.phonetic || "",
-        pos: registerLabel(chunk.register) || "",
-        translation: chunk.translation || "",
-        note: chunk.short || "",
-        example: example?.en || "",
-        exampleZh: example?.zh || "",
-        senses: (chunk.senses || []).map((sense) => sense.zh).filter(Boolean).slice(0, 3),
-        collocations: (chunk.variants || []).map((item) => item.text || item).filter(Boolean).slice(0, 4),
-        family: [],
-        theme: theme.label || "Talk"
-      };
-    }
-    if (route.name === "sentence") {
-      const sentence = route.result;
-      if (!sentence?.text) return null;
-      return {
-        kind: "句子",
-        title: sentence.text,
-        phonetic: "",
-        pos: sentence.tone || "",
-        translation: sentence.translation || "",
-        note: sentence.syntax || "",
-        example: "",
-        exampleZh: "",
-        senses: (sentence.keyWords || []).map((word) => `${word.word} · ${word.meaningZh || word.meaning || ""}`).slice(0, 3),
-        collocations: [],
-        family: [],
-        theme: theme.label || "Talk"
-      };
-    }
-    return null;
-  }
-
-  function wrapCanvasText(ctx, text, maxWidth) {
-    const lines = [];
-    let line = "";
-    for (const char of String(text || "")) {
-      const next = line + char;
-      if (line && ctx.measureText(next).width > maxWidth) {
-        lines.push(line);
-        line = char;
-      } else {
-        line = next;
-      }
-    }
-    if (line) lines.push(line);
-    return lines;
-  }
-
-  function shareCardCanvas(data) {
-    const styles = getComputedStyle(document.documentElement);
-    const read = (name, fallback) => (styles.getPropertyValue(name) || fallback).trim();
-    const paper = read("--paper", "#f6f1e7");
-    const ink = read("--ink", "#171813");
-    const accent = read("--lime", "#d9ff6b");
-    const accentInk = read("--accent-ink", "#557000");
-    const muted = read("--muted", "#6b6a5f");
-    const family = read("--font", '"Inter", "Noto Sans SC", sans-serif');
-    const mono = read("--mono", 'ui-monospace, "SFMono-Regular", monospace');
-
-    const W = 1080;
-    const H = 1350;
-    const pad = 84;
-    const canvas = document.createElement("canvas");
-    canvas.width = W;
-    canvas.height = H;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = paper;
-    ctx.fillRect(0, 0, W, H);
-
-    // header
-    ctx.fillStyle = accent;
-    ctx.fillRect(pad, 74, 44, 44);
-    ctx.fillStyle = ink;
-    ctx.font = `500 26px ${mono}`;
-    ctx.textBaseline = "alphabetic";
-    ctx.fillText(`TALK · ${data.theme}`.toUpperCase(), pad + 64, 108);
-    ctx.textAlign = "right";
-    ctx.fillStyle = muted;
-    ctx.fillText(data.kind, W - pad, 108);
-    ctx.textAlign = "left";
-
-    // rule
-    ctx.fillStyle = accentInk;
-    ctx.fillRect(pad, 152, W - pad * 2, 3);
-
-    // title
-    let y = 320;
-    const titleSize = data.kind === "句子" ? 66 : 104;
-    ctx.fillStyle = ink;
-    ctx.font = `800 ${titleSize}px ${family}`;
-    const titleLines = wrapCanvasText(ctx, data.title, W - pad * 2).slice(0, 4);
-    for (const line of titleLines) {
-      ctx.fillText(line, pad, y);
-      y += titleSize * 1.18;
-    }
-
-    // meta
-    y += 10;
-    ctx.font = `500 30px ${mono}`;
-    ctx.fillStyle = muted;
-    const meta = [data.phonetic, data.pos].filter(Boolean).join("  ·  ");
-    if (meta) ctx.fillText(meta, pad, y);
-
-    // translation
-    y += 96;
-    ctx.fillStyle = ink;
-    ctx.font = `600 42px ${family}`;
-    const trLines = wrapCanvasText(ctx, data.translation, W - pad * 2).slice(0, 3);
-    for (const line of trLines) {
-      ctx.fillText(line, pad, y);
-      y += 62;
-    }
-
-    // note
-    if (data.note) {
-      y += 8;
-      ctx.fillStyle = muted;
-      ctx.font = `400 32px ${family}`;
-      const noteLines = wrapCanvasText(ctx, data.note, W - pad * 2).slice(0, 3);
-      for (const line of noteLines) {
-        ctx.fillText(line, pad, y);
-        y += 46;
-      }
-    }
-
-    // example
-    if (data.example) {
-      y += 34;
-      ctx.fillStyle = accent;
-      ctx.fillRect(pad, y - 30, 6, 120);
-      ctx.fillStyle = ink;
-      ctx.font = `500 34px ${family}`;
-      const exLines = wrapCanvasText(ctx, data.example, W - pad * 2 - 36).slice(0, 3);
-      for (const line of exLines) {
-        ctx.fillText(line, pad + 30, y);
-        y += 48;
-      }
-      if (data.exampleZh) {
-        ctx.fillStyle = muted;
-        ctx.font = `400 28px ${family}`;
-        const zh = wrapCanvasText(ctx, data.exampleZh, W - pad * 2 - 36).slice(0, 2);
-        for (const line of zh) {
-          ctx.fillText(line, pad + 30, y + 4);
-          y += 42;
-        }
-      }
-    } else if (data.senses?.length) {
-      y += 6;
-      ctx.font = `500 26px ${mono}`;
-      data.senses.forEach((sense, index) => {
-        ctx.fillStyle = accentInk;
-        ctx.fillText(String(index + 1).padStart(2, "0"), pad, y);
-        ctx.fillStyle = ink;
-        ctx.font = `500 34px ${family}`;
-        const lines = wrapCanvasText(ctx, sense, W - pad * 2 - 76).slice(0, 2);
-        lines.forEach((line, lineIndex) => {
-          ctx.fillText(line, pad + 66, y + lineIndex * 44);
-        });
-        y += 44 * lines.length + 26;
-        ctx.font = `500 26px ${mono}`;
-      });
-    }
-
-    // collocations & family
-    if (data.collocations?.length) {
-      y += 22;
-      ctx.fillStyle = accentInk;
-      ctx.font = `500 24px ${mono}`;
-      ctx.fillText("搭配", pad, y);
-      ctx.fillStyle = ink;
-      ctx.font = `500 30px ${family}`;
-      const text = data.collocations.join("  ·  ");
-      const lines = wrapCanvasText(ctx, text, W - pad * 2 - 100).slice(0, 2);
-      lines.forEach((line, index) => ctx.fillText(line, pad + 84, y + index * 40));
-      y += 40 * lines.length + 14;
-    }
-    if (data.family?.length) {
-      ctx.fillStyle = accentInk;
-      ctx.font = `500 24px ${mono}`;
-      ctx.fillText("同根", pad, y);
-      ctx.fillStyle = ink;
-      ctx.font = `500 30px ${family}`;
-      ctx.fillText(data.family.join("  ·  "), pad + 84, y);
-      y += 40;
-    }
-
-    // footer
-    ctx.fillStyle = accentInk;
-    ctx.fillRect(pad, H - 168, W - pad * 2, 2);
-    ctx.fillStyle = ink;
-    ctx.font = `700 40px ${family}`;
-    ctx.fillText("把词，看透。", pad, H - 96);
-    ctx.textAlign = "right";
-    ctx.fillStyle = muted;
-    ctx.font = `500 24px ${mono}`;
-    ctx.fillText("wundermiku.github.io/talk", W - pad, H - 96);
-    ctx.textAlign = "left";
-    return canvas;
-  }
-
-  let shareCard = null;
-
-  function activeShareScope() {
-    if (state.wordLayers.length) return state.wordLayers[state.wordLayers.length - 1].el;
-    return screen || document;
-  }
-
-  function shareHeroNode() {
-    const scope = activeShareScope();
-    if (state.wordLayers.length) return scope.querySelector(".sentence-stage") || scope.querySelector(".sentence-line") || scope.querySelector(".chunk-hero") || scope.querySelector(".result-hero");
-    const route = state.route;
-    const pick = (selector) => scope.querySelector(selector);
-    if (route.name === "word") return pick(".result-hero");
-    if (route.name === "chunk") return pick(".chunk-hero");
-    if (route.name === "sentence") return pick(".sentence-stage") || pick(".sentence-line");
-    return null;
-  }
-
-  // Every block on the page can go into the image; the reader decides which.
-  function shareSections() {
-    const scope = activeShareScope();
-    return Array.from(scope.querySelectorAll(".result-page .block"))
-      .filter((block) => block.querySelector(".block-head, .sentence-part-head"))
-      .map((block, index) => {
-        const head = block.querySelector(".block-head, .sentence-part-head");
-        let label = `第 ${index + 1} 段`;
-        if (head) {
-          label = (head.querySelector("h2")?.textContent || head.textContent).replace(/\s+/g, " ").trim() || label;
-        }
-        return { index, label, node: block };
-      });
-  }
-
-  function shareParts(sections) {
-    return [shareHeroNode(), ...sections].filter(Boolean);
-  }
-
-  async function buildShareImage(data, sections = []) {
-    const route = state.route;
-    const parts = shareParts(sections);
-    if (!parts.length) return null;
-    const paper = getComputedStyle(document.documentElement).getPropertyValue("--paper").trim() || "#f6f1e7";
-    const theme = window.TALK_THEME?.current?.() || {};
-    const stage = document.createElement("div");
-    const topLayer = state.wordLayers[state.wordLayers.length - 1];
-    const inLayer = Boolean(topLayer);
-    const scope = inLayer
-      ? (topLayer.kind === "chunk" ? "chunk-page" : topLayer.kind === "sentence" ? "sentence-page" : "result-page")
-      : (route.name === "chunk" ? "chunk-page" : route.name === "sentence" ? "sentence-page" : "result-page");
-    stage.className = `share-compose ${scope}`;
-    stage.setAttribute("data-theme", theme.id || "");
-    if (scope === "sentence-page") stage.setAttribute("data-view", "original");
-    stage.innerHTML = `
-      <div class="share-compose-brand">
-        <span class="share-compose-logo">talk.</span>
-        <span class="mono">${esc(theme.label || "Talk")} · ${esc(data.kind)}</span>
-      </div>
-      <div class="share-compose-body"></div>
-      <div class="share-compose-foot">
-        <span>把词，看透。</span>
-        <span class="mono">wundermiku.github.io/talk</span>
-      </div>`;
-    const body = stage.querySelector(".share-compose-body");
-    for (const node of parts) {
-      const clone = node.cloneNode(true);
-      clone.querySelectorAll(".example-actions, .speak-btn, .copy-inline, .word-copy, .quote-mark, .example-quote, .example-toolbar, .chunk-toolbar, .sentence-tools, .page-actions, .reclassify").forEach((el) => el.remove());
-      clone.querySelectorAll(".reveal, .is-in").forEach((el) => el.classList.remove("reveal", "is-in"));
-      clone.classList.remove("reveal", "is-in");
-      clone.style.opacity = "1";
-      clone.style.transform = "none";
-      clone.style.color = "var(--ink)";
-      clone.querySelectorAll("*").forEach((el) => {
-        el.style.animation = "none";
-        el.style.opacity = "1";
-        el.style.transform = "none";
-        el.style.translate = "none";
-        el.style.scale = "none";
-      });
-      clone.querySelectorAll("[id]").forEach((el) => el.removeAttribute("id"));
-      body.appendChild(clone);
-    }
-    document.body.appendChild(stage);
-    try {
-      const width = 390;
-      const canvas = await window.htmlToImage.toCanvas(stage, {
-        width,
-        height: stage.scrollHeight,
-        pixelRatio: Math.min(3, 1080 / width),
-        backgroundColor: paper,
-        style: { transform: "none", margin: "0" }
-      });
-      return canvas;
-    } catch (_) {
-      return null;
-    } finally {
-      stage.remove();
-    }
-  }
-
-  const SHARE_PICK_KEY = "talk.share.v1";
-
-  function savedSharePick() {
-    try {
-      const raw = JSON.parse(localStorage.getItem(SHARE_PICK_KEY) || "null");
-      return Array.isArray(raw) ? raw.map(Number) : null;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  function defaultSharePick(sections) {
-    const picked = [];
-    for (const pattern of [/词义|释义/, /例句/]) {
-      const hit = sections.find((section) => pattern.test(section.label) && !picked.includes(section.index));
-      if (hit) picked.push(hit.index);
-    }
-    for (const section of sections) {
-      if (picked.length >= 2) break;
-      if (!picked.includes(section.index)) picked.push(section.index);
-    }
-    return picked;
-  }
-
-  function sharePickFor(sections) {
-    const saved = savedSharePick();
-    const valid = (saved || []).filter((index) => sections.some((section) => section.index === index));
-    return valid.length ? valid : defaultSharePick(sections);
-  }
-
-  function shareChoicesHtml(sections, picked) {
-    return sections.map((section) => `
-      <label class="share-choice">
-        <input type="checkbox" data-share-section="${section.index}" ${picked.includes(section.index) ? "checked" : ""} />
-        <span>${esc(section.label)}</span>
-      </label>`).join("");
-  }
-
-  async function openShareSheet() {
-    const data = sharePageData();
-    if (!data) {
-      toast("这一页还没有可分享的内容");
-      return;
-    }
-    const sections = shareSections();
-    state.shareSections = sections;
-    state.sharePicked = sharePickFor(sections);
-    openSheetShell({ kicker: "分享这一页", title: data.title });
-    const body = document.getElementById("sheet-scroll");
-    if (!body) return;
-    const nodes = sections.filter((section) => state.sharePicked.includes(section.index)).map((section) => section.node);
-    renderSharePreview(data, nodes);
-  }
-
-  function renderShareChooser() {
-    const body = document.getElementById("sheet-scroll");
-    const data = sharePageData();
-    const sections = state.shareSections || [];
-    if (!body || !data) return;
-    body.innerHTML = `
-      <div class="share-sheet">
-        <p class="sheet-lead">挑几段放进图片；标题和释义始终保留。</p>
-        <div class="share-choices">${shareChoicesHtml(sections, state.sharePicked || [])}</div>
-        <button class="btn btn-primary" type="button" data-action="share-generate">生成分享图</button>
-        <p class="share-hint">${esc(data.theme)} 主题 · ${esc(data.kind)}</p>
-      </div>`;
-  }
-
-  async function renderSharePreview(data, sections) {
-    const body = document.getElementById("sheet-scroll");
-    if (!body) return;
-    body.innerHTML = `
-      <div class="share-sheet">
-        <div class="share-loading"><span class="mono">正在排版分享图…</span></div>
-        <div class="share-actions" hidden>
-          <a class="btn btn-primary" data-share-save download="talk-${encodeURIComponent(data.title).slice(0, 24)}.png">保存图片</a>
-          <button class="btn btn-secondary" type="button" data-action="share-native">系统分享</button>
-          <button class="btn btn-ghost" type="button" data-action="share-adjust">调整内容</button>
-        </div>
-        <p class="share-hint">${esc(data.theme)} 主题 · ${esc(data.kind)}</p>
-      </div>`;
-    const canvas = window.htmlToImage ? await buildShareImage(data, sections) : shareCardCanvas(data);
-    const sheet = body.querySelector(".share-sheet");
-    if (!canvas) {
-      if (sheet) sheet.innerHTML = `<p class="share-hint">这一页暂时生成不了分享图</p>`;
-      return;
-    }
-    const url = canvas.toDataURL("image/png");
-    state.shareUrl = url;
-    if (!sheet) return;
-    sheet.querySelector(".share-loading")?.remove();
-    const actions = sheet.querySelector(".share-actions");
-    const hint = sheet.querySelector(".share-hint");
-    const img = document.createElement("img");
-    img.className = "share-card-img";
-    img.alt = "分享图预览";
-    img.src = url;
-    img.width = canvas.width;
-    img.height = canvas.height;
-    sheet.insertBefore(img, actions || hint);
-    if (actions) {
-      actions.hidden = false;
-      const save = actions.querySelector("[data-share-save]");
-      if (save) save.href = url;
-    }
-  }
-
   function backTopbar({ label, title, bookmark = null, share = false, actions = "" }) {
     const saved = bookmark ? isSavedKey(bookmark) : false;
     return `
@@ -2362,206 +1973,6 @@ import {
     container.classList.add("is-swapping");
   }
 
-  function translationCacheKey() {
-    return "talk.translations.v3" + (uiLang() === "en" ? ".en" : "");
-  }
-  const TRANSLATION_CACHE_MAX = 40;
-  const TRANSLATION_CACHE_TTL = 30 * 86400000;
-
-  function translationCacheAll() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(translationCacheKey()) || "{}");
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function translationCacheGet(text) {
-    const entry = translationCacheAll()[text];
-    if (!entry?.result || Date.now() - Number(entry.at || 0) > TRANSLATION_CACHE_TTL) return null;
-    return { ...entry.result, cached: true };
-  }
-
-  function translationCachePut(text, result) {
-    const all = translationCacheAll();
-    all[text] = { at: Date.now(), result };
-    const entries = Object.entries(all)
-      .sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0))
-      .slice(0, TRANSLATION_CACHE_MAX);
-    try { localStorage.setItem(translationCacheKey(), JSON.stringify(Object.fromEntries(entries))); } catch (_) { /* no-op */ }
-  }
-
-  function translatorEmptyHtml() {
-    const copy = copyFor("translator");
-    return `<div class="translator-empty">
-      <span class="translator-empty-mark">Aa</span>
-      <p>${esc(copy.empty)}</p>
-      <div class="translator-examples">
-        ${copy.samples.map(([text, label]) => `<button class="translator-example" type="button" data-action="translator-sample" data-text="${attr(text)}">${esc(label)} <span>↗</span></button>`).join("")}
-      </div>
-    </div>`;
-  }
-
-  function styleEmoji(style, className = "") {
-    return `<img class="${className}" src="${esc(style.emoji)}" alt="" loading="eager" decoding="async" draggable="false" />`;
-  }
-
-  function translatorStylesHtml() {
-    return TRANSLATOR_STYLES.map((style) => {
-      const selected = state.translatorStyles.includes(style.id);
-      return `<button class="translator-style-chip tone-${style.tone} ${selected ? "selected" : ""}" type="button" data-action="translator-style" data-style="${style.id}" aria-pressed="${selected}">
-        ${styleEmoji(style, "translator-style-emoji")}
-        <strong>${esc(style.name)}</strong>
-        <span class="translator-style-check" aria-hidden="true">${selected ? "✓" : ""}</span>
-      </button>`;
-    }).join("");
-  }
-
-  function translatorModeHtml() {
-    return copyFor("translator").modes.map(([mode, label]) => `<button class="translator-mode-btn ${state.translatorMode === mode ? "active" : ""}" type="button" data-action="translator-mode" data-mode="${mode}" aria-pressed="${state.translatorMode === mode}">${esc(label)}</button>`).join("");
-  }
-
-  function updateTranslatorStyleControls() {
-    $$(".translator-style-chip").forEach((button) => {
-      const selected = state.translatorStyles.includes(button.dataset.style);
-      button.classList.toggle("selected", selected);
-      button.setAttribute("aria-pressed", String(selected));
-      const check = button.querySelector(".translator-style-check");
-      if (check) check.textContent = selected ? "✓" : "";
-    });
-    $$(".translator-style-count").forEach((count) => {
-      count.textContent = `已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}`;
-    });
-  }
-
-  function translatorPage() {
-    const copy = copyFor("translator");
-    return `
-      ${homeTopbar()}
-      <main class="result-page translator-page">
-        <section class="translator-hero reveal" style="--d:0">
-          <div class="eyebrow translator-eyebrow">
-            <span class="spark"></span>${esc(copy.kicker)}
-          </div>
-          <h1 class="translator-title">${esc(copy.titleLead)}<em>${esc(copy.titleAccent)}</em></h1>
-          <p class="translator-lede">${esc(copy.lede)}</p>
-        </section>
-        <form class="translator-form reveal" id="translator-form" style="--d:0.4" novalidate>
-          <div class="translator-input-shell">
-            <div class="translator-input-head">
-              <span class="mono">原文</span>
-              <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
-            </div>
-            <textarea id="translator-input" rows="3" placeholder="${attr(copy.inputPlaceholder)}" spellcheck="false" aria-label="待翻译文本"></textarea>
-            <div class="translator-input-foot">
-              <span class="translator-input-meta"><span class="translator-language">自动识别</span><span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span><span class="translator-char-count">0 字</span></span>
-              <button class="search-submit" type="submit" aria-label="生成选中的风格">${icon("arrowUpRight")}</button>
-            </div>
-          </div>
-        </form>
-        <div class="translator-styles reveal" style="--d:0.8">${translatorStylesHtml()}</div>
-        <div class="translator-landing-hint reveal" style="--d:1">${translatorEmptyHtml()}</div>
-      </main>`;
-  }
-
-  function translatorSourceLanguage() {
-    if (state.translatorMode === "zh" || state.translatorMode === "en") return state.translatorMode;
-    const input = $("#translator-input");
-    return detectSourceLanguage(input?.value || "");
-  }
-
-  function openTranslationWorkspace(text) {
-    const value = String(text || "").trim();
-    if (!value) {
-      toast("先输入一句中文或英文");
-      return;
-    }
-    state.workspaceOpen = true;
-    state.lastTranslationInput = value;
-    workspaceRoot.innerHTML = `<section class="translation-workspace" aria-label="翻译结果">
-      <header class="translation-workspace-head">
-        <div>
-          <span class="mono">${esc(copyFor("translator").workspaceKicker || "MULTI-STYLE")}</span>
-          <h2>${esc(copyFor("translator").workspaceTitle || "翻译结果")}</h2>
-        </div>
-        <button class="icon-btn" type="button" data-action="close-workspace" aria-label="关闭翻译结果">${icon("close")}</button>
-      </header>
-      <div class="translation-workspace-body" data-lenis-prevent>
-        <form class="workspace-translator-form" id="workspace-translator-form" novalidate>
-          <div class="workspace-input-shell">
-            <textarea id="workspace-translator-input" rows="2"  spellcheck="false" aria-label="待翻译文本">${esc(value)}</textarea>
-            <div class="workspace-input-foot">
-              <div class="translator-mode-switch" role="group" aria-label="翻译方向">${translatorModeHtml()}</div>
-              <span class="translator-language">自动识别</span>
-              <span class="translator-char-count">0 字</span>
-              <button class="search-submit" type="submit" aria-label="重新翻译">${icon("arrowUpRight")}</button>
-            </div>
-          </div>
-        </form>
-        <div class="workspace-style-row">
-          <div class="translator-styles">${translatorStylesHtml()}</div>
-          <span class="translator-style-count">已选 ${state.translatorStyles.length} / ${TRANSLATOR_STYLES.length}</span>
-        </div>
-        <div class="translation-workspace-results" id="translation-workspace-results"></div>
-      </div>
-    </section>`;
-    updateScrollLock();
-    requestAnimationFrame(() => {
-      const panel = $(".translation-workspace", workspaceRoot);
-      panel?.classList.add("show");
-      // Do not auto-focus the textarea: opening the result view should not
-      // summon the on-screen keyboard every time.
-      updateTranslatorLanguage();
-      updateTranslatorStyleControls();
-    });
-    runTranslation(value);
-  }
-
-  function closeTranslationWorkspace({ immediate = false } = {}) {
-    if (!state.workspaceOpen && !workspaceRoot.firstElementChild) return;
-    state.workspaceOpen = false;
-    state.translatorSeq += 1;
-    updateScrollLock();
-    const panel = $(".translation-workspace", workspaceRoot);
-    if (immediate || !panel) {
-      workspaceRoot.innerHTML = "";
-      return;
-    }
-    panel.classList.remove("show");
-    window.setTimeout(() => {
-      if (!state.workspaceOpen) workspaceRoot.innerHTML = "";
-    }, 300);
-  }
-
-  function syncTranslatorInputsFromWorkspace() {
-    const workspaceInput = $("#workspace-translator-input");
-    const landingInput = $("#translator-input");
-    if (workspaceInput && landingInput) landingInput.value = workspaceInput.value;
-    updateTranslatorLanguage();
-  }
-
-  function updateTranslatorLanguage() {
-    const input = $("#translator-input");
-    const value = input?.value.trim() || "";
-    const text = state.translatorMode === "zh"
-      ? "中 → 英"
-      : state.translatorMode === "en"
-        ? "英 → 英"
-        : value
-          ? detectSourceLanguage(value) === "zh" ? "自动 · 中 → 英" : "自动 · 英 → 英"
-          : "自动识别";
-    $$(".translator-language").forEach((label) => { label.textContent = text; });
-    const typingLang = translatorTargetIsChinese() ? "zh" : "en";
-    applyInputMode(input, typingLang);
-    applyInputMode($("#workspace-translator-input"), typingLang);
-    const workspaceValue = $("#workspace-translator-input")?.value ?? value;
-    const shown = $("#workspace-translator-input") ? workspaceValue : value;
-    $$(".translator-char-count").forEach((label) => {
-      label.textContent = `${shown.length} 字`;
-    });
-  }
-
   /* Phones pick a keyboard from inputmode. A word search wants a Latin
      keyboard; translating from Chinese wants the Chinese one. Keep this in one
      place so a future language pair only needs a mapping entry. */
@@ -2576,640 +1987,6 @@ import {
     target.setAttribute("inputmode", mode.inputmode);
     target.setAttribute("lang", mode.lang);
     target.setAttribute("autocapitalize", mode.autocapitalize);
-  }
-
-  function translatorTargetIsChinese() {
-    return state.translatorMode === "zh";
-  }
-
-  function renderTranslatorLoading(styles = state.translatorStyles) {
-    const host = $("#translation-workspace-results");
-    if (!host) return;
-    const selected = TRANSLATOR_STYLES.filter((style) => styles.includes(style.id));
-    host.innerHTML = `<div class="translation-loading">
-      <div class="translation-loading-head"><span class="loading-dots"><i></i><i></i><i></i></span><span>正在写成 ${selected.length} 个英文版本…</span></div>
-      ${selected.map((style) => `<div class="translation-loading-card tone-${style.tone}"><span>${esc(style.name)}</span><i></i><i></i></div>`).join("")}
-    </div>`;
-  }
-
-  function renderTranslatorNoModel() {
-    const host = $("#translation-workspace-results");
-    if (!host) return;
-    host.innerHTML = `<div class="translator-empty">
-      <span class="translator-empty-mark">!</span>
-      <p>翻译需要模型。先连接一个 OpenAI 兼容服务，再回来输入。</p>
-      <div class="translator-empty-actions">
-        <button class="btn btn-primary" type="button" data-action="settings">${icon("settings")} 连接模型</button>
-        <button class="btn btn-secondary" type="button" data-action="demo-translation">先看一段示例</button>
-      </div>
-    </div>`;
-  }
-
-  function renderTranslatorError(message) {
-    const host = $("#translation-workspace-results");
-    if (!host) return;
-    host.innerHTML = `<div class="translator-empty error">
-      <span class="translator-empty-mark">!</span>
-      <p>这次没有翻完：${esc(shorten(message || "未知错误", 160))}</p>
-      <button class="btn btn-secondary" type="button" data-action="regenerate-translation">${icon("refresh")} 重试</button>
-    </div>`;
-  }
-
-  function demoTranslationResult(text) {
-    const source = String(text || "").trim() || "今天有点累，但我还是想出去走走。";
-    const bodies = [
-      "Tired, but I still want to get out for a bit.",
-      "Beat, but I could still use some fresh air.",
-      "I am somewhat fatigued; nevertheless, I would like to take a walk.",
-      "Low-key wiped, but still down for a walk.",
-      "Weary as I am, a stroll would do me good."
-    ];
-    const nuances = ["短、直接，像日常对话", "像母语者会脱口而出的说法", "邮件、报告、正式场合", "社交平台上的轻松口气", "书面语里的从容"];
-    return {
-      sourceText: source,
-      sourceLanguage: state.translatorMode === "en" ? "en" : "zh",
-      variants: TRANSLATOR_STYLES.map((style, index) => ({
-        style: style.id,
-        text: bodies[index] || bodies[0],
-        nuance: "",
-        phrases: [],
-        points: []
-      })),
-      model: "示例",
-      cached: false,
-      demo: true,
-      at: Date.now()
-    };
-  }
-
-  function renderTranslatorResult(result) {
-    const host = $("#translation-workspace-results");
-    if (!host || !result?.variants?.length) return;
-    const source = result.sourceLanguage === "zh" ? "中 → 英" : "英 → 英";
-    const styleMap = new Map(TRANSLATOR_STYLES.map((style) => [style.id, style]));
-    host.innerHTML = `<div class="translation-result">
-      <div class="translation-result-head">
-        <div><span class="mono">${esc(source)}</span><span class="translation-cache-label">${result.cached ? "本机缓存" : "本次生成"}</span></div>
-        <button class="link-btn" type="button" data-action="regenerate-translation">重新生成</button>
-      </div>
-      <div class="translation-list">
-        ${result.variants.map((variant, index) => {
-          const style = styleMap.get(variant.style) || TRANSLATOR_STYLES[index] || TRANSLATOR_STYLES[0];
-          return `<article class="translation-card reveal-item tone-${style.tone}" style="--i:${Math.min(index, 4)}" data-action="translation-detail" data-index="${index}" tabindex="0" role="button" aria-label="查看${attr(style.name)}版本的搭配与知识点">
-            <div class="translation-card-head">
-              <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
-              <div><h2>${esc(style.name)}</h2><p>${esc(style.hint)}</p></div>
-              <button class="icon-btn translation-copy" type="button" data-action="copy-translation" data-text="${attr(variant.text)}" aria-label="复制这个版本">${icon("copy")}</button>
-            </div>
-            <p class="translation-text">${esc(variant.text)}</p>
-            ${variant.nuance ? `<p class="translation-nuance">${esc(variant.nuance)}</p>` : ""}
-            ${(variant.examples || []).length ? `<div class="translation-examples">${variant.examples.map((item) => `<button class="translation-example" type="button" data-action="example-lookup" data-text="${attr(item.en)}">${esc(item.en)}<span>${esc(item.zh)}</span></button>`).join("")}</div>` : ""}
-            <span class="translation-open">搭配与知识点 <span aria-hidden="true">↗</span></span>
-          </article>`;
-        }).join("")}
-      </div>
-    </div>`;
-    queueReveal(host);
-  }
-
-  function translationDetailHtml(variant, style) {
-    const phrases = variant?.phrases || [];
-    const points = variant?.points || [];
-    return `<div class="sheet-content translation-detail tone-${style.tone}">
-      <div class="translation-detail-head">
-        <span class="translation-emoji" aria-hidden="true">${styleEmoji(style)}</span>
-        <div><span class="mono">${esc(style.name)}</span><h2>搭配与知识点</h2></div>
-      </div>
-      <p class="translation-detail-text">${esc(variant.text)}</p>
-      ${variant.nuance ? `<p class="translation-detail-nuance">${esc(variant.nuance)}</p>` : ""}
-      <div class="translation-detail-section">
-        <h3>常见搭配</h3>
-        ${phrases.length ? phrases.map((item) => `<div class="translation-phrase">
-          <strong>${esc(item.phrase)}</strong>
-          <span>${esc(item.zh || "")}${item.note ? ` · ${esc(item.note)}` : ""}</span>
-        </div>`).join("") : `<p class="translation-detail-empty">这次没返回，重新生成试试。</p>`}
-      </div>
-      ${(variant.examples || []).length ? `<div class="translation-detail-section">
-        <h3>例句</h3>
-        ${variant.examples.map((item) => `<button class="translation-example" type="button" data-action="example-lookup" data-text="${attr(item.en)}">${esc(item.en)}<span>${esc(item.zh)}</span></button>`).join("")}
-      </div>` : ""}
-      <div class="translation-detail-section">
-        <h3>知识点</h3>
-        ${points.length ? `<ul class="translation-points">${points.map((point) => `<li>${esc(point)}</li>`).join("")}</ul>` : `<p class="translation-detail-empty">这次没返回，重新生成试试。</p>`}
-      </div>
-      <button class="btn btn-secondary translation-detail-copy" type="button" data-action="copy-translation" data-text="${attr(variant.text)}">${icon("copy")} 复制这个版本</button>
-    </div>`;
-  }
-
-  function openTranslationDetail(index) {
-    const result = state.lastTranslationResult;
-    const variant = result?.variants?.[Number(index)];
-    if (!variant) return;
-    const style = TRANSLATOR_STYLES.find((item) => item.id === variant.style) || TRANSLATOR_STYLES[0];
-    openSheetShell({ kicker: "风格拆解", title: style.name });
-    const sheet = $(".sheet", overlayRoot);
-    if (sheet) {
-      TRANSLATOR_STYLES.forEach((item) => sheet.classList.remove(`tone-${item.tone}`));
-      sheet.classList.add("translation-detail-sheet", `tone-${style.tone}`);
-    }
-    const holder = $("#sheet-scroll");
-    if (holder) holder.innerHTML = translationDetailHtml(variant, style);
-  }
-
-  function normalizeTranslation(raw, sourceText, cfg, sourceLanguage, selectedStyles) {
-    const base = raw && typeof raw === "object" ? raw : {};
-    const sourceVariants = Array.isArray(base.variants) ? base.variants : [];
-    const wanted = TRANSLATOR_STYLES.filter((style) => selectedStyles.includes(style.id));
-    const variants = wanted.map((style, index) => {
-      const found = sourceVariants.find((item) => String(item?.style || "").toLowerCase() === style.id)
-        || sourceVariants[index]
-        || {};
-      const phrases = Array.isArray(found.phrases)
-        ? found.phrases.map((item) => ({
-            phrase: String(item?.phrase || item?.text || "").trim(),
-            zh: String(item?.zh || item?.meaning || "").trim(),
-            note: String(item?.note || "").trim()
-          })).filter((item) => item.phrase)
-        : [];
-      const examples = Array.isArray(found.examples)
-        ? found.examples.map((item) => ({
-            en: String(item?.en || item?.text || "").trim(),
-            zh: String(item?.zh || item?.translation || "").trim()
-          })).filter((item) => item.en)
-        : [];
-      return {
-        style: style.id,
-        text: String(found.text || found.translation || "").trim(),
-        nuance: String(found.nuance || found.note || "").trim(),
-        examples,
-        phrases,
-        points: Array.isArray(found.points)
-          ? found.points.map((item) => String(item || "").trim()).filter(Boolean)
-          : []
-      };
-    }).filter((variant) => variant.text);
-    if (!variants.length) throw new Error("模型没有返回可用的英文版本。");
-    return {
-      sourceText,
-      sourceLanguage: sourceLanguage || (base.sourceLanguage === "en" ? "en" : "zh"),
-      variants,
-      model: cfg.model,
-      cached: false,
-      at: Date.now()
-    };
-  }
-
-  async function requestTranslation(text, cfg, sourceLanguage, selectedStyles) {
-    const resolvedCfg = LLM.resolveConfig(cfg);
-    LLM.endpointFor(resolvedCfg.baseUrl, resolvedCfg);
-    const messages = [
-      { role: "system", content: TRANSLATOR_SYSTEM_PROMPT + englishDirective() },
-      { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
-    ];
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
-    diagLog("info", "model.start", `translation · ${state.settings?.detailLevel || "standard"}`, { chars: text.length });
-    try {
-      let content = "";
-      try {
-        content = await LLM.sendChatStream(resolvedCfg, messages, {
-          signal: controller.signal,
-          allowJsonMode: false,
-          googleJsonMode: true,
-          maxTokens: 1600,
-          temperature: 0.3
-        });
-      } catch (error) {
-        if (error?.name === "AbortError") throw error;
-        const response = await LLM.sendChat(resolvedCfg, messages, {
-          signal: controller.signal,
-          allowJsonMode: false,
-          maxTokens: 1600,
-          temperature: 0.3
-        });
-        if (!response.ok) {
-          throw new Error(await LLM.readHttpError(response, 220));
-        }
-        const json = await LLM.readJsonResponse(response, "翻译接口");
-        content = LLM.extractContent(json, resolvedCfg);
-      }
-      if (!content) throw new Error("模型返回了空内容。");
-      return normalizeTranslation(LLM.parseJsonObject(content), text, resolvedCfg, sourceLanguage, selectedStyles);
-    } finally {
-      window.clearTimeout(timer);
-    }
-  }
-
-  async function runTranslation(raw, { bypassCache = false } = {}) {
-    const text = String(raw || "").trim();
-    if (!text) {
-      toast("先输入一句中文或英文");
-      return;
-    }
-    const selectedStyles = TRANSLATOR_STYLES
-      .filter((style) => state.translatorStyles.includes(style.id))
-      .map((style) => style.id);
-    if (!selectedStyles.length) {
-      toast("至少选择一个风格");
-      return;
-    }
-    const token = ++state.translatorSeq;
-    const sourceLanguage = translatorSourceLanguage();
-    state.lastTranslationInput = text;
-    updateTranslatorLanguage();
-    const cacheKey = `${sourceLanguage}|${selectedStyles.join(",")}|${text}`;
-    const cached = bypassCache ? null : translationCacheGet(cacheKey);
-    if (cached) {
-      state.lastTranslationResult = cached;
-      renderTranslatorResult(cached);
-      addHistory("translation", text);
-      return;
-    }
-    if (!hasModelConfig()) {
-      renderTranslatorNoModel();
-      return;
-    }
-    renderTranslatorLoading(selectedStyles);
-    try {
-      const result = await requestTranslation(text, state.settings, sourceLanguage, selectedStyles);
-      if (token !== state.translatorSeq) return;
-      state.lastTranslationResult = result;
-      translationCachePut(cacheKey, result);
-      renderTranslatorResult(result);
-      addHistory("translation", text);
-    } catch (error) {
-      if (token !== state.translatorSeq) return;
-      renderTranslatorError(error?.name === "AbortError" ? MODEL_TIMEOUT_TEXT : String(error?.message || error));
-    }
-  }
-
-  const THEME_DB_NAME = "talk.themeDecks.v1";
-  const THEME_DB_STORE = "decks";
-  const THEME_LEGACY_KEY = "talk.themeDecks.v1";
-  const THEME_DISPLAY_LIMIT = 8;
-  const THEME_DISPLAY_KEY = "talk.themeDisplay.v1";
-
-  function themeDbOpen() {
-    return new Promise((resolve, reject) => {
-      if (!("indexedDB" in window)) {
-        reject(new Error("IndexedDB unavailable"));
-        return;
-      }
-      const request = indexedDB.open(THEME_DB_NAME, 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(THEME_DB_STORE)) {
-          const store = db.createObjectStore(THEME_DB_STORE, { keyPath: "key" });
-          store.createIndex("at", "at");
-        }
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error || new Error("Theme DB error"));
-    });
-  }
-
-  function normalizeStoredTheme(deck) {
-    if (!deck || typeof deck !== "object" || !deck.title || !Array.isArray(deck.words)) return null;
-    return {
-      key: String(deck.key || deck.title).trim(),
-      title: String(deck.title),
-      subtitle: String(deck.subtitle || ""),
-      scene: String(deck.scene || ""),
-      words: deck.words,
-      at: Number(deck.at) || 0
-    };
-  }
-
-  async function themeDecksRead() {
-    const db = await themeDbOpen();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(THEME_DB_STORE, "readonly");
-      const request = tx.objectStore(THEME_DB_STORE).getAll();
-      request.onsuccess = () => {
-        const decks = (Array.isArray(request.result) ? request.result : [])
-          .map(normalizeStoredTheme)
-          .filter(Boolean)
-          .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
-        db.close();
-        resolve(decks);
-      };
-      request.onerror = () => {
-        db.close();
-        reject(request.error || new Error("Theme read failed"));
-      };
-    });
-  }
-
-  async function themeDeckSave(deck) {
-    const db = await themeDbOpen();
-    const key = String(deck.title || "").trim();
-    if (!key) throw new Error("主题没有标题。");
-    const stored = { ...deck, key, at: Date.now() };
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(THEME_DB_STORE, "readwrite");
-      tx.objectStore(THEME_DB_STORE).put(stored);
-      tx.oncomplete = () => { db.close(); resolve(stored); };
-      tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme write failed")); };
-    });
-  }
-
-  async function clearThemeStore() {
-    const db = await themeDbOpen();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(THEME_DB_STORE, "readwrite");
-      tx.objectStore(THEME_DB_STORE).clear();
-      tx.oncomplete = () => { db.close(); resolve(); };
-      tx.onerror = () => { db.close(); reject(tx.error || new Error("Theme clear failed")); };
-    });
-  }
-
-  async function themeCacheStats() {
-    const decks = await themeDecksRead();
-    const bytes = new Blob([JSON.stringify(decks)]).size;
-    return {
-      count: decks.length,
-      displayCount: state.themeDisplay.length,
-      max: THEME_DISPLAY_LIMIT,
-      bytes,
-      words: decks.reduce((sum, deck) => sum + (deck.words?.length || 0), 0)
-    };
-  }
-
-  async function renderThemeCacheStats() {
-    const target = $("#theme-cache-stats");
-    if (!target) return;
-    try {
-      const stats = await themeCacheStats();
-      target.innerHTML = `<div class="cache-settings-summary"><span><strong>${stats.count}</strong> 个主题 · 展览 ${stats.displayCount} / ${stats.max}</span><span>${formatBytes(stats.bytes)} · IndexedDB</span></div>
-        <p class="api-note">共 ${stats.words} 个词。数据库保留全部主题；首页展览队列最多 ${stats.max} 版，换入新版只会移出最早一版，不删除数据库。</p>`;
-    } catch (_) {
-      target.innerHTML = `<p class="api-note">主题库暂时无法读取。</p>`;
-    }
-  }
-
-  function themeDisplayLoad() {
-    try {
-      const value = JSON.parse(localStorage.getItem(THEME_DISPLAY_KEY) || "[]");
-      return Array.isArray(value) ? value.map(String) : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function themeDisplaySave() {
-    try { localStorage.setItem(THEME_DISPLAY_KEY, JSON.stringify(state.themeDisplay)); } catch (_) { /* no-op */ }
-  }
-
-  async function initThemeStore() {
-    try {
-      let decks = await themeDecksRead();
-      if (!decks.length) {
-        // One-time migration from the old localStorage cache.
-        let legacy = [];
-        try { legacy = JSON.parse(localStorage.getItem(THEME_LEGACY_KEY) || "[]"); } catch (_) { legacy = []; }
-        if (Array.isArray(legacy) && legacy.length) {
-          for (const deck of legacy) {
-            try { await themeDeckSave(deck); } catch (_) { /* skip malformed */ }
-          }
-          try { localStorage.removeItem(THEME_LEGACY_KEY); } catch (_) { /* no-op */ }
-          decks = await themeDecksRead();
-        }
-      }
-      state.themeDecks = decks;
-      const titles = new Set(decks.map((deck) => deck.title));
-      let display = themeDisplayLoad().filter((title) => titles.has(title));
-      for (const deck of decks) {
-        if (display.length >= THEME_DISPLAY_LIMIT) break;
-        if (!display.includes(deck.title)) display.push(deck.title);
-      }
-      state.themeDisplay = display.slice(0, THEME_DISPLAY_LIMIT);
-      state.themeIndex = 0;
-      themeDisplaySave();
-    } catch (error) {
-      console.warn("Theme database unavailable.", error);
-      state.themeDecks = [];
-      state.themeDisplay = [];
-    }
-  }
-
-  function ensureThemeDecks() {
-    if (!Array.isArray(state.themeDecks)) state.themeDecks = [];
-    if (!Array.isArray(state.themeDisplay)) state.themeDisplay = [];
-    if (!state.themeDisplay.length && state.themeDecks.length) {
-      state.themeDisplay = state.themeDecks.slice(0, THEME_DISPLAY_LIMIT).map((deck) => deck.title);
-    }
-    if (!state.themeDisplay.length) return;
-    state.themeIndex = Math.max(0, Math.min(Number(state.themeIndex) || 0, state.themeDisplay.length - 1));
-  }
-
-  function themeDeckByTitle(title) {
-    return state.themeDecks.find((deck) => deck.title === title) || null;
-  }
-
-  function showThemeDeck(deck, { animate = false } = {}) {
-    if (!deck) return;
-    ensureThemeDecks();
-    let index = state.themeDisplay.indexOf(deck.title);
-    if (index === -1) {
-      state.themeDisplay.unshift(deck.title);
-      if (state.themeDisplay.length > THEME_DISPLAY_LIMIT) {
-        state.themeDisplay = state.themeDisplay.slice(0, THEME_DISPLAY_LIMIT);
-      }
-      themeDisplaySave();
-      index = 0;
-    }
-    state.themeIndex = index;
-    state.themeDeck = deck;
-    renderThemeSalon({ animate });
-  }
-
-  function fallbackThemeDeck() {
-    const decks = Array.isArray(CONTENT.themeDecks) ? CONTENT.themeDecks : [];
-    return decks[state.themeSeq % Math.max(1, decks.length)] || {
-      title: "主题展",
-      subtitle: "给词语一个可以站立的地方。",
-      scene: "先把一组词放进同一个世界，再让它们彼此照亮。",
-      words: []
-    };
-  }
-
-  function currentThemeDeck() {
-    ensureThemeDecks();
-    const title = state.themeDisplay[state.themeIndex];
-    const deck = title ? themeDeckByTitle(title) : null;
-    if (deck) return deck;
-    if (state.themeDecks.length) return themeDeckByTitle(state.themeDisplay[0]) || state.themeDecks[0];
-    if (state.themeDeck) return state.themeDeck;
-    return fallbackThemeDeck();
-  }
-
-  function normalizeThemeDeck(raw) {
-    const base = raw && typeof raw === "object" ? raw : {};
-    const title = String(base.title || "").trim();
-    const subtitle = String(base.subtitle || "").trim();
-    const scene = String(base.scene || "").trim();
-    const words = (Array.isArray(base.words) ? base.words : []).map((item) => ({
-      word: String(item?.word || "").trim().toLowerCase(),
-      pos: String(item?.pos || "").trim(),
-      gloss: String(item?.gloss || "").trim(),
-      why: String(item?.why || "").trim()
-    })).filter((item) => item.word && item.gloss).slice(0, 5);
-    if (!title || words.length < 3) throw new Error("主题内容不完整。");
-    return { title, subtitle, scene, words, generated: true, at: Date.now() };
-  }
-
-  function themeSalonMarkup(deck) {
-    const copy = copyFor("themeSalon");
-    const words = Array.isArray(deck.words) ? deck.words : [];
-    const lead = words[0];
-    const columns = words.slice(1);
-    ensureThemeDecks();
-    const total = state.themeDisplay.length;
-    const libraryTotal = state.themeDecks.length;
-    const issue = String(total ? state.themeIndex + 1 : 1).padStart(2, "0");
-    const totalLabel = total ? String(total).padStart(2, "0") : "01";
-    const libraryLabel = libraryTotal ? String(libraryTotal).padStart(2, "0") : "00";
-    const canCycle = total > 1;
-    return `<div class="theme-poster">
-      <div class="poster-masthead">
-        <div class="poster-brand">
-          <span class="poster-brand-mark">${esc(copy.brand || "TALK")}</span>
-          <span class="poster-brand-section">${esc(copy.masthead)}</span>
-        </div>
-        <div class="poster-edition">
-          <span>${esc(copy.editionLabel)} · No. ${issue} / ${totalLabel}</span>
-          <div class="poster-nav" aria-label="缓存内切换">
-            <button type="button" data-action="theme-cycle" data-delta="-1" aria-label="上一版" ${canCycle ? "" : "disabled"}>‹</button>
-            <button type="button" data-action="theme-cycle" data-delta="1" aria-label="下一版" ${canCycle ? "" : "disabled"}>›</button>
-          </div>
-        </div>
-      </div>
-      <div class="poster-rule"></div>
-      <div class="poster-head">
-        <div>
-          <div class="eyebrow poster-kicker"><span class="spark"></span>${esc(copy.kicker)}</div>
-          <h2 class="poster-title">${esc(deck.title)}</h2>
-          <p class="poster-subtitle">${esc(deck.subtitle || "")}</p>
-        </div>
-      </div>
-      <div class="poster-body">
-        ${lead ? `<button class="poster-lead" type="button" data-action="word" data-word="${attr(lead.word)}" aria-label="查看 ${attr(lead.word)}" style="--i:0">
-          <span class="poster-lead-label">01 / ${esc(copy.leadLabel)}</span>
-          <span class="poster-lead-word">${esc(lead.word)}</span>
-          <span class="poster-lead-pos">${esc(posLabel(lead.pos))}</span>
-          <span class="poster-lead-gloss">${esc(lead.gloss)}</span>
-          <span class="poster-lead-why">${esc(lead.why || "")}</span>
-        </button>` : ""}
-        <div class="poster-columns">
-          ${columns.map((item, index) => `<button class="poster-col" type="button" data-action="word" data-word="${attr(item.word)}" aria-label="查看 ${attr(item.word)}" style="--i:${index + 1}">
-            <span class="poster-col-index">${String(index + 2).padStart(2, "0")}</span>
-            <span class="poster-col-word">${esc(item.word)}</span>
-            <span class="poster-col-pos">${esc(posLabel(item.pos))}</span>
-            <span class="poster-col-gloss">${esc(item.gloss)}</span>
-            <span class="poster-col-why">${esc(item.why || "")}</span>
-          </button>`).join("")}
-        </div>
-      </div>
-      ${deck.scene ? `<div class="poster-scene"><span>${esc(copy.sceneLabel)}</span><p>${esc(deck.scene)}</p></div>` : ""}
-      <div class="poster-bottom">
-        <span class="poster-cache-count">${total ? `${totalLabel} ${esc(copy.cacheUnit)} · ${esc(copy.libraryLabel)} ${libraryLabel} ${esc(copy.libraryUnit)}` : esc(copy.noCache)}</span>
-        <div class="poster-actions">
-          <button class="poster-picker" type="button" data-action="theme-picker">${esc(copy.pickerCta)}</button>
-          <button class="poster-single ${state.themeGenerating ? "is-loading" : ""}" type="button" data-action="theme-generate" ${state.themeGenerating ? "disabled" : ""}>
-            ${state.themeGenerating ? esc(copy.printing) : `${icon("sparkle")} ${esc(copy.singleCta)}`}
-          </button>
-        </div>
-      </div>
-      <div class="poster-footer"><span>talk. · ${esc(copy.local)}</span><span>${esc(copy.footerRight)}</span></div>
-    </div>`;
-  }
-
-  function renderThemeSalon({ animate = false } = {}) {
-    const host = $("#theme-salon");
-    if (!host) return;
-    host.classList.remove("is-printing");
-    host.innerHTML = themeSalonMarkup(currentThemeDeck());
-    if (animate) {
-      void host.offsetWidth;
-      host.classList.add("is-printing");
-      window.setTimeout(() => host.classList.remove("is-printing"), 1100);
-    }
-  }
-
-  function cycleTheme(delta) {
-    ensureThemeDecks();
-    if (state.themeDisplay.length <= 1) return;
-    state.themeIndex = (state.themeIndex + Number(delta || 1) + state.themeDisplay.length) % state.themeDisplay.length;
-    state.themeDeck = themeDeckByTitle(state.themeDisplay[state.themeIndex]) || state.themeDeck;
-    renderThemeSalon({ animate: true });
-  }
-
-  async function requestThemeDeck(seed, exclude = []) {
-    const data = await LLM.requestJson({
-      settings: state.settings,
-      system: window.TALK_PROMPTS.theme,
-      user: { task: "theme", seed, exclude },
-      maxTokens: 1400,
-      timeoutMs: 50_000,
-      label: "主题沙龙",
-      disableThinking: true,
-      temperature: 0.3,
-      retries: 1
-    });
-    return normalizeThemeDeck(data);
-  }
-
-  async function generateThemeDeck() {
-    if (state.themeGenerating) return;
-    if (!hasModelConfig(state.settings)) {
-      toast("未连接模型，先在设置里接入模型");
-      return;
-    }
-    state.themeGenerating = true;
-    renderThemeSalon();
-    try {
-      const exclude = state.themeDecks.map((deck) => deck.title);
-      const deck = await requestThemeDeck(`${Date.now()}-${state.themeSeq++}`, exclude);
-      await themeDeckSave(deck);
-      state.themeDecks = await themeDecksRead();
-      showThemeDeck(deck);
-      toast("已印好一版，存入主题库");
-    } catch (error) {
-      console.warn("Theme generation failed.", error);
-      toast(`主题生成失败：${String(error?.message || error).slice(0, 100)}`);
-    } finally {
-      state.themeGenerating = false;
-      renderThemeSalon();
-    }
-  }
-
-  function openThemePicker() {
-    const copy = copyFor("themeSalon");
-    if (!state.themeDecks.length) {
-      toast("主题库里还没有缓存");
-      return;
-    }
-    openSheetShell({ kicker: copy.pickerKicker, title: copy.pickerTitle });
-    const holder = $("#sheet-scroll");
-    if (!holder) return;
-    const currentTitle = currentThemeDeck()?.title || "";
-    holder.innerHTML = `<div class="sheet-content theme-picker">
-      <p class="settings-intro">数据库共 ${state.themeDecks.length} 版。选一个不在展览队列里的主题，会替换掉队列里最早的一版，但不会删除数据库。</p>
-      <div class="theme-picker-list">
-        ${state.themeDecks.map((deck, index) => `<button class="theme-picker-item ${deck.title === currentTitle ? "active" : ""}" type="button" data-action="theme-pick" data-title="${attr(deck.title)}">
-          <span class="theme-picker-index">No. ${String(index + 1).padStart(2, "0")}</span>
-          <span class="theme-picker-copy"><strong>${esc(deck.title)}</strong><small>${esc(deck.subtitle || "无副标题")}</small></span>
-          <span class="theme-picker-count">${deck.words?.length || 0} 词${state.themeDisplay.includes(deck.title) ? " · 展览中" : ""}</span>
-        </button>`).join("")}
-      </div>
-    </div>`;
-  }
-
-  function pickTheme(title) {
-    const deck = themeDeckByTitle(String(title || ""));
-    if (!deck) return;
-    closeSheet();
-    showThemeDeck(deck, { animate: true });
   }
 
   function homePage() {
@@ -5711,34 +4488,6 @@ import {
     commitSettingsDraft();
   }
 
-  function isQwenProfile(profile = {}) {
-    return profile.id === "qwen" || /qianwenaiapi|dashscope|qwencloudapi/i.test(profile.baseUrl || "");
-  }
-
-  function qwenTtsProfile(cfg = state.settings) {
-    const profiles = (cfg.profiles || []).filter((profile) => profile.apiKey && isQwenProfile(profile));
-    if (!profiles.length) return null;
-    return profiles.find((profile) => profile.id === cfg.activeProfileId)
-      || profiles.find((profile) => profile.id === "qwen")
-      || profiles[0];
-  }
-
-  function qwenTtsEndpoint(profile, model = state.settings?.qwenTtsModel) {
-    const base = String(profile?.baseUrl || "").trim();
-    if (!base) return "";
-    try {
-      const origin = secureRemoteUrl(new URL(base).origin);
-      // Qwen3-TTS uses the multimodal generation route; Qwen-Audio-TTS uses
-      // the dedicated non-realtime speech route.
-      const path = /^qwen3-tts/i.test(String(model || ""))
-        ? "/api/v1/services/aigc/multimodal-generation/generation"
-        : "/api/v1/services/audio/tts/SpeechSynthesizer";
-      return `${origin}${path}`;
-    } catch (_) {
-      return "";
-    }
-  }
-
   function ttsSettingsHtml(draft) {
     const engine = draft.ttsEngine === "qwen" ? "qwen" : "native";
     return `
@@ -6673,19 +5422,15 @@ import {
 
   const WORD_SYSTEM_PROMPT = window.TALK_PROMPTS.word;
   const SENTENCE_SYSTEM_PROMPT = window.TALK_PROMPTS.sentence;
-  const TRANSLATOR_STYLES = window.TALK_CONTENT.translator.styles;
   // Long paragraphs are fine: the request only has to fit the model context.
   const TRANSLATOR_MAX_CHARS = 4000;
   // A sentence to analyse can be a paragraph; the word lookup path stays short.
   const SEARCH_MAX_CHARS = 800;
-  const TRANSLATOR_SYSTEM_PROMPT = window.TALK_PROMPTS.translator;
   const CHUNK_SYSTEM_PROMPT = window.TALK_PROMPTS.chunk;
   const REVERSE_SYSTEM_PROMPT = window.TALK_PROMPTS.reverse;
   const CHUNK_CACHE_PREFIX = "chunk:";
   const CHUNK_CACHE_LIMIT = 60;
   const REVERSE_MAX_SENTENCE_WORDS = 20;
-
-  state.translatorStyles = TRANSLATOR_STYLES.map((style) => style.id);
 
   function reverseBudget() {
     return Math.max(600, Math.min(3000, Number(state.settings?.reverseMaxTokens) || 1500));
@@ -7140,6 +5885,11 @@ import {
     if (!target) return;
     const action = target.dataset.action;
 
+    if (actions.has(action)) {
+      await actions.dispatch(action, { event, target });
+      return;
+    }
+
     switch (action) {
       case "home":
         event.preventDefault();
@@ -7391,16 +6141,6 @@ import {
         toggleSaved(target);
         break;
 
-      case "speak":
-        event.preventDefault();
-        speakText(target.dataset.text || "", target);
-        break;
-
-      case "regenerate-audio":
-        event.preventDefault();
-        speakText(target.dataset.text || "", target, state.settings, { bypassCache: true });
-        break;
-
       case "regenerate-sentence": {
         event.preventDefault();
         const surface = getActiveSurface();
@@ -7565,61 +6305,11 @@ import {
         copyCurrentPage();
         break;
 
-      case "share-page": {
-        event.preventDefault();
-        openShareSheet();
-        break;
-      }
-
-      case "share-generate": {
-        const picked = $$("[data-share-section]:checked").map((input) => Number(input.dataset.shareSection));
-        const data = sharePageData();
-        if (!data) return;
-        state.sharePicked = picked;
-        try { localStorage.setItem(SHARE_PICK_KEY, JSON.stringify(picked)); } catch (_) { /* private mode */ }
-        const sections = (state.shareSections || []).filter((section) => picked.includes(section.index)).map((section) => section.node);
-        renderSharePreview(data, sections);
-        break;
-      }
-      case "share-adjust": {
-        renderShareChooser();
-        break;
-      }
-      case "share-native": {
-        event.preventDefault();
-        if (!state.shareUrl) break;
-        (async () => {
-          try {
-            const blob = await (await fetch(state.shareUrl)).blob();
-            const file = new File([blob], "talk-card.png", { type: "image/png" });
-            if (navigator.canShare && navigator.canShare({ files: [file] })) {
-              await navigator.share({ files: [file], title: "talk." });
-              return;
-            }
-            toast("这台设备不支持系统分享，请用「保存图片」");
-          } catch (_) {
-            toast("分享没有完成，可以保存图片再发");
-          }
-        })();
-        break;
-      }
-
       case "copy-text": {
         event.preventDefault();
         const text = target.dataset.copy || "";
         if (!text) break;
         void copyText(text).then((copied) => toast(copied ? "已复制" : "这个浏览器不允许复制"));
-        break;
-      }
-
-      case "translator-style": {
-        event.preventDefault();
-        const styleId = target.dataset.style;
-        if (!TRANSLATOR_STYLES.some((style) => style.id === styleId)) break;
-        state.translatorStyles = state.translatorStyles.includes(styleId)
-          ? state.translatorStyles.filter((id) => id !== styleId)
-          : [...state.translatorStyles, styleId];
-        updateTranslatorStyleControls();
         break;
       }
 
@@ -7659,58 +6349,6 @@ import {
           if (current) scheduleThemeExamples(current);
         }
         renderSettingsContent();
-        break;
-
-      case "translator-mode": {
-        event.preventDefault();
-        state.translatorMode = target.dataset.mode === "zh" || target.dataset.mode === "en" ? target.dataset.mode : "auto";
-        $$(".translator-mode-btn").forEach((button) => {
-          const active = button.dataset.mode === state.translatorMode;
-          button.classList.toggle("active", active);
-          button.setAttribute("aria-pressed", String(active));
-        });
-        updateTranslatorLanguage();
-        break;
-      }
-
-      case "close-workspace":
-        event.preventDefault();
-        closeTranslationWorkspace();
-        break;
-
-      case "translation-detail":
-        event.preventDefault();
-        openTranslationDetail(Number(target.dataset.index));
-        break;
-
-      case "copy-translation": {
-        event.preventDefault();
-        const text = target.dataset.text || "";
-        if (!text) break;
-        void copyText(text).then((copied) => {
-          toast(copied ? "已复制这个版本" : "复制失败");
-        });
-        break;
-      }
-
-      case "translator-sample": {
-        event.preventDefault();
-        const input = $("#translator-input");
-        if (!input) break;
-        input.value = target.dataset.text || "";
-        updateTranslatorLanguage();
-        openTranslationWorkspace(input.value);
-        break;
-      }
-
-      case "regenerate-translation":
-        event.preventDefault();
-        if (state.lastTranslationInput) runTranslation(state.lastTranslationInput, { bypassCache: true });
-        break;
-
-      case "demo-translation":
-        event.preventDefault();
-        renderTranslatorResult(demoTranslationResult($("#translator-input")?.value || $("#workspace-translator-input")?.value));
         break;
 
       case "settings-tab":
@@ -7882,26 +6520,6 @@ import {
         break;
       }
 
-      case "theme-cycle":
-        event.preventDefault();
-        cycleTheme(target.dataset.delta);
-        break;
-
-      case "theme-generate":
-        event.preventDefault();
-        generateThemeDeck();
-        break;
-
-      case "theme-picker":
-        event.preventDefault();
-        openThemePicker();
-        break;
-
-      case "theme-pick":
-        event.preventDefault();
-        pickTheme(target.dataset.title);
-        break;
-
       case "shuffle-moods":
         event.preventDefault();
         state.moodOffset += 3;
@@ -7931,11 +6549,6 @@ import {
         state.draft.cacheDisplay = target.dataset.display === "corner" ? "corner" : "borders";
         scheduleSettingsCommit();
         renderSettingsContent();
-        break;
-
-      case "test-tts":
-        event.preventDefault();
-        testTts(target);
         break;
 
       case "save-settings":
@@ -8431,18 +7044,6 @@ import {
         renderSettingsContent();
         toast("运行日志已清空");
         break;
-      case "clear-theme-cache":
-        event.preventDefault();
-        await clearThemeStore();
-        state.themeDecks = [];
-        state.themeDisplay = [];
-        state.themeIndex = 0;
-        state.themeDeck = null;
-        themeDisplaySave();
-        renderThemeSalon();
-        renderSettingsContent();
-        toast("主题库已清空");
-        break;
 
       case "clear-word-cache":
         event.preventDefault();
@@ -8818,366 +7419,6 @@ import {
     syncSaveButton(button, saved);
     const scope = state.wordLayers.length ? state.wordLayers[state.wordLayers.length - 1].el : screen;
     $$('[data-action="save"]', scope).forEach((item) => syncSaveButton(item, saved));
-  }
-
-  function primeAudio() {
-    if (!ttsAudio) {
-      ttsAudio = new Audio();
-      ttsAudio.preload = "auto";
-    }
-    if (!ttsAudio.dataset.primed) {
-      ttsAudio.dataset.primed = "1";
-      ttsAudio.src = SILENT_AUDIO;
-      const attempt = ttsAudio.play();
-      if (attempt) attempt.catch(() => { /* The first click may be silent. */ });
-    }
-  }
-
-  function stopSpeech() {
-    if (currentAudio) {
-      const audio = currentAudio;
-      currentAudio = null;
-      try { audio.pause(); } catch (_) { /* no-op */ }
-      if (audio.dataset.url) URL.revokeObjectURL(audio.dataset.url);
-    }
-    if ("speechSynthesis" in window) window.speechSynthesis.cancel();
-    $$(".is-speaking, .is-loading").forEach((item) => {
-      item.classList.remove("is-speaking", "is-loading");
-      item.removeAttribute("aria-busy");
-    });
-  }
-
-  function setTtsLoading(button, loading) {
-    if (!button) return;
-    button.classList.toggle("is-loading", loading);
-    if (loading) button.setAttribute("aria-busy", "true");
-    else button.removeAttribute("aria-busy");
-  }
-
-  function pickSystemVoice() {
-    if (!("speechSynthesis" in window)) return null;
-    const voices = window.speechSynthesis.getVoices()
-      .filter((voice) => /^en([-_]|$)/i.test(voice.lang) || /English/i.test(voice.name));
-    const patterns = [
-      /Microsoft.*(Aria|Jenny|Guy|Sonia|Ryan).*(Natural|Online)/i,
-      /Microsoft.*(Aria|Jenny|Guy|Sonia|Ryan)/i,
-      /Google US English/i,
-      /Samantha/i,
-      /Ava/i,
-      /Microsoft.*English/i,
-      /en-US/i
-    ];
-    for (const pattern of patterns) {
-      const found = voices.find((voice) => pattern.test(voice.name) || pattern.test(voice.lang));
-      if (found) return found;
-    }
-    return null;
-  }
-
-  function speakSystem(text, button) {
-    if (!("speechSynthesis" in window)) return "system";
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "en-US";
-    utterance.rate = 0.92;
-    utterance.pitch = 1;
-    const voice = pickSystemVoice();
-    if (voice) utterance.voice = voice;
-    if (button) {
-      button.classList.add("is-speaking");
-      utterance.onend = () => button.classList.remove("is-speaking");
-      utterance.onerror = () => button.classList.remove("is-speaking");
-    }
-    window.speechSynthesis.speak(utterance);
-    return "system";
-  }
-
-  async function playAudioBlob(blob, button) {
-    if (!blob.size) throw new Error("语音接口返回了空音频。");
-    const url = URL.createObjectURL(blob);
-    const audio = ttsAudio || new Audio();
-    ttsAudio = audio;
-    try { audio.pause(); } catch (_) { /* no-op */ }
-    if (audio.dataset.url) URL.revokeObjectURL(audio.dataset.url);
-    audio.src = url;
-    audio.dataset.url = url;
-    currentAudio = audio;
-    if (button) button.classList.add("is-speaking");
-    const cleanup = () => {
-      if (button) button.classList.remove("is-speaking");
-      if (currentAudio === audio) currentAudio = null;
-      URL.revokeObjectURL(url);
-    };
-    audio.onended = cleanup;
-    audio.onerror = cleanup;
-    try {
-      await audio.play();
-    } catch (error) {
-      cleanup();
-      throw error;
-    }
-  }
-
-  async function playAudioUrl(url, button) {
-    if (!url) throw new Error("语音接口没有返回音频地址。");
-    url = secureRemoteUrl(url);
-    const audio = ttsAudio || new Audio();
-    ttsAudio = audio;
-    try { audio.pause(); } catch (_) { /* no-op */ }
-    if (audio.dataset.url) {
-      URL.revokeObjectURL(audio.dataset.url);
-      delete audio.dataset.url;
-    }
-    audio.src = url;
-    currentAudio = audio;
-    if (button) button.classList.add("is-speaking");
-    const cleanup = () => {
-      if (button) button.classList.remove("is-speaking");
-      if (currentAudio === audio) currentAudio = null;
-    };
-    audio.onended = cleanup;
-    audio.onerror = cleanup;
-    try {
-      await audio.play();
-    } catch (error) {
-      cleanup();
-      throw error;
-    }
-    return "qwen-url";
-  }
-
-  function base64ToBlob(data, type = "audio/mpeg") {
-    const raw = String(data || "").includes(",") ? String(data).split(",").pop() : String(data || "");
-    const binary = atob(raw);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    return new Blob([bytes], { type });
-  }
-
-  async function speakQwen(text, button, cfg, { bypassCache = false } = {}) {
-    const profile = qwenTtsProfile(cfg);
-    if (!profile) throw new Error("还没有可用的 Qwen API 密钥，请先在模型设置里填写。");
-    const model = String(cfg.qwenTtsModel || "qwen-audio-3.1-tts-plus").trim();
-    const endpoint = qwenTtsEndpoint(profile, model);
-    if (!endpoint) throw new Error("Qwen API 地址为空，无法定位语音接口。");
-    const isQwen3 = /^qwen3-tts/i.test(model);
-    let voice = String(cfg.qwenTtsVoice || "").trim();
-    if (isQwen3 && (!voice || /^longanhuan/i.test(voice))) voice = "Cherry";
-    if (!voice) voice = "longanhuan_v3.1";
-    const cacheKey = `qwen|${model}|${voice}|${text}|${AUDIO_CACHE_VERSION}`;
-    if (!bypassCache) {
-      const cached = await getCachedAudio(cacheKey);
-      if (cached) {
-        await playAudioBlob(cached, button);
-        return "qwen-cache";
-      }
-    }
-    const ttsTimeoutMs = 30_000;
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), ttsTimeoutMs);
-    let response;
-    let raw;
-    try {
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${usableApiKey(profile.apiKey)}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model,
-          input: isQwen3
-            ? {
-                text,
-                voice,
-                language_type: detectSourceLanguage(text) === "zh" ? "Chinese" : "English"
-              }
-            : {
-                text,
-                voice,
-                format: "mp3",
-                sample_rate: 24000
-              }
-        }),
-        signal: controller.signal
-      });
-      raw = await response.text();
-    } catch (error) {
-      if (error?.name === "AbortError") throw new Error(`Qwen 语音请求超过 ${ttsTimeoutMs / 1000} 秒，已中断。`);
-      throw error;
-    } finally {
-      window.clearTimeout(timer);
-    }
-    let payload = null;
-    try { payload = raw ? JSON.parse(raw) : null; } catch (_) { /* handled below */ }
-    if (!response.ok || !payload) {
-      const message = payload?.message || payload?.code || raw.slice(0, 180) || `HTTP ${response.status}`;
-      throw new Error(`Qwen 语音失败：${message}`);
-    }
-    const audio = payload.output?.audio || payload.audio || payload.output || {};
-    if (audio.data) {
-      const blob = base64ToBlob(audio.data, "audio/mpeg");
-      await putCachedAudio(cacheKey, blob);
-      await playAudioBlob(blob, button);
-      return "qwen";
-    }
-    if (audio.url) {
-      const audioUrl = secureRemoteUrl(audio.url);
-      try {
-        const file = await fetch(audioUrl);
-        if (file.ok) {
-          const blob = await file.blob();
-          if (blob.size) {
-            await putCachedAudio(cacheKey, blob);
-            await playAudioBlob(blob, button);
-            return "qwen";
-          }
-        }
-      } catch (_) {
-        // The signed OSS URL can still be played directly even when fetch is blocked.
-      }
-      return playAudioUrl(audioUrl, button);
-    }
-    throw new Error("Qwen 语音返回里没有 audio.url 或 audio.data。");
-  }
-
-  /* ---------- Audio cache (Qwen TTS results only; no local model) ---------- */
-
-  const AUDIO_DB_NAME = "talk.audio.v1";
-  const AUDIO_DB_STORE = "audio";
-  const AUDIO_CACHE_VERSION = "v4";
-  let lastTtsError = "";
-
-  function openAudioDb() {
-    return new Promise((resolve, reject) => {
-      if (!("indexedDB" in window)) {
-        reject(new Error("IndexedDB unavailable"));
-        return;
-      }
-      const request = indexedDB.open(AUDIO_DB_NAME, 1);
-      request.onupgradeneeded = () => {
-        const db = request.result;
-        if (!db.objectStoreNames.contains(AUDIO_DB_STORE)) db.createObjectStore(AUDIO_DB_STORE);
-      };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
-
-  async function getCachedAudio(key) {
-    try {
-      const db = await openAudioDb();
-      return await new Promise((resolve) => {
-        const request = db.transaction(AUDIO_DB_STORE, "readonly").objectStore(AUDIO_DB_STORE).get(key);
-        request.onsuccess = () => resolve(request.result?.blob || null);
-        request.onerror = () => resolve(null);
-      });
-    } catch (_) {
-      return null;
-    }
-  }
-
-  async function getAudioStats() {
-    try {
-      const db = await openAudioDb();
-      const records = await new Promise((resolve) => {
-        const req = db.transaction(AUDIO_DB_STORE, "readonly").objectStore(AUDIO_DB_STORE).getAll();
-        req.onsuccess = () => resolve(req.result || []);
-        req.onerror = () => resolve([]);
-      });
-      return {
-        count: records.length,
-        bytes: records.reduce((sum, record) => sum + (record?.blob?.size || 0), 0),
-        latest: records
-          .filter((record) => record?.at)
-          .sort((a, b) => Number(b.at) - Number(a.at))
-          .slice(0, 8)
-          .map((record) => ({ at: Number(record.at), bytes: record?.blob?.size || 0 }))
-      };
-    } catch (_) {
-      return { count: 0, bytes: 0, latest: [] };
-    }
-  }
-
-  async function clearAudioCache() {
-    try {
-      const db = await openAudioDb();
-      await new Promise((resolve) => {
-        const tx = db.transaction(AUDIO_DB_STORE, "readwrite");
-        tx.objectStore(AUDIO_DB_STORE).clear();
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => resolve();
-      });
-    } catch (_) {
-      // Ignore unavailable storage.
-    }
-  }
-
-  async function putCachedAudio(key, blob) {
-    try {
-      const db = await openAudioDb();
-      await new Promise((resolve, reject) => {
-        const tx = db.transaction(AUDIO_DB_STORE, "readwrite");
-        tx.objectStore(AUDIO_DB_STORE).put({ blob, at: Date.now() }, key);
-        tx.oncomplete = () => resolve();
-        tx.onerror = () => reject(tx.error);
-      });
-    } catch (_) {
-      // Cache failures must never block playback.
-    }
-  }
-
-  function refreshTtsError() {
-    const box = $("#tts-error");
-    if (!box) return;
-    box.hidden = !lastTtsError;
-    box.textContent = lastTtsError ? `最近错误：${lastTtsError}` : "";
-  }
-
-  async function speakText(text, button = null, cfg = state.settings, options = {}) {
-    const clean = String(text || "").trim();
-    if (!clean) return null;
-    const engine = cfg.ttsEngine === "qwen" ? "qwen" : "native";
-    if (engine === "native") {
-      stopSpeech();
-      return speakSystem(clean, button);
-    }
-    primeAudio();
-    stopSpeech();
-    setTtsLoading(button, true);
-    try {
-      const result = await speakQwen(clean, button, cfg, options);
-      lastTtsError = "";
-      return result;
-    } catch (error) {
-      lastTtsError = String(error?.message || error || "未知错误");
-      refreshTtsError();
-      toast(lastTtsError);
-      console.warn("Qwen TTS failed; falling back to system speech.", error);
-      return speakSystem(clean, button);
-    } finally {
-      setTtsLoading(button, false);
-    }
-  }
-
-  async function testTts(button) {
-    const status = $("#tts-test-status");
-    const selected = state.draft || state.settings;
-    const engine = selected.ttsEngine === "qwen" ? "qwen" : "native";
-    if (status) {
-      status.textContent = engine === "qwen" ? "正在请求 Qwen 语音…" : "正在使用设备系统语音";
-    }
-    lastTtsError = "";
-    const result = await speakText("Talk is ready.", button, selected, { bypassCache: true });
-    if (engine === "native") {
-      refreshTtsError();
-      return;
-    }
-    if (status) {
-      status.textContent = String(result || "").startsWith("qwen")
-        ? "Qwen 语音已就绪"
-        : `Qwen 语音失败，已回退系统语音：${lastTtsError || "未知错误"}`;
-    }
-    refreshTtsError();
   }
 
   async function copyCurrentPage() {
