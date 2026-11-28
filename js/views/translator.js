@@ -6,8 +6,21 @@ import { $, $$, esc, attr, shorten, detectSourceLanguage, copyText } from "../co
 import { icon } from "../core/icons.js";
 import { diagLog } from "../core/diagnostics.js";
 
-const TRANSLATION_CACHE_MAX = 40;
+const TRANSLATION_CACHE_MAX = 200;
 const TRANSLATION_CACHE_TTL = 30 * 86400000;
+
+function readLocalCache(key, fallback) {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || "null");
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : fallback;
+  } catch (_) {
+    return fallback;
+  }
+}
+
+function writeLocalCache(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* no-op */ }
+}
 
 function styleEmoji(style, className = "") {
   return `<img class="${className}" src="${esc(style.emoji)}" alt="" loading="eager" decoding="async" draggable="false" />`;
@@ -67,6 +80,8 @@ export function createTranslatorView({
   modelTimeoutText,
   copyFor,
   uiLang,
+  kvGet = readLocalCache,
+  kvSet = writeLocalCache,
   englishDirective,
   hasModelConfig,
   homeTopbar,
@@ -82,12 +97,8 @@ export function createTranslatorView({
   }
 
   function translationCacheAll() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(translationCacheKey()) || "{}");
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-    } catch (_) {
-      return {};
-    }
+    const parsed = kvGet(translationCacheKey(), {});
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? { ...parsed } : {};
   }
 
   function translationCacheGet(text) {
@@ -102,7 +113,7 @@ export function createTranslatorView({
     const entries = Object.entries(all)
       .sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0))
       .slice(0, TRANSLATION_CACHE_MAX);
-    try { localStorage.setItem(translationCacheKey(), JSON.stringify(Object.fromEntries(entries))); } catch (_) { /* no-op */ }
+    kvSet(translationCacheKey(), Object.fromEntries(entries));
   }
 
   function translatorEmptyHtml() {

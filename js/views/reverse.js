@@ -11,7 +11,8 @@ import {
   markdownLite
 } from "../model/markdown.js";
 
-const REVERSE_THREAD_LIMIT = 30;
+const REVERSE_THREAD_LIMIT = 200;
+const REVERSE_FIRST_LIMIT = 200;
 
 function readLocalJson(key, fallback) {
   try {
@@ -36,6 +37,8 @@ export function createReverseView({
   state,
   copyFor,
   uiLang,
+  kvGet = readLocalJson,
+  kvSet = writeLocalJson,
   reverseIdFor,
   reverseBudget,
   reverseStyleName,
@@ -56,15 +59,20 @@ export function createReverseView({
     return "talk.reverse.v2" + (uiLang() === "en" ? ".en" : "");
   }
 
+  function readStoreMap(key) {
+    const raw = kvGet(key, {});
+    return raw && typeof raw === "object" && !Array.isArray(raw) ? { ...raw } : {};
+  }
+
   function loadReverseThreads() {
-    return readLocalJson(reverseThreadsKey(), {});
+    return readStoreMap(reverseThreadsKey());
   }
 
   function saveReverseThreads(map) {
     const entries = Object.values(map).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     const kept = {};
     entries.slice(0, REVERSE_THREAD_LIMIT).forEach((entry) => { kept[entry.id] = entry; });
-    writeLocalJson(reverseThreadsKey(), kept);
+    kvSet(reverseThreadsKey(), kept);
   }
 
   function persistReverseThread() {
@@ -111,7 +119,7 @@ export function createReverseView({
   }
 
   function clearReverseThreads() {
-    writeLocalJson(reverseThreadsKey(), {});
+    kvSet(reverseThreadsKey(), {});
   }
 
   function currentReverseThread() {
@@ -119,14 +127,14 @@ export function createReverseView({
   }
 
   function cacheGetReverseFirst(text) {
-    return readLocalJson(reverseFirstKey(), {})[reverseIdFor(text)] || null;
+    return readStoreMap(reverseFirstKey())[reverseIdFor(text)] || null;
   }
 
   function cachePutReverseFirst(text, data) {
-    const map = readLocalJson(reverseFirstKey(), {});
+    const map = readStoreMap(reverseFirstKey());
     map[reverseIdFor(text)] = { ...data, at: Date.now() };
     const entries = Object.entries(map).sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0));
-    writeLocalJson(reverseFirstKey(), Object.fromEntries(entries.slice(0, 40)));
+    kvSet(reverseFirstKey(), Object.fromEntries(entries.slice(0, REVERSE_FIRST_LIMIT)));
   }
 
   function reverseSuggestions() {

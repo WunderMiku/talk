@@ -26,6 +26,7 @@ export function createSheetController({
   wordCacheStats,
   wordCacheEstimate,
   getAudioStats,
+  getStorageEstimate,
   formatBytes,
   clearWordStore,
   clearAudioCache,
@@ -227,14 +228,18 @@ export function createSheetController({
     holder.innerHTML = `<div class="sheet-content" id="cache-dashboard"><p class="settings-intro">正在读取本机缓存…</p></div>`;
     const words = wordCacheStats();
     const audio = await getAudioStats();
+    const quotaEst = getStorageEstimate ? await getStorageEstimate() : { usage: 0, quota: 0, persisted: false };
     if (!holder.isConnected) return;
     const estimate = wordCacheEstimate();
     const percent = Math.min(100, words.max ? (words.count / words.max) * 100 : 0);
     const totalBytes = words.bytes + audio.bytes;
     const recent = words.entries.slice(0, 24);
+    const quotaText = quotaEst.quota > 0
+      ? `本机可用配额 ${formatBytes(quotaEst.quota)}${quotaEst.persisted ? " · 已开启持久化" : ""}；书库、词条、寻词与精读均存 IndexedDB。`
+      : "只存本机 IndexedDB；导出不含音频。";
     holder.innerHTML = `
       <div class="sheet-content" id="cache-dashboard">
-        <p class="settings-intro">只存本机；导出不含音频。</p>
+        <p class="settings-intro">${quotaText}</p>
         <div class="cache-summary-grid">
           <div class="cache-summary-card">
             <span class="cache-summary-label">词条</span>
@@ -257,7 +262,7 @@ export function createSheetController({
         </div>
         <div class="cache-limit-grid">
           <label>词条上限
-            <input type="number" min="10" max="2000" step="10" value="${words.max}" data-cache-setting="cacheMax" inputmode="numeric" />
+            <input type="number" min="10" max="20000" step="10" value="${words.max}" data-cache-setting="cacheMax" inputmode="numeric" />
           </label>
           <label>保留天数
             <input type="number" min="1" max="3650" step="1" value="${words.ttlDays}" data-cache-setting="cacheTtlDays" inputmode="numeric" />

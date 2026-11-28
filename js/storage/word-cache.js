@@ -56,7 +56,7 @@ export function createWordCacheStore({
 
   function cacheMax() {
     const value = Number(state.settings?.cacheMax) || DEFAULT_CACHE_MAX;
-    return Math.max(10, Math.min(2000, Math.round(value)));
+    return Math.max(10, Math.min(20000, Math.round(value)));
   }
 
   function cacheTtlDays() {

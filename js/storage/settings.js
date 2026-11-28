@@ -480,6 +480,10 @@ export function createSettingsStore({ state, data: DATA, llm: LLM, toast }) {
   }
 
   function persistSaved() {
+    if (window.TALK_WORDBOOKS?.backend?.() === "IndexedDB") {
+      try { localStorage.removeItem(SAVED_KEY); } catch (_) { /* no-op */ }
+      return;
+    }
     try { localStorage.setItem(SAVED_KEY, JSON.stringify(state.saved)); } catch (_) { /* no-op */ }
   }
 

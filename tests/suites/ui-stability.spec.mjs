@@ -294,4 +294,94 @@ suite("ui stability · bug & twitch regressions", { timeout: 60_000 }, (s) => {
     });
     t.expect(page.errors).toEqual([]);
   });
+
+  s.test("migrates legacy wordbooks, reverse threads, and translation cache from localStorage into IndexedDB without loss", async (state, t) => {
+    const page = await state.env.newPage();
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem("__seeded_idb_test")) return;
+      sessionStorage.setItem("__seeded_idb_test", "1");
+      localStorage.setItem("talk.wordbooks.v1", JSON.stringify({
+        version: 1,
+        books: [
+          { id: "dense-stacks", name: "密集书库", system: true, createdAt: 1, items: [{ term: "ephemeral", addedAt: 1 }] },
+          { id: "custom-1", name: "外刊高频", system: false, createdAt: 2, items: [{ term: "ubiquitous", addedAt: 2 }] }
+        ]
+      }));
+      localStorage.setItem("talk.saved.v1", JSON.stringify(["ephemeral", "resilient"]));
+      localStorage.setItem("talk.reverse.threads.v1", JSON.stringify({
+        "rv-legacy-1": {
+          id: "rv-legacy-1",
+          title: "legacy thread",
+          updatedAt: Date.now(),
+          messages: [
+            { role: "user", content: "测试迁移" },
+            { role: "assistant", content: "已迁移到 [[IndexedDB]]。" }
+          ]
+        }
+      }));
+      localStorage.setItem("talk.translations.v3", JSON.stringify({
+        "hello": { at: Date.now(), result: { sourceText: "hello", variants: [{ style: "natural", text: "Hello" }] } }
+      }));
+    });
+
+    await page.open("/");
+    await page.waitForTimeout(200);
+
+    const migrated = await page.evaluate(async () => {
+      const wb = window.TALK_WORDBOOKS;
+      wb.addTerm("persistedword", "dense-stacks");
+      await wb.flush();
+      return {
+        backend: wb.backend(),
+        wouldFitLarge: wb.wouldFit(10_000_000),
+        hasEphemeral: wb.hasTerm("ephemeral"),
+        hasUbiquitous: wb.hasTerm("ubiquitous"),
+        hasResilient: wb.hasTerm("resilient"),
+        hasPersisted: wb.hasTerm("persistedword"),
+        lsWordbooks: localStorage.getItem("talk.wordbooks.v1"),
+        lsSaved: localStorage.getItem("talk.saved.v1"),
+        lsReverse: localStorage.getItem("talk.reverse.threads.v1"),
+        lsTrans: localStorage.getItem("talk.translations.v3")
+      };
+    });
+
+    t.expect(migrated).toEqual({
+      backend: "IndexedDB",
+      wouldFitLarge: true,
+      hasEphemeral: true,
+      hasUbiquitous: true,
+      hasResilient: true,
+      hasPersisted: true,
+      lsWordbooks: null,
+      lsSaved: null,
+      lsReverse: null,
+      lsTrans: null
+    });
+
+    // Reload and confirm all migrated + newly added data survive from IndexedDB alone.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".screen");
+    await page.waitForTimeout(200);
+
+    const afterReload = await page.evaluate(() => ({
+      backend: window.TALK_WORDBOOKS.backend(),
+      uniqueWords: window.TALK_WORDBOOKS.stats().uniqueWords,
+      hasPersisted: window.TALK_WORDBOOKS.hasTerm("persistedword"),
+      hasUbiquitous: window.TALK_WORDBOOKS.hasTerm("ubiquitous"),
+      lsWordbooks: localStorage.getItem("talk.wordbooks.v1")
+    }));
+    t.expect(afterReload).toEqual({
+      backend: "IndexedDB",
+      uniqueWords: 4,
+      hasPersisted: true,
+      hasUbiquitous: true,
+      lsWordbooks: null
+    });
+
+    // Verify migrated legacy reverse thread is still openable from IndexedDB.
+    await page.goto(`${state.env.origin}/#/reverse/rv-legacy-1`, { waitUntil: "domcontentloaded" });
+    await page.waitForSelector(".reverse-markdown");
+    t.expect(await page.textContent(".reverse-markdown")).toContain("IndexedDB");
+    t.expect(page.errors).toEqual([]);
+  });
 });

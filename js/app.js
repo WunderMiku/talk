@@ -45,6 +45,12 @@ import {
   chunkCacheKey,
   createWordCacheStore
 } from "./storage/word-cache.js";
+import {
+  initKvStore,
+  kvGet,
+  kvSet,
+  getStorageEstimate
+} from "./storage/idb-kv.js";
 import { ensureWord, ensureChunk, ensureSentence } from "./model/normalize.js";
 import {
   MODEL_TIMEOUT_MS,
@@ -77,7 +83,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   const CONTENT = window.TALK_CONTENT;
   const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "298"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "299"; // cache-busting build, kept in step with ?v= and sw.js
   const actions = createActionRegistry();
 
   const app = document.getElementById("app");
@@ -295,6 +301,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     wordCacheStats,
     wordCacheEstimate,
     getAudioStats,
+    getStorageEstimate,
     formatBytes,
     clearWordStore,
     clearAudioCache,
@@ -345,6 +352,8 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     modelTimeoutText: MODEL_TIMEOUT_TEXT,
     copyFor,
     uiLang,
+    kvGet,
+    kvSet,
     englishDirective,
     hasModelConfig,
     homeTopbar,
@@ -451,6 +460,8 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     state,
     copyFor,
     uiLang,
+    kvGet,
+    kvSet,
     reverseIdFor,
     reverseBudget,
     reverseStyleName,
@@ -1940,10 +1951,22 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     });
   }
 
+  const KV_LEGACY_KEYS = [
+    "talk.reverse.threads.v1",
+    "talk.reverse.threads.v1.en",
+    "talk.reverse.v2",
+    "talk.reverse.v2.en",
+    "talk.translations.v3",
+    "talk.translations.v3.en"
+  ];
+
   async function init() {
     await unlockStoredKeys();
     if (hadPlainKeys()) persistSettings(state.settings);
     setupInstallPrompt();
+    await initKvStore(KV_LEGACY_KEYS);
+    await window.TALK_WORDBOOKS?.initStore?.(state.saved);
+    syncSavedFromWordbooks();
     await initThemeStore();
     applyCacheDisplay();
     applyContentCopy();

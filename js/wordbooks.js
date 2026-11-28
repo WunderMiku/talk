@@ -48,16 +48,52 @@
     };
   }
 
+  const WB_DB_NAME = "talk.wordbooks.v1";
+  const WB_DB_STORE = "store";
+  const WB_RECORD_ID = "main";
+
   let memoryStore = null;
+  let wbDb = null;
+  let idbReady = false;
+  let wbWriteChain = Promise.resolve();
 
-  function loadStore(legacySaved = []) {
-    if (memoryStore) return memoryStore;
-    let parsed = null;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) parsed = JSON.parse(raw);
-    } catch (_) { /* ignore */ }
+  function openRawWbDb() {
+    return new Promise((resolve, reject) => {
+      if (typeof indexedDB === "undefined") {
+        reject(new Error("IndexedDB unavailable"));
+        return;
+      }
+      const req = indexedDB.open(WB_DB_NAME, 1);
+      req.onupgradeneeded = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(WB_DB_STORE)) {
+          db.createObjectStore(WB_DB_STORE, { keyPath: "id" });
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error);
+    });
+  }
 
+  function rawWbGet(db) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(WB_DB_STORE, "readonly");
+      const req = tx.objectStore(WB_DB_STORE).get(WB_RECORD_ID);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  }
+
+  function rawWbPut(db, record) {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(WB_DB_STORE, "readwrite");
+      tx.objectStore(WB_DB_STORE).put(record);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  }
+
+  function normalizeStoreShape(parsed, legacySaved = []) {
     if (!parsed || !Array.isArray(parsed.books)) {
       parsed = defaultStore();
       // Migrate legacy flat saved list into 密集书库 without losing anything
@@ -71,9 +107,7 @@
           parsed.books[0].items.push({ term, addedAt: Date.now() });
         }
       }
-      saveStore(parsed);
     }
-
     // Ensure 密集书库 always exists and sits first
     let dense = parsed.books.find((b) => b.id === DEFAULT_BOOK_ID);
     if (!dense) {
@@ -86,24 +120,141 @@
     parsed.books.forEach((b) => {
       if (!Array.isArray(b.items)) b.items = [];
     });
+    return parsed;
+  }
+
+  // Merge any books/terms from a legacy localStorage copy into the primary IDB store without losing anything.
+  function mergeStoresLossless(primary, extra) {
+    if (!extra || !Array.isArray(extra.books)) return primary;
+    const seen = new Set();
+    primary.books.forEach((b) => {
+      (b.items || []).forEach((it) => {
+        const k = normKey(it?.term);
+        if (k) seen.add(k);
+      });
+    });
+    for (const srcBook of extra.books) {
+      if (!srcBook || !Array.isArray(srcBook.items) || !srcBook.items.length) continue;
+      let dstBook = primary.books.find((b) => b.id === srcBook.id)
+        || primary.books.find((b) => b.name === srcBook.name);
+      if (!dstBook) {
+        dstBook = {
+          id: srcBook.id || slugId(srcBook.name),
+          name: srcBook.name || DEFAULT_BOOK_NAME,
+          system: srcBook.id === DEFAULT_BOOK_ID,
+          createdAt: srcBook.createdAt || Date.now(),
+          items: []
+        };
+        primary.books.push(dstBook);
+      }
+      for (const it of srcBook.items) {
+        const term = cleanTerm(it?.term);
+        const k = normKey(term);
+        if (!k || seen.has(k)) continue;
+        seen.add(k);
+        dstBook.items.push({ term, addedAt: Number(it?.addedAt) || Date.now() });
+      }
+    }
+    return primary;
+  }
+
+  function readLocalStore() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && Array.isArray(parsed.books)) return parsed;
+      }
+    } catch (_) { /* ignore */ }
+    return null;
+  }
+
+  function loadStore(legacySaved = []) {
+    if (memoryStore) return memoryStore;
+    const rawLocal = readLocalStore();
+    const hadLocal = Boolean(rawLocal);
+    const parsed = normalizeStoreShape(rawLocal, legacySaved);
     memoryStore = parsed;
+    if (!hadLocal) saveStore(parsed);
     return memoryStore;
+  }
+
+  async function initStore(legacySaved = []) {
+    if (idbReady) return memoryStore || loadStore(legacySaved);
+    if (typeof indexedDB === "undefined") {
+      return loadStore(legacySaved);
+    }
+    try {
+      let existingRow = null;
+      if (window.idb?.openDB) {
+        wbDb = await window.idb.openDB(WB_DB_NAME, 1, {
+          upgrade(db) {
+            if (!db.objectStoreNames.contains(WB_DB_STORE)) {
+              db.createObjectStore(WB_DB_STORE, { keyPath: "id" });
+            }
+          }
+        });
+        existingRow = await wbDb.get(WB_DB_STORE, WB_RECORD_ID);
+      } else {
+        const rawDb = await openRawWbDb();
+        wbDb = {
+          __raw: rawDb,
+          put: (_store, record) => rawWbPut(rawDb, record)
+        };
+        existingRow = await rawWbGet(rawDb);
+      }
+
+      const idbStore = existingRow?.data && Array.isArray(existingRow.data.books) ? existingRow.data : null;
+      const localStore = readLocalStore();
+      let merged;
+      if (idbStore) {
+        merged = normalizeStoreShape(idbStore, []);
+        if (localStore) mergeStoresLossless(merged, localStore);
+      } else if (localStore) {
+        merged = normalizeStoreShape(localStore, []);
+      } else if (memoryStore) {
+        merged = normalizeStoreShape(memoryStore, []);
+      } else {
+        merged = normalizeStoreShape(null, []);
+      }
+      if (Array.isArray(legacySaved) && legacySaved.length) {
+        mergeStoresLossless(merged, normalizeStoreShape(null, legacySaved));
+      }
+
+      memoryStore = merged;
+      await wbDb.put(WB_DB_STORE, { id: WB_RECORD_ID, data: merged, updatedAt: Date.now() });
+      idbReady = true;
+      // Clear legacy localStorage copy only after IndexedDB commit succeeded.
+      try { localStorage.removeItem(STORAGE_KEY); } catch (_) { /* ignore */ }
+      return memoryStore;
+    } catch (error) {
+      console.warn("IndexedDB wordbooks store unavailable; using localStorage fallback.", error);
+      wbDb = null;
+      idbReady = false;
+      return loadStore(legacySaved);
+    }
   }
 
   const STORAGE_LIMIT = 4600000;
 
   function usage() {
     try {
+      if (memoryStore) return JSON.stringify(memoryStore).length;
       return (localStorage.getItem(STORAGE_KEY) || "").length;
     } catch (_) {
       return 0;
     }
   }
 
-  // Cheap pre-flight: does the current store plus roughly this many extra
-  // characters still fit in the browser's ~5M UTF-16 quota?
+  // IndexedDB has hundreds of MB to GB available; only enforce the ~4.6M UTF-16
+  // guard when running on the localStorage fallback.
   function wouldFit(extraChars = 0) {
+    if (idbReady) return true;
     return usage() + Math.ceil(Math.max(0, Number(extraChars) || 0) * 1.3) + 1024 < STORAGE_LIMIT;
+  }
+
+  function backend() {
+    return idbReady ? "IndexedDB" : "localStorage";
   }
 
   function reportStorageError() {
@@ -115,6 +266,16 @@
   function saveStore(store = memoryStore) {
     if (!store) return false;
     memoryStore = store;
+    if (idbReady && wbDb) {
+      const snapshot = store;
+      wbWriteChain = wbWriteChain
+        .catch(() => {})
+        .then(() => wbDb.put(WB_DB_STORE, { id: WB_RECORD_ID, data: snapshot, updatedAt: Date.now() }))
+        .catch(() => {
+          reportStorageError();
+        });
+      return true;
+    }
     let payload = "";
     try {
       payload = JSON.stringify(store);
@@ -133,6 +294,10 @@
       reportStorageError();
       return false;
     }
+  }
+
+  function flush() {
+    return wbWriteChain.catch(() => {});
   }
 
   function resetMemoryCache() {
@@ -476,8 +641,11 @@
     STORAGE_KEY,
     DEFAULT_BOOK_ID,
     DEFAULT_BOOK_NAME,
+    initStore,
     loadStore,
     saveStore,
+    flush,
+    backend,
     resetMemoryCache,
     stats,
     listBooks,
