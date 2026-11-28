@@ -4,6 +4,48 @@
 
 整个应用是纯静态的 HTML/CSS/JS，没有构建、没有后端。浏览器直接读模型 API，数据落在 IndexedDB 和 localStorage。
 
+## 模块结构（原生 ES Modules）
+
+入口 `index.html` 先加载静态配置与基础设施脚本（`data.js`、`theme.js`、`content.js`、`prompts.js`、`llm-client.js`、`i18n.js`、`wordbooks.js`、`doc-parser.js`、`doc-reader.js`），再以 `<script type="module" src="js/app.js?v=...">` 启动主应用，不需要打包器：
+
+```text
+js/
+├── app.js                 入口装配、路由、平滑滚动/入场、输入调度与 __TALK_BRIDGE__
+├── llm-client.js          统一模型传输层（OpenAI / Gemini 流式 SSE、JSON 重试、模型列表、连通性测试）
+├── core/
+│   ├── utils.js           DOM 快捷函数、转义、文本归一与语言/颗粒度判定
+│   ├── icons.js           内联 SVG 图标集
+│   ├── diagnostics.js     脱敏运行日志与全局错误采集
+│   └── actions.js         data-action 注册与分发器（取代巨型 click switch）
+├── storage/
+│   ├── vault.js           WebCrypto AES-GCM 密钥封存与解封（talk.vault.v1）
+│   ├── settings.js        模型配置/预设、偏好持久化、历史与收藏状态
+│   └── word-cache.js      IndexedDB / localStorage 词条、意群、句子缓存与导入导出
+├── model/
+│   ├── stream-preview.js  流式输出渐进字段抽取
+│   ├── markdown.js        语境寻词 Markdown 与 [[...]] 锚点解析
+│   ├── normalize.js       词条/意群/句子数据归一化与防幻觉校验
+│   └── lookup.js          modelLookup 编排、去重、关联词预加载与主题例句补全
+├── features/
+│   ├── tts.js             系统原生 + Qwen 语音合成与音频缓存
+│   ├── theme-salon.js     首页主题沙龙策展与版本库
+│   └── share.js           分享图段落选择与 1080px PNG 合成
+└── views/
+    ├── home.js            首页、每日词条与词单
+    ├── word.js            词条页、多词性切换与主题例句块
+    ├── chunk.js           意群页与颗粒度改判
+    ├── sentence.js        句子页、三视角切换、意群推进与结构树
+    ├── reverse.js         语境寻词多轮对话页与持久化
+    ├── translator.js      多风格翻译页、工作区与缓存
+    ├── status.js          加载 / 离线未收录 / 错误状态页
+    ├── layers.js          词/意群/句子多层嵌套探索栈与后台挂起恢复
+    ├── sheets.js          通用底部抽屉、词义速览与缓存仪表盘
+    ├── settings-sheet.js  设置三页签、渠道模板/表单编辑器
+    └── history-sheet.js   历史记录、寻词记录与词汇书库管理抽屉
+```
+
+各功能与视图模块通过工厂函数注入依赖，并导出自己的 `actions` 映射表，在 `js/app.js` 启动时统一注册到 `actions` 分发器。
+
 ## 一次查词的完整链路
 
 ```text
@@ -136,7 +178,7 @@ memory                                记法
 | 例句 / 搭配 | 1 / 2 | 2 / 4 | 3 / 5 |
 | 时间轴 / 重点词 | 2 / 3 | 3 / 4 | 4 / 5 |
 
-数值都在 `app.js` 的 `DETAIL_LEVELS` 里，提示词里另有一份同样的数量要求（`prompts.js`）。改深度要两边一起改，否则模型会收到互相矛盾的指令。
+数值都在 `js/storage/settings.js` 的 `DETAIL_LEVELS` 里，提示词里另有一份同样的数量要求（`prompts.js`）。改深度要两边一起改，否则模型会收到互相矛盾的指令。
 
 
 ### 按压与复制
@@ -195,13 +237,17 @@ cp -r icons css js vendor dist/
 
 `vendor/`（idb、Lenis、html-to-image）已随仓库提交，部署不再联网下载；升级版本时跑 `bash scripts/fetch-assets.sh .` 重新下载并按写死的 SHA-256 校验。
 
-改前端资源后有三处版本号要一起动，否则老用户会拿到新旧混杂的缓存：
+改前端资源或增删 `js/` 下的 ES 子模块后，直接跑一键脚本同步三处版本号与 `sw.js` 的 ESM 预缓存清单，不要手工逐处改：
 
-1. `app.js` 里的 `APP_VERSION`
-2. `index.html` 里所有 `?v=` 查询参数（含 `css/themes/*.css`）
-3. `sw.js` 的缓存名（`talk-shell-vNNN`）和 `?v=`
+```bash
+npm run bump                      # 构建号 +1，同步 js/app.js APP_BUILD、index.html ?v=、sw.js SHELL_CACHE 与 ESM 子模块列表
+node scripts/bump-build.mjs --sync   # 保持当前构建号，仅重新同步 sw.js 里的 ESM 子模块清单
+npm run check:shell               # 校验三处版本同步、SW 覆盖全部静态资源与 ESM 子模块、以及全量 JS 语法检查
+```
 
-新增静态目录时记得同步 `pages.yml` 的拷贝清单——`themes/` 最初就是因为漏了这一步而 404。
+- `sw.js` 安装阶段对预缓存清单使用 `{ cache: "reload" }`，确保无 `?v=` 参数的 ES 子模块在递增构建号后不会被浏览器旧 HTTP 缓存污染。
+- 新增顶级静态目录时同步检查 `scripts/build-web.mjs` 与 `.github/workflows/pages.yml`（`tests/suites/shell.spec.mjs` 会自动校验）。
+- `.github/workflows/test.yml` 会在 PR 以及 Pages / Android APK 发布前自动跑完整个离线测试套件。
 
 ## 本地开发
 
@@ -215,7 +261,7 @@ python3 -m http.server 8080     # 或任意静态服务器
 
 ## 自动化测试
 
-`npm test` 跑 `tests/` 里的离线端到端套件：静态站点与假模型同源（`tests/lib/server.mjs`），浏览器用 Playwright，桩数据在 `tests/fixtures/`。覆盖查词、意群、语境寻词、句子拆解、缓存导入导出、离线降级与主题覆盖，共 22 例。细节见 [TESTING.md](TESTING.md)。
+`npm test` 跑 `tests/` 里的完整离线测试套件（单元测试 + Playwright 端到端，共 14 组 50 例）：静态站点与假模型同源（`tests/lib/server.mjs`），桩数据在 `tests/fixtures/`。覆盖统一模型传输层（`llm-client`）、核心工具与数据归一化、SW 外壳与语法一致性、查词、意群、语境寻词、句子拆解、长文精读、词汇书库、缓存导入导出、分享图、离线降级与主题覆盖。细节见 [TESTING.md](TESTING.md)。
 
 ## 手工验收清单
 

@@ -159,33 +159,42 @@ Qwen 失败时提示原因并自动回退到设备语音，不会让一个词没
 index.html              单页外壳、资源版本参数与构建号
 css/styles.css          布局与组件，横屏间距收敛为 --word-* 变量
 css/theme.css           基础 token（Paper）
-css/themes/constructivist.css 构成主义主题覆盖
-css/themes/swiss-lab.css     Swiss Lab 主题覆盖
-css/themes/topo-acid.css    Topo Acid 主题覆盖
-css/themes/archive-grid.css Archive Grid 主题覆盖
-css/themes/retro-stub.css   Retro Stub 主题覆盖
+css/themes/             其余六套主题覆盖（constructivist / swiss-lab / topo-acid / archive-grid / retro-stub / still）
+js/llm-client.js        统一模型传输层（OpenAI / Gemini 流式、JSON 重试、模型发现与测试）
 js/theme.js             主题注册表
 js/content.js           基础文案 + 各主题的语气改写
 js/prompts.js           静态模型提示词（与主题无关）
 js/data.js              内置示例词条
-js/app.js               应用主体：路由、请求、渲染、缓存、设置
-sw.js                   app-shell service worker
+js/i18n.js              中英双语界面映射
+js/wordbooks.js         词汇书库引擎（零丢失分册、导入导出）
+js/doc-parser.js        长文精读解析器
+js/doc-reader.js        长文精读本视图与导出
+js/app.js               应用入口：依赖装配、路由、入场动效与 __TALK_BRIDGE__
+js/core/                通用工具、图标、脱敏诊断日志与 data-action 分发器
+js/storage/             AES-GCM 密钥封存、设置/历史/收藏与 IndexedDB 词条缓存
+js/model/               流式预览、Markdown 锚点、数据归一化与模型查询编排
+js/features/            发音（原生 / Qwen）、主题沙龙与分享图合成
+js/views/               首页、词/意群/句/寻词/翻译视图、多层探索栈与设置/书库抽屉
+sw.js                   app-shell service worker（自动同步所有 ESM 子模块预缓存）
 vendor/                 随仓库提交的运行依赖（idb、Lenis、html-to-image）
+scripts/bump-build.mjs  一键同步/递增构建号并更新 sw.js 预缓存清单
+scripts/build-web.mjs   组装纯静态 dist/（供 Pages / Capacitor 使用）
 scripts/screenshots.mjs Playwright 截图脚本
-scripts/dev/            一次性调试与审查脚本（从仓库根运行）
-tests/                  离线端到端测试（假模型 + Playwright）
+tests/                  离线端到端测试 + 单元测试（假模型 + Playwright）
 docs/ARCHITECTURE.md    实现说明与设计取舍
 docs/TESTING.md         测试怎么跑、怎么加
 ```
 
 ## 开发与测试
 
-站点没有构建步骤；`package.json` 只为测试与截图脚本存在。
+站点没有构建步骤；`package.json` 只为测试、版本同步与截图脚本存在。
 
 ```bash
 npm install
 npx playwright install chromium
-npm test
+npm test              # 运行全套单元测试 + Playwright 离线端到端测试
+npm run check:shell   # 快速校验构建号同步、SW 预缓存完整性与 JS 语法
+npm run bump          # 发布前递增构建号并自动同步 index.html / sw.js
 ```
 
 测试不需要 API key：页面会被指向同源的假模型（`/__mock`），用例与桩数据都在 `tests/`。单独跑某个套件用 `npm test -- chunk`，看用例列表用 `npm test -- --list`。
