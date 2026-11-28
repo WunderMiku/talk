@@ -24,27 +24,44 @@ suite("ui stability · bug & twitch regressions", { timeout: 60_000 }, (s) => {
     if (state.env) await state.env.close();
   });
 
-  s.test("settings sentence-level chip only toggles its own group and preserves scroll", async (state, t) => {
+  s.test("settings 4-tab layout removes legacy fold-mode, toggles controls in-place, and preserves scroll", async (state, t) => {
     const page = await state.env.newPage();
     await page.open("/");
     await page.click('[data-action="settings"]');
     await page.waitForSelector(".settings-sheet");
-    await page.click('[data-action="settings-tab"][data-tab="data"]');
-    await page.waitForSelector('[data-action="sentence-level"][data-level="cet6"]');
 
+    const tabIds = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-action="settings-tab"]')].map((el) => el.dataset.tab)
+    );
+    t.expect(tabIds).toEqual(["model", "reading", "appearance", "data"]);
+
+    // Reading tab: sentence-level & detail-level toggle in place; legacy fold-mode is gone.
+    await page.click('[data-action="settings-tab"][data-tab="reading"]');
+    await page.waitForSelector('[data-action="sentence-level"][data-level="cet6"]');
     await page.click('[data-action="sentence-level"][data-level="cet6"]');
-    const chipState = await page.evaluate(() => ({
-      langActive: document.querySelectorAll('[data-action="lang"].active').length,
-      foldActive: document.querySelectorAll('[data-action="fold-mode"].active').length,
-      genMetaActive: document.querySelectorAll('[data-action="gen-meta"].active').length,
-      levelActive: document.querySelector('[data-action="sentence-level"].active')?.dataset.level || ""
+    await page.click('[data-action="detail-level"][data-level="deep"]');
+    const readingState = await page.evaluate(() => ({
+      foldCount: document.querySelectorAll('[data-action="fold-mode"]').length,
+      levelActive: document.querySelector('[data-action="sentence-level"].active')?.dataset.level || "",
+      detailActive: document.querySelector('[data-action="detail-level"].active')?.dataset.level || ""
     }));
-    t.expect(chipState).toEqual({
-      langActive: 1,
-      foldActive: 1,
-      genMetaActive: 1,
-      levelActive: "cet6"
+    t.expect(readingState).toEqual({
+      foldCount: 0,
+      levelActive: "cet6",
+      detailActive: "deep"
     });
+
+    // Appearance tab: one-tap theme card + display toggles preserve scroll position.
+    await page.click('[data-action="settings-tab"][data-tab="appearance"]');
+    await page.waitForSelector('[data-action="cache-display"][data-display="corner"]');
+    const appearanceChips = await page.evaluate(() => ({
+      langActive: document.querySelectorAll('[data-action="lang"].active').length,
+      genMetaActive: document.querySelectorAll('[data-action="gen-meta"].active').length,
+      themeCards: document.querySelectorAll('.theme-grid [data-action="theme"]').length
+    }));
+    t.expect(appearanceChips.langActive).toBe(1);
+    t.expect(appearanceChips.genMetaActive).toBe(1);
+    t.expect(appearanceChips.themeCards).toBeGreaterThanOrEqual(6);
 
     const cacheBtn = page.locator('[data-action="cache-display"][data-display="corner"]');
     await cacheBtn.scrollIntoViewIfNeeded();
@@ -53,6 +70,182 @@ suite("ui stability · bug & twitch regressions", { timeout: 60_000 }, (s) => {
     await cacheBtn.click();
     const afterScroll = await page.evaluate(() => document.querySelector("#sheet-scroll")?.scrollTop || 0);
     t.expect(afterScroll).toBe(beforeScroll);
+
+    // One-tap theme switch updates active card in place without jumping scroll.
+    await page.click('.theme-grid [data-action="theme"][data-theme="swiss-lab"]');
+    const afterTheme = await page.evaluate(() => ({
+      theme: document.documentElement.dataset.theme,
+      activeCard: document.querySelector('.theme-grid [data-action="theme"].is-active')?.dataset.theme || "",
+      scrollTop: document.querySelector("#sheet-scroll")?.scrollTop || 0
+    }));
+    t.expect(afterTheme.theme).toBe("swiss-lab");
+    t.expect(afterTheme.activeCard).toBe("swiss-lab");
+    t.expect(afterTheme.scrollTop).toBe(beforeScroll);
+    t.expect(page.errors).toEqual([]);
+  });
+
+  s.test("settings button and active tab clicks are strictly idempotent across rapid taps and close/reopen races", async (state, t) => {
+    const page = await state.env.newPage();
+    await page.open("/");
+    await page.click('[data-action="settings"]');
+    await page.waitForSelector(".settings-sheet");
+    await page.waitForTimeout(120);
+
+    // Switch to reading tab, scroll down, and mark an in-flight setting change.
+    await page.click('[data-action="settings-tab"][data-tab="reading"]');
+    await page.waitForSelector('[data-action="sentence-level"][data-level="ielts"]');
+    await page.click('[data-action="sentence-level"][data-level="ielts"]');
+    await page.evaluate(() => {
+      const scroller = document.querySelector("#sheet-scroll");
+      if (scroller) scroller.scrollTop = 120;
+      window.__sheetRef = document.querySelector("#overlay-root .sheet");
+      window.__settingsRef = document.querySelector("#sheet-scroll .settings-sheet");
+    });
+    const scrollBefore = await page.evaluate(() => document.querySelector("#sheet-scroll")?.scrollTop || 0);
+
+    // Fire 8 rapid clicks on the settings button and 5 rapid clicks on the active tab.
+    await page.evaluate(() => {
+      const settingsBtn = document.querySelector('[data-action="settings"]');
+      const activeTab = document.querySelector('[data-action="settings-tab"].active');
+      for (let i = 0; i < 8; i++) settingsBtn?.click();
+      for (let i = 0; i < 5; i++) activeTab?.click();
+    });
+    await page.waitForTimeout(80);
+
+    const idempotent = await page.evaluate(() => ({
+      sheets: document.querySelectorAll("#overlay-root .sheet").length,
+      backdrops: document.querySelectorAll("#overlay-root .sheet-backdrop").length,
+      sameSheet: document.querySelector("#overlay-root .sheet") === window.__sheetRef,
+      sameSettings: document.querySelector("#sheet-scroll .settings-sheet") === window.__settingsRef,
+      scrollTop: document.querySelector("#sheet-scroll")?.scrollTop || 0,
+      levelActive: document.querySelector('[data-action="sentence-level"].active')?.dataset.level || ""
+    }));
+    t.expect(idempotent).toEqual({
+      sheets: 1,
+      backdrops: 1,
+      sameSheet: true,
+      sameSettings: true,
+      scrollTop: scrollBefore,
+      levelActive: "ielts"
+    });
+
+    // Sub-sheet navigation (Data -> Cache Manager -> Back to Settings) reuses the same shell.
+    await page.click('[data-action="settings-tab"][data-tab="data"]');
+    await page.click('[data-action="open-cache"]');
+    await page.waitForSelector("#cache-dashboard");
+    const inSubSheet = await page.evaluate(() => ({
+      sameSheet: document.querySelector("#overlay-root .sheet") === window.__sheetRef,
+      hasBack: Boolean(document.querySelector('[data-action="settings-back"]'))
+    }));
+    t.expect(inSubSheet).toEqual({ sameSheet: true, hasBack: true });
+
+    // Clicking settings button while in a sub-sheet returns cleanly to Settings root in the same shell.
+    await page.evaluate(() => document.querySelector('[data-action="settings"]')?.click());
+    await page.waitForSelector(".settings-sheet");
+    const returnedSameShell = await page.evaluate(() => ({
+      sameSheet: document.querySelector("#overlay-root .sheet") === window.__sheetRef,
+      hasBack: Boolean(document.querySelector('[data-action="settings-back"]'))
+    }));
+    t.expect(returnedSameShell).toEqual({ sameSheet: true, hasBack: false });
+
+    // Rapid close + immediate reopen within the 520ms close animation must not get wiped by a stale timer.
+    await page.click(".sheet-close");
+    await page.waitForTimeout(80);
+    await page.click('[data-action="settings"]');
+    await page.waitForTimeout(620);
+    const survivedCloseRace = await page.evaluate(() => ({
+      sheets: document.querySelectorAll("#overlay-root .sheet.show").length,
+      hasSettings: Boolean(document.querySelector("#sheet-scroll .settings-sheet"))
+    }));
+    t.expect(survivedCloseRace).toEqual({ sheets: 1, hasSettings: true });
+    t.expect(page.errors).toEqual([]);
+  });
+
+  s.test("data tab and cache dashboard stay fast with 500 cached words in IndexedDB", async (state, t) => {
+    const page = await state.env.newPage();
+    await page.open("/");
+
+    // Seed 500 realistic cached word records (~3.5KB each) into IndexedDB.
+    await page.evaluate(async () => {
+      const db = await window.idb.openDB("talk.words.v1", 2, {
+        upgrade(upgradeDb) {
+          if (!upgradeDb.objectStoreNames.contains("entries")) {
+            upgradeDb.createObjectStore("entries", { keyPath: "key" });
+          }
+          if (!upgradeDb.objectStoreNames.contains("sentences")) {
+            upgradeDb.createObjectStore("sentences", { keyPath: "key" });
+          }
+        }
+      });
+      const tx = db.transaction("entries", "readwrite");
+      const pad = "Detailed contextual usage note explaining subtle register differences and common collocations. ".repeat(24);
+      const now = Date.now();
+      for (let i = 0; i < 500; i++) {
+        const word = `benchword${i}`;
+        tx.store.put({
+          key: word,
+          at: now - i * 1000,
+          detail: "standard",
+          schema: 3,
+          data: {
+            word,
+            phonetic: "/ˈbentʃ.wɜːrd/",
+            pos: "noun",
+            translation: `基准词 ${i}`,
+            short: `Synthetic entry ${i} for cache latency verification.`,
+            note: pad,
+            senses: [
+              { pos: "noun", gloss: `义项 ${i}`, en: pad.slice(0, 180) },
+              { pos: "verb", gloss: `动词义 ${i}`, en: pad.slice(0, 180) }
+            ],
+            examples: [
+              { en: `We benchmarked ${word} across five hundred stored entries.`, zh: `我们在五百条缓存记录上测试了 ${word}。` }
+            ]
+          }
+        });
+      }
+      await tx.done;
+      db.close();
+    });
+
+    await page.open("/");
+    await page.click('[data-action="settings"]');
+    await page.waitForSelector(".settings-sheet");
+
+    // Measure first click into Data tab (cold summary build) and repeat click (O(1) cached summary).
+    const firstDataMs = await page.evaluate(() => {
+      const t0 = performance.now();
+      document.querySelector('[data-action="settings-tab"][data-tab="data"]')?.click();
+      return performance.now() - t0;
+    });
+    await page.waitForSelector(".data-metrics-row");
+    const dataText = await page.textContent(".data-metrics-row");
+    t.expect(dataText).toContain("500");
+
+    await page.click('[data-action="settings-tab"][data-tab="model"]');
+    const secondDataMs = await page.evaluate(() => {
+      const t0 = performance.now();
+      document.querySelector('[data-action="settings-tab"][data-tab="data"]')?.click();
+      return performance.now() - t0;
+    });
+
+    const cacheOpenMs = await page.evaluate(async () => {
+      const t0 = performance.now();
+      document.querySelector('[data-action="open-cache"]')?.click();
+      while (!document.querySelector("#cache-dashboard .cache-word-item")) {
+        await new Promise((r) => requestAnimationFrame(r));
+      }
+      return performance.now() - t0;
+    });
+    const dashboardStats = await page.evaluate(() => ({
+      items: document.querySelectorAll("#cache-dashboard .cache-word-item").length,
+      text: document.querySelector("#cache-dashboard")?.textContent || ""
+    }));
+    t.expect(dashboardStats.items).toBe(24);
+    t.expect(dashboardStats.text).toContain("500");
+    t.expect(firstDataMs).toBeLessThan(250);
+    t.expect(secondDataMs).toBeLessThan(80);
+    t.expect(cacheOpenMs).toBeLessThan(350);
     t.expect(page.errors).toEqual([]);
   });
 

@@ -97,7 +97,9 @@ export function createSettingsSheet({
   reverseZoneName,
   exampleStyleFor,
   saveExampleStyles,
+  wordCacheSummary,
   wordCacheStats,
+  themeCacheStatsSync,
   formatBytes,
   diagText,
   refreshTtsError,
@@ -108,6 +110,13 @@ export function createSettingsSheet({
   scheduleThemeExamples,
   toast
 }) {
+  const VALID_TABS = new Set(["model", "reading", "appearance", "data"]);
+
+  function resolveTab(tab) {
+    if (tab === "tts") return "reading";
+    return VALID_TABS.has(tab) ? tab : "model";
+  }
+
   function settingsStatus(text) {
     const target = $("#settings-save-status");
     if (target) target.textContent = text;
@@ -161,8 +170,31 @@ export function createSettingsSheet({
     });
   }
 
+  function returnToSettingsRoot({ resetScroll = false } = {}) {
+    state.settingsOpen = true;
+    state.settingsSubView = "";
+    state.providerDraft = null;
+    state.providerStatus = null;
+    const copy = copyFor("settings");
+    openSheetShell({
+      kicker: copy.kicker,
+      title: copy.title,
+      reuse: Boolean($(".sheet", overlayRoot) && $(".sheet-backdrop", overlayRoot)),
+      backAction: ""
+    });
+    renderSettingsContent();
+    if (resetScroll) $("#sheet-scroll")?.scrollTo({ top: 0 });
+  }
+
   function openProviderPicker() {
-    openSheetShell({ kicker: "MODEL SETUP", title: "选择供应商" });
+    state.settingsSubView = "provider-picker";
+    openSheetShell({
+      kicker: "MODEL SETUP",
+      title: "选择供应商",
+      reuse: Boolean(state.sheetOpen),
+      backAction: "settings-back",
+      backLabel: "返回设置"
+    });
     const body = $("#sheet-scroll", overlayRoot);
     if (!body) return;
     body.innerHTML = `
@@ -177,6 +209,7 @@ export function createSettingsSheet({
             <span class="template-note">${esc(template.note || "")}</span>
           </button>`).join("")}
       </div>`;
+    body.scrollTop = 0;
   }
 
   function renderProviderSheet() {
@@ -251,232 +284,359 @@ export function createSettingsSheet({
         isNew: true
       };
     state.providerStatus = null;
-    openSheetShell({ kicker: "MODEL", title: existing ? "编辑模型" : "添加模型" });
+    state.settingsSubView = "provider-editor";
+    openSheetShell({
+      kicker: "MODEL",
+      title: existing ? "编辑模型" : "添加模型",
+      reuse: Boolean(state.sheetOpen),
+      backAction: "settings-back",
+      backLabel: "返回设置"
+    });
     renderProviderSheet();
+    $("#sheet-scroll")?.scrollTo({ top: 0 });
   }
 
-  function ttsSettingsHtml(draft) {
+  function ttsCardBodyHtml(draft) {
     const engine = draft.ttsEngine === "qwen" ? "qwen" : "native";
-    return `
-      <div class="tts-head">
-        <span class="settings-subhead">发音</span>
-        <div class="tts-engine-switch" role="group" aria-label="发音引擎">
-          <button class="tts-engine-btn ${engine === "native" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="native" aria-pressed="${engine === "native"}">系统原生</button>
-          <button class="tts-engine-btn ${engine === "qwen" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="qwen" aria-pressed="${engine === "qwen"}">Qwen 语音</button>
-        </div>
-      </div>
-      ${engine === "qwen" ? (() => {
-        const qwen = qwenTtsProfile(draft);
-        return `<div class="qwen-tts-panel">
-          <div class="tts-row">
-            <input id="qwen-tts-model" type="text" data-setting="qwenTtsModel" value="${attr(draft.qwenTtsModel || "qwen-audio-3.1-tts-plus")}" placeholder="qwen-audio-3.1-tts-plus" spellcheck="false" aria-label="Qwen TTS 模型" />
-            <input id="qwen-tts-voice" type="text" data-setting="qwenTtsVoice" value="${attr(draft.qwenTtsVoice || "longanhuan_v3.1")}" placeholder="longanhuan_v3.1" spellcheck="false" aria-label="Qwen TTS 音色" />
-            <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
-          </div>
-          ${qwen ? `<p class="tts-line" id="qwen-tts-endpoint">使用「${esc(qwen.name)}」的 API 密钥 · ${esc(qwenTtsEndpoint(qwen, draft.qwenTtsModel))}</p>` : `<p class="tts-line tts-error">还没有可用的 Qwen 密钥。请先在「模型」里填写 Qwen 的 API 密钥。</p>`}
-          <p class="tts-line">模型默认 qwen-audio-3.1-tts-plus；音色可填 longanhuan_v3.1 或其他 Qwen 音色。</p>
-          <span class="tts-status" id="tts-test-status">${qwen ? "密钥已就绪" : "需要先配置 Qwen 密钥"}</span>
-          <p class="tts-line tts-https-warning">密钥只保存在本机；语音请求由浏览器直接发往 Qwen。公共设备建议关闭「记住密钥」。</p>
-        </div>`;
-      })() : `
+    if (engine === "qwen") {
+      const qwen = qwenTtsProfile(draft);
+      return `<div class="qwen-tts-panel">
         <div class="tts-row">
-          <span class="tts-line">点击即读，无需下载</span>
+          <input id="qwen-tts-model" type="text" data-setting="qwenTtsModel" value="${attr(draft.qwenTtsModel || "qwen-audio-3.1-tts-plus")}" placeholder="qwen-audio-3.1-tts-plus" spellcheck="false" aria-label="Qwen TTS 模型" />
+          <input id="qwen-tts-voice" type="text" data-setting="qwenTtsVoice" value="${attr(draft.qwenTtsVoice || "longanhuan_v3.1")}" placeholder="longanhuan_v3.1" spellcheck="false" aria-label="Qwen TTS 音色" />
           <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
         </div>
-        <span class="tts-status" id="tts-test-status"></span>
-        <p class="tts-error" id="tts-error" hidden></p>`}`;
+        ${qwen ? `<p class="tts-line" id="qwen-tts-endpoint">使用「${esc(qwen.name)}」的 API 密钥 · ${esc(qwenTtsEndpoint(qwen, draft.qwenTtsModel))}</p>` : `<p class="tts-line tts-error">还没有可用的 Qwen 密钥。请先在「模型」里填写 Qwen 的 API 密钥。</p>`}
+        <p class="tts-line">默认 qwen-audio-3.1-tts-plus；音色可填 longanhuan_v3.1 或其他 Qwen 音色。</p>
+        <span class="tts-status" id="tts-test-status">${qwen ? "密钥已就绪" : "需要先配置 Qwen 密钥"}</span>
+        <p class="tts-line tts-https-warning">密钥只保存在本机；语音请求由浏览器直接发往 Qwen。</p>
+      </div>`;
+    }
+    return `
+      <div class="tts-row">
+        <span class="tts-line">调用系统朗读，点击即读、无需额外额度</span>
+        <button class="btn btn-secondary tts-test-btn" type="button" data-action="test-tts">${icon("volume")} 试听</button>
+      </div>
+      <span class="tts-status" id="tts-test-status"></span>
+      <p class="tts-error" id="tts-error" hidden></p>`;
   }
 
   function modelSettingsHtml(draft) {
     const current = activeProfile(draft);
     return `
-      <div class="model-profile-head">
-        <span class="settings-subhead">可用模型</span>
-        <span class="mono">${draft.profiles.length} 个</span>
-      </div>
-      ${draft.profiles.length ? "" : '<p class="provider-empty">还没有可用的模型。点下面添加一个，填好密钥就能查词。</p>'}
-      <div class="provider-list" role="list" aria-label="模型渠道">
-        ${draft.profiles.map((profile) => `
-          <div class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" role="listitem">
-            <button class="provider-select" type="button" data-action="provider-select" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
-              <span class="provider-row-copy">
-                <strong>${esc(profile.model || "未选模型")}</strong>
-                <small class="mono">${esc(profile.name || "未命名")} · ${esc(profileHost(profile))}</small>
-              </span>
-              ${profile.id === draft.activeProfileId ? '<i class="provider-dot" aria-hidden="true"></i>' : ""}
-            </button>
-            <button class="provider-edit" type="button" data-action="provider-edit" data-profile="${attr(profile.id)}">编辑</button>
-          </div>`).join("")}
-        <button class="provider-add" type="button" data-action="provider-new">+ 添加模型</button>
-      </div>
-      <div class="field">
-        <label>生成深度</label>
-        <div class="detail-switch" role="group" aria-label="生成深度">
-          ${Object.entries(detailLevels).map(([id, item]) => `
-            <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">模型渠道</span>
+          <span class="mono">${draft.profiles.length} 个</span>
         </div>
-      </div>
-      ${profileSupportsThinking(current) ? `
-      <div class="thinking-panel">
-        <label class="check-row">
-          <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
-          开启深度思考
+        ${draft.profiles.length ? "" : '<p class="provider-empty">还没有可用的模型。点下面添加一个，填好密钥就能查词。</p>'}
+        <div class="provider-list" role="list" aria-label="模型渠道">
+          ${draft.profiles.map((profile) => `
+            <div class="provider-row ${profile.id === draft.activeProfileId ? "is-active" : ""}" role="listitem">
+              <button class="provider-select" type="button" data-action="provider-select" data-profile="${attr(profile.id)}" aria-pressed="${profile.id === draft.activeProfileId}">
+                <span class="provider-row-copy">
+                  <span class="provider-row-title">
+                    <strong>${esc(profile.model || "未选模型")}</strong>
+                    <span class="provider-proto-pill">${esc(protocolBadge(profile.protocol || "openai"))}</span>
+                  </span>
+                  <small class="mono">${esc(profile.name || "未命名")} · ${esc(profileHost(profile))}</small>
+                </span>
+                ${profile.id === draft.activeProfileId ? '<i class="provider-dot" aria-hidden="true"></i>' : ""}
+              </button>
+              <button class="provider-edit" type="button" data-action="provider-edit" data-profile="${attr(profile.id)}">编辑</button>
+            </div>`).join("")}
+          <button class="provider-add" type="button" data-action="provider-new">+ 添加模型</button>
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">连接与安全</span>
+        </div>
+        <div class="settings-status-row">
+          <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
+            ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(current?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
+          </div>
+          <button class="btn btn-secondary settings-test-btn" type="button" data-action="test-connection" ${draft.profiles.length ? "" : "disabled"}>${icon("sparkle")} 测试连通</button>
+        </div>
+        ${profileSupportsThinking(current) ? `
+        <div class="settings-card-divider"></div>
+        <div class="thinking-panel compact">
+          <label class="pref-toggle inline-toggle">
+            <span class="pref-copy">
+              <strong>开启深度思考</strong>
+              <span>允许模型先推理再输出，复杂句子更细致但耗时更长。</span>
+            </span>
+            <span class="pref-switch">
+              <input type="checkbox" data-profile-option="enableThinking" ${draft.enableThinking ? "checked" : ""} />
+              <span class="pref-slider" aria-hidden="true"></span>
+            </span>
+          </label>
+          <div class="thinking-budget-row">
+            <label for="thinking-budget">思考预算（tokens，0 为自动）</label>
+            <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
+          </div>
+        </div>` : ""}
+        <div class="settings-card-divider"></div>
+        <label class="pref-toggle inline-toggle">
+          <span class="pref-copy">
+            <strong>在这台设备上记住密钥</strong>
+            <span>仅保存在当前浏览器本机存储，公共设备建议关闭。</span>
+          </span>
+          <span class="pref-switch">
+            <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
+            <span class="pref-slider" aria-hidden="true"></span>
+          </span>
         </label>
-        <div class="thinking-budget-row">
-          <label for="thinking-budget">思考预算（tokens）</label>
-          <input id="thinking-budget" type="number" min="0" max="262144" step="128" data-profile-option="thinkingBudget" value="${Number(draft.thinkingBudget) || 0}" inputmode="numeric" />
-        </div>
-      </div>` : ""}
-      <label class="check-row">
-        <input type="checkbox" data-setting="remember" ${draft.remember ? "checked" : ""} />
-        在这台设备上记住密钥
-      </label>
-      <div class="key-status ${hasModelConfig(draft) ? "" : "off"}" id="api-test-status">
-        ${hasModelConfig(draft) ? `${icon("shield")} <span>已配置 · ${esc(current?.name || draft.model || "自定义")}</span>` : "<span>演示模式 · 无需密钥</span>"}
-      </div>
-      <div class="settings-inline-actions">
-        <button class="btn btn-secondary" type="button" data-action="test-connection" ${draft.profiles.length ? "" : "disabled"}>${icon("sparkle")} 测试当前模型</button>
-      </div>
-      <p class="api-note"><b>浏览器限制：</b>部分服务商会用 CORS 拦截网页直连；这里失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>`;
+        <details class="settings-hint-disclosure">
+          <summary>网页直连与 CORS 说明</summary>
+          <p class="api-note">部分服务商会用 CORS 拦截网页直连，测试失败不代表密钥有误。把地址换成自建代理可以绕开，也能把真实密钥留在服务端。</p>
+        </details>
+      </section>`;
   }
 
-  function dataSettingsHtml(draft) {
-    const stats = wordCacheStats();
-    const lang = window.TALK_I18N?.lang || "zh";
+  function readingSettingsHtml(draft) {
+    const engine = draft.ttsEngine === "qwen" ? "qwen" : "native";
+    const budget = Number(draft.reverseMaxTokens) || 1500;
     return `
-      <div class="setting-group">
-        <span class="settings-subhead">界面语言</span>
-        <div class="level-row">
-          <button class="level-chip${lang === "zh" ? " active" : ""}" type="button" data-action="lang" data-lang="zh" aria-pressed="${lang === "zh"}">中文</button>
-          <button class="level-chip${lang === "en" ? " active" : ""}" type="button" data-action="lang" data-lang="en" aria-pressed="${lang === "en"}">English</button>
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">查词与解析</span>
         </div>
-      </div>
-      <div class="theme-setting">
-        <span class="settings-subhead">外观主题</span>
-        <div class="theme-list" role="list" aria-label="外观主题">
+        <div class="settings-block">
+          <div class="settings-row-label">
+            <strong>生成深度</strong>
+            <span>决定词条释义与搭配详略</span>
+          </div>
+          <div class="detail-switch" role="group" aria-label="生成深度">
+            ${Object.entries(detailLevels).map(([id, item]) => `
+              <button class="detail-btn ${(draft.detailLevel || "standard") === id ? "active" : ""}" type="button" data-action="detail-level" data-level="${id}" aria-pressed="${(draft.detailLevel || "standard") === id}">${item.label}</button>`).join("")}
+          </div>
+        </div>
+        <div class="settings-card-divider"></div>
+        <div class="settings-block">
+          <div class="settings-row-label">
+            <strong>学习阶段</strong>
+            <span>用于句子拆解与重点标注</span>
+          </div>
+          <div class="level-row">
+            ${sentenceLevels.map((level) => `
+              <button class="level-chip${draft.sentenceLevel === level.id ? " active" : ""}" type="button"
+                data-action="sentence-level" data-level="${attr(level.id)}" aria-pressed="${draft.sentenceLevel === level.id}"
+                title="${attr(level.hint)}">${esc(level.label)}</button>`).join("")}
+          </div>
+        </div>
+        <div class="settings-card-divider"></div>
+        <div class="settings-block">
+          <div class="settings-row-label">
+            <strong>语境寻词长度</strong>
+            <span><span id="reverse-token-value">${budget}</span> tokens · <span id="reverse-token-zone">${reverseZoneName(budget)}</span></span>
+          </div>
+          <input class="setting-range" type="range" min="600" max="3000" step="100"
+            value="${budget}" data-setting="reverseMaxTokens" aria-label="语境寻词输出上限" />
+          <div class="token-scale" id="reverse-token-scale">
+            <span class="token-zone${budget < 1000 ? " is-active" : ""}" style="flex:4">只给结论</span>
+            <span class="token-zone${budget >= 1000 && budget < 2000 ? " is-active" : ""}" style="flex:10">分块讲解</span>
+            <span class="token-zone${budget >= 2000 ? " is-active" : ""}" style="flex:10">成句拆解</span>
+          </div>
+          <div class="token-ticks">
+            <span style="left:0">600</span>
+            <span style="left:16.7%">1000</span>
+            <span style="left:58.3%">2000</span>
+            <span style="left:100%">3000</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-card" id="tts-settings-card">
+        <div class="tts-head">
+          <span class="settings-subhead">朗读发音</span>
+          <div class="tts-engine-switch" role="group" aria-label="发音引擎">
+            <button class="tts-engine-btn ${engine === "native" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="native" aria-pressed="${engine === "native"}">系统原生</button>
+            <button class="tts-engine-btn ${engine === "qwen" ? "active" : ""}" type="button" data-action="tts-engine" data-engine="qwen" aria-pressed="${engine === "qwen"}">Qwen 语音</button>
+          </div>
+        </div>
+        <div id="tts-card-body">${ttsCardBodyHtml(draft)}</div>
+      </section>
+
+      <details class="settings-card settings-disclosure">
+        <summary class="settings-disclosure-head">
+          <span class="settings-subhead">高级生成选项</span>
+          <span class="settings-disclosure-hint">预加载 · 例句风格</span>
+        </summary>
+        <div class="settings-disclosure-body">
+          <label class="pref-toggle inline-toggle">
+            <span class="pref-copy">
+              <strong>预加载二级词条</strong>
+              <span>词页出现后，在后台生成最多 ${prefetchLimit} 个相关词；会额外消耗模型额度。</span>
+            </span>
+            <span class="pref-switch">
+              <input type="checkbox" data-setting="prefetch" ${draft.prefetch ? "checked" : ""} />
+              <span class="pref-slider" aria-hidden="true"></span>
+            </span>
+          </label>
+          <div class="settings-card-divider"></div>
+          <div class="settings-block">
+            <div class="settings-row-label">
+              <strong>例句风格</strong>
+              <span>只影响之后生成的例句</span>
+            </div>
+            <div class="example-style-list">
+              ${(window.TALK_THEME?.list?.() || []).map((theme) => `
+                <label class="example-style-row">
+                  <span>${esc(theme.label)}</span>
+                  <input type="text" data-example-style="${attr(theme.id)}" value="${attr(exampleStyleFor(theme.id))}" spellcheck="false" aria-label="${attr(theme.label)} 的例句风格" />
+                </label>`).join("")}
+            </div>
+            <button class="link-btn" type="button" data-action="reset-example-styles">恢复默认风格</button>
+          </div>
+        </div>
+      </details>`;
+  }
+
+  function appearanceSettingsHtml(draft) {
+    const lang = window.TALK_I18N?.lang || "zh";
+    const currentThemeId = window.TALK_THEME.current().id;
+    return `
+      <section class="settings-card">
+        <div class="settings-inline-row">
+          <div class="settings-row-label">
+            <strong>界面语言</strong>
+            <span>仅切换界面文字，词条解析保持双语</span>
+          </div>
+          <div class="level-row compact" role="group" aria-label="界面语言">
+            <button class="level-chip${lang === "zh" ? " active" : ""}" type="button" data-action="lang" data-lang="zh" aria-pressed="${lang === "zh"}">中文</button>
+            <button class="level-chip${lang === "en" ? " active" : ""}" type="button" data-action="lang" data-lang="en" aria-pressed="${lang === "en"}">English</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">外观主题</span>
+          <span class="mono">点选即切换</span>
+        </div>
+        <div class="theme-grid" role="list" aria-label="外观主题">
           ${Object.values(window.TALK_THEME.themes).map((theme) => {
-            const active = window.TALK_THEME.current().id === theme.id;
-            return `<div class="theme-row${active ? " is-active open" : ""}" role="listitem" data-theme-row="${attr(theme.id)}">
-              <button class="theme-row-head" type="button" data-action="theme-toggle" data-theme="${attr(theme.id)}" aria-expanded="${active}">
-                <span class="theme-swatch" aria-hidden="true"><i style="background:${attr(theme.themeColor || "#f3f0e7")}"></i><i style="background:${attr(theme.accentFill || theme.accent || "#171813")}"></i></span>
-                <span class="theme-row-copy"><strong>${esc(theme.label)}</strong><small>${esc(theme.description || "")}</small></span>
-                <span class="theme-row-state">${active ? "使用中" : ""}</span>
-                <span class="theme-row-chevron" aria-hidden="true">▾</span>
-              </button>
-              <div class="theme-row-body">
-                <div class="theme-row-inner">
-                  <div class="theme-row-actions">
-                    ${active
-                      ? '<span class="theme-row-current">当前正在使用</span>'
-                      : `<button class="btn btn-secondary theme-apply" type="button" data-action="theme" data-theme="${attr(theme.id)}">使用这套主题</button>`}
-                  </div>
-                </div>
-              </div>
-            </div>`;
+            const active = currentThemeId === theme.id;
+            const accentSwatch = theme.accentFill || theme.accent || "#171813";
+            const baseSwatch = theme.themeColor && theme.themeColor !== accentSwatch ? theme.themeColor : "#efe5cf";
+            return `<button class="theme-card${active ? " is-active" : ""}" type="button" role="listitem" data-action="theme" data-theme="${attr(theme.id)}" aria-pressed="${active}">
+              <span class="theme-card-bar" aria-hidden="true">
+                <i class="bar-bg" style="background:${attr(baseSwatch)}"></i>
+                <i class="bar-accent" style="background:${attr(accentSwatch)}"></i>
+              </span>
+              <span class="theme-card-head">
+                <strong>${esc(theme.label)}</strong>
+                <span class="theme-card-state">${active ? "使用中" : ""}</span>
+              </span>
+              <small>${esc(theme.description || "")}</small>
+            </button>`;
           }).join("")}
         </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">学习阶段</span>
-        <p class="settings-note">只影响句子模式</p>
-        <div class="level-row">
-          ${sentenceLevels.map((level) => `
-            <button class="level-chip${draft.sentenceLevel === level.id ? " active" : ""}" type="button"
-              data-action="sentence-level" data-level="${attr(level.id)}" aria-pressed="${draft.sentenceLevel === level.id}"
-              title="${attr(level.hint)}">${esc(level.label)}</button>`).join("")}
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">界面细节</span>
         </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">从句展开方式</span>
-        <div class="level-row">
-          <button class="level-chip${(draft.foldMode || "block") === "block" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="block" aria-pressed="${(draft.foldMode || "block") === "block"}">缩进块</button>
-          <button class="level-chip${draft.foldMode === "inline" ? " active" : ""}" type="button" data-action="fold-mode" data-mode="inline" aria-pressed="${draft.foldMode === "inline"}">句内插入</button>
+        <div class="settings-inline-row">
+          <div class="settings-row-label">
+            <strong>生成信息</strong>
+            <span>词条底部显示模型与耗时脚注</span>
+          </div>
+          <div class="level-row compact" role="group" aria-label="生成信息">
+            <button class="level-chip${draft.showGenMeta !== false ? " active" : ""}" type="button" data-action="gen-meta" data-on="1" aria-pressed="${draft.showGenMeta !== false}">显示</button>
+            <button class="level-chip${draft.showGenMeta === false ? " active" : ""}" type="button" data-action="gen-meta" data-on="0" aria-pressed="${draft.showGenMeta === false}">隐藏</button>
+          </div>
         </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">语境寻词长度</span>
-        <p class="settings-note"><span id="reverse-token-value">${Number(draft.reverseMaxTokens) || 1500}</span> tokens · <span id="reverse-token-zone">${reverseZoneName(Number(draft.reverseMaxTokens) || 1500)}</span></p>
-        <input class="setting-range" type="range" min="600" max="3000" step="100"
-          value="${Number(draft.reverseMaxTokens) || 1500}" data-setting="reverseMaxTokens" aria-label="语境寻词输出上限" />
-        <div class="token-scale" id="reverse-token-scale">
-          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) < 1000 ? " is-active" : ""}" style="flex:4">只给结论</span>
-          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) >= 1000 && (Number(draft.reverseMaxTokens) || 1500) < 2000 ? " is-active" : ""}" style="flex:10">分块讲解</span>
-          <span class="token-zone${(Number(draft.reverseMaxTokens) || 1500) >= 2000 ? " is-active" : ""}" style="flex:10">成句拆解</span>
+        <div class="settings-card-divider"></div>
+        <div class="settings-inline-row">
+          <div class="settings-row-label">
+            <strong>缓存提示方式</strong>
+            <span>虚线未缓存 · 实线已缓存</span>
+          </div>
+          <div class="cache-display-switch" role="group" aria-label="缓存提示方式">
+            <button class="cache-display-btn ${draft.cacheDisplay !== "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="borders" aria-pressed="${draft.cacheDisplay !== "corner"}">边框</button>
+            <button class="cache-display-btn ${draft.cacheDisplay === "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="corner" aria-pressed="${draft.cacheDisplay === "corner"}">三角标</button>
+          </div>
         </div>
-        <div class="token-ticks">
-          <span style="left:0">600</span>
-          <span style="left:16.7%">1000</span>
-          <span style="left:58.3%">2000</span>
-          <span style="left:100%">3000</span>
+      </section>`;
+  }
+
+  function dataSettingsHtml() {
+    const stats = wordCacheSummary ? wordCacheSummary() : wordCacheStats();
+    const themeStats = themeCacheStatsSync
+      ? themeCacheStatsSync()
+      : { count: Array.isArray(state.themeDecks) ? state.themeDecks.length : 0, displayCount: Array.isArray(state.themeDisplay) ? state.themeDisplay.length : 0, max: 8, bytes: 0, words: 0 };
+    return `
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">本机存储</span>
+          <span class="mono">${esc(stats.backend)}</span>
         </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">生成信息</span>
-        <div class="level-row">
-          <button class="level-chip${draft.showGenMeta !== false ? " active" : ""}" type="button" data-action="gen-meta" data-on="1" aria-pressed="${draft.showGenMeta !== false}">显示</button>
-          <button class="level-chip${draft.showGenMeta === false ? " active" : ""}" type="button" data-action="gen-meta" data-on="0" aria-pressed="${draft.showGenMeta === false}">隐藏</button>
+        <div class="data-metrics-row">
+          <div class="data-metric">
+            <span class="data-metric-label">词条</span>
+            <strong>${stats.count}</strong>
+            <span class="mono">${formatBytes(stats.bytes)}</span>
+          </div>
+          <div class="data-metric">
+            <span class="data-metric-label">句子</span>
+            <strong>${sentenceCache.size}</strong>
+            <span class="mono">永久保留</span>
+          </div>
+          <div class="data-metric">
+            <span class="data-metric-label">主题库</span>
+            <strong>${themeStats.count}</strong>
+            <span class="mono">${formatBytes(themeStats.bytes)}</span>
+          </div>
         </div>
-      </div>
-      <div class="setting-group">
-        <span class="settings-subhead">例句风格</span>
-        <p class="settings-note">只影响之后生成的例句</p>
-        <div class="example-style-list">
-          ${(window.TALK_THEME?.list?.() || []).map((theme) => `
-            <label class="example-style-row">
-              <span>${esc(theme.label)}</span>
-              <input type="text" data-example-style="${attr(theme.id)}" value="${attr(exampleStyleFor(theme.id))}" spellcheck="false" aria-label="${attr(theme.label)} 的例句风格" />
-            </label>`).join("")}
+        <div class="cache-actions data-primary-actions">
+          <button class="btn btn-primary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
+          <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
+          <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
         </div>
-        <button class="link-btn" type="button" data-action="reset-example-styles">恢复默认风格</button>
-      </div>
-      <label class="pref-toggle">
-        <span class="pref-copy">
-          <strong>预加载二级词条</strong>
-          <span>词页出现后，在后台生成最多 ${prefetchLimit} 个相关词；会额外消耗模型额度。</span>
-        </span>
-        <span class="pref-switch">
-          <input type="checkbox" data-setting="prefetch" ${draft.prefetch ? "checked" : ""} />
-          <span class="pref-slider" aria-hidden="true"></span>
-        </span>
-      </label>
-      <div class="cache-display-setting">
-        <span class="pref-copy">
-          <strong>缓存提示方式</strong>
-          <span>虚线未缓存，实线已缓存</span>
-        </span>
-        <div class="cache-display-switch" role="group" aria-label="缓存提示方式">
-          <button class="cache-display-btn ${draft.cacheDisplay !== "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="borders" aria-pressed="${draft.cacheDisplay !== "corner"}">边框</button>
-          <button class="cache-display-btn ${draft.cacheDisplay === "corner" ? "active" : ""}" type="button" data-action="cache-display" data-display="corner" aria-pressed="${draft.cacheDisplay === "corner"}">三角标</button>
+      </section>
+
+      <section class="settings-card">
+        <div class="settings-card-head">
+          <span class="settings-subhead">按类清理</span>
         </div>
-      </div>
-      <div class="cache-settings-summary">
-        <span><strong>${stats.count}</strong> 个词条 · 永久保留</span>
-        <span>${formatBytes(stats.bytes)} · ${stats.backend}</span>
-      </div>
-      <p class="field-hint">句子分析缓存 ${sentenceCache.size} 条（按原文、深度、水平区分），可单独删除或整表清空。</p>
-      <div class="cache-actions">
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="open-cache">${icon("archive")} 缓存管理</button>
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="export-word-cache">导出 JSON</button>
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="import-word-cache">导入 JSON</button>
-        <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-sentence-cache">清空句子</button>
-        <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
-      </div>
-      <div class="theme-cache-setting">
-        <span class="settings-subhead">主题库</span>
-        <div id="theme-cache-stats"><p class="api-note">正在读取主题缓存…</p></div>
-        <button class="link-btn" type="button" data-action="clear-theme-cache">清空主题库</button>
-      </div>
-      <div class="diag-card">
-        <span class="settings-subhead">运行日志</span>
-        <p class="api-note">只记录请求类型、字符数与错误文本；密钥、令牌和长串已脱敏。出问题时复制它发给开发者。</p>
-        <pre class="diag-preview" id="diag-preview">${esc(diagText().split("\n").slice(-9).join("\n"))}</pre>
-        <div class="cache-actions">
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="copy-diagnostics">${icon("copy")} 复制诊断</button>
-          <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-diagnostics">清空日志</button>
+        <div class="settings-inline-row">
+          <div class="settings-row-label">
+            <strong>句子分析缓存</strong>
+            <span>当前 ${sentenceCache.size} 条，按原文、深度与水平区分</span>
+          </div>
+          <button class="btn btn-secondary settings-compact-btn" type="button" data-action="clear-sentence-cache">清空句子</button>
         </div>
-      </div>
-      <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>
-`;
+        <div class="settings-card-divider"></div>
+        <div class="settings-inline-row">
+          <div class="settings-row-label">
+            <strong>主题词展库</strong>
+            <span id="theme-cache-inline">${themeStats.count} 套主题 · 展览 ${themeStats.displayCount}/${themeStats.max} · 共 ${themeStats.words} 词</span>
+          </div>
+          <button class="btn btn-secondary settings-compact-btn" type="button" data-action="clear-theme-cache">清空主题库</button>
+        </div>
+      </section>
+
+      <details class="settings-card settings-disclosure">
+        <summary class="settings-disclosure-head">
+          <span class="settings-subhead">运行诊断</span>
+          <span class="settings-disclosure-hint">脱敏日志 · 排障用</span>
+        </summary>
+        <div class="settings-disclosure-body">
+          <p class="api-note">只记录请求类型、字符数与错误文本；密钥、令牌和长串已脱敏。出问题时复制它发给开发者。</p>
+          <pre class="diag-preview" id="diag-preview">${esc(diagText().split("\n").slice(-9).join("\n"))}</pre>
+          <div class="cache-actions">
+            <button class="btn btn-secondary cache-action-btn" type="button" data-action="copy-diagnostics">${icon("copy")} 复制诊断</button>
+            <button class="btn btn-secondary cache-action-btn" type="button" data-action="clear-diagnostics">清空日志</button>
+          </div>
+        </div>
+      </details>
+
+      <button class="btn btn-secondary install-settings-btn" id="install-app" type="button" data-action="install-app" ${state.installPrompt ? "" : "hidden"}>${icon("external")} 安装到主屏幕</button>`;
   }
 
   function renderSettingsContent() {
@@ -484,20 +644,28 @@ export function createSettingsSheet({
     if (!holder || !state.draft) return;
     const prevScroll = holder.scrollTop;
     const draft = state.draft;
-    const tab = state.settingsTab || "model";
+    const tab = resolveTab(state.settingsTab);
+    state.settingsTab = tab;
     const settingsCopy = copyFor("settings");
     const tabs = settingsCopy.tabs;
     const sheetTitle = $(".sheet-title", overlayRoot);
     if (sheetTitle) sheetTitle.textContent = settingsCopy.title;
     const sheetKicker = $(".sheet-head .mono", overlayRoot);
     if (sheetKicker) sheetKicker.textContent = settingsCopy.kicker;
+    const paneHtml = tab === "reading"
+      ? readingSettingsHtml(draft)
+      : tab === "appearance"
+        ? appearanceSettingsHtml(draft)
+        : tab === "data"
+          ? dataSettingsHtml()
+          : modelSettingsHtml(draft);
     holder.innerHTML = `
       <div class="sheet-content settings-sheet">
         <div class="settings-tabs" role="tablist" aria-label="设置分类">
           ${tabs.map(([id, label]) => `<button class="settings-tab ${tab === id ? "active" : ""}" type="button" role="tab" aria-selected="${tab === id}" data-action="settings-tab" data-tab="${id}">${label}</button>`).join("")}
         </div>
-        <div class="settings-pane" role="tabpanel">
-          ${tab === "tts" ? ttsSettingsHtml(draft) : tab === "data" ? dataSettingsHtml(draft) : modelSettingsHtml(draft)}
+        <div class="settings-pane" role="tabpanel" data-tab-pane="${tab}">
+          ${paneHtml}
         </div>
         <div class="settings-footer">
           <span id="settings-save-status"><span data-app-version>v${appVersion}</span> · build <span data-app-build>${appBuild}</span> · ${state.settingsDirty ? "正在保存…" : "更改自动保存"}</span>
@@ -505,21 +673,47 @@ export function createSettingsSheet({
         </div>
       </div>`;
     holder.scrollTop = prevScroll;
-    window.TALK_I18N?.apply(overlayRoot || document.body);
-    if (tab === "tts") requestAnimationFrame(refreshTtsError);
-    if (tab === "data") requestAnimationFrame(renderThemeCacheStats);
+    if (window.TALK_I18N?.lang === "en") {
+      window.TALK_I18N.apply(overlayRoot || document.body);
+    }
+    if (tab === "reading") requestAnimationFrame(refreshTtsError);
   }
 
   function openSettingsSheet() {
+    // Idempotency guard: if the settings root sheet is already open and visible,
+    // never tear down DOM, discard draft edits, replay animations, or reset scroll.
+    const existingSettings = $("#sheet-scroll .settings-sheet", overlayRoot);
+    if (state.settingsOpen && state.sheetOpen && !state.settingsSubView && !state.providerDraft && existingSettings) {
+      if (state.sheetCloseTimer) {
+        window.clearTimeout(state.sheetCloseTimer);
+        state.sheetCloseTimer = null;
+      }
+      $(".sheet-backdrop", overlayRoot)?.classList.add("show");
+      $(".sheet", overlayRoot)?.classList.add("show");
+      return;
+    }
+
+    // If returning from a settings sub-sheet (provider picker/editor or cache dashboard),
+    // preserve the live draft and smoothly reuse the existing sheet shell.
+    if (state.settingsOpen && state.sheetOpen && state.draft) {
+      flushSettingsDraft();
+      returnToSettingsRoot({ resetScroll: true });
+      return;
+    }
+
     state.settingsOpen = true;
+    state.settingsSubView = "";
+    state.providerDraft = null;
+    state.providerStatus = null;
     state.settingsDirty = false;
-    state.settingsTab = state.settingsTab || "model";
+    state.settingsTab = resolveTab(state.settingsTab);
     state.draft = {
       ...state.settings,
       profiles: (state.settings.profiles || []).map((profile) => ({ ...profile }))
     };
     const copy = copyFor("settings");
-    openSheetShell({ kicker: copy.kicker, title: copy.title });
+    const canReuse = Boolean($(".sheet", overlayRoot) && $(".sheet-backdrop", overlayRoot));
+    openSheetShell({ kicker: copy.kicker, title: copy.title, reuse: canReuse, backAction: "" });
     renderSettingsContent();
   }
 
@@ -565,9 +759,17 @@ export function createSettingsSheet({
       tapFeedback();
       openSettingsSheet();
     },
+    "settings-back"({ event }) {
+      event.preventDefault();
+      returnToSettingsRoot({ resetScroll: true });
+    },
     "settings-tab"({ event, target }) {
       event.preventDefault();
-      state.settingsTab = target.dataset.tab || "model";
+      const nextTab = resolveTab(target.dataset.tab || "model");
+      if (nextTab === state.settingsTab && $("#sheet-scroll .settings-pane", overlayRoot)) {
+        return;
+      }
+      state.settingsTab = nextTab;
       renderSettingsContent();
       $("#sheet-scroll")?.scrollTo({ top: 0 });
     },
@@ -679,15 +881,7 @@ export function createSettingsSheet({
       else draft.profiles.push(clean);
       state.draft = applyProfileToSettings(draft, clean);
       commitSettingsDraft();
-      state.settingsOpen = true;
-      state.providerDraft = null;
-      state.providerStatus = null;
-      if (state.sheetOpen && $("#sheet-scroll")) {
-        renderSettingsContent();
-        $("#sheet-scroll")?.scrollTo({ top: 0 });
-      } else {
-        openSettingsSheet();
-      }
+      returnToSettingsRoot({ resetScroll: true });
       toast("模型已保存");
     },
     "provider-delete"({ event }) {
@@ -700,15 +894,7 @@ export function createSettingsSheet({
         ? applyProfileToSettings(state.draft, state.draft.profiles[0])
         : { ...state.draft, activeProfileId: "", baseUrl: "", model: "", apiKey: "" };
       commitSettingsDraft();
-      state.settingsOpen = true;
-      state.providerDraft = null;
-      state.providerStatus = null;
-      if (state.sheetOpen && $("#sheet-scroll")) {
-        renderSettingsContent();
-        $("#sheet-scroll")?.scrollTo({ top: 0 });
-      } else {
-        openSettingsSheet();
-      }
+      returnToSettingsRoot({ resetScroll: true });
     },
     "delete-profile"({ event }) {
       event.preventDefault();
@@ -725,23 +911,48 @@ export function createSettingsSheet({
     "detail-level"({ event, target }) {
       event.preventDefault();
       if (!state.draft) return;
-      state.draft.detailLevel = target.dataset.level || "standard";
+      const next = target.dataset.level || "standard";
+      if (state.draft.detailLevel === next) return;
+      state.draft.detailLevel = next;
       scheduleSettingsCommit();
-      renderSettingsContent();
+      $$('[data-action="detail-level"]').forEach((btn) => {
+        const active = btn.dataset.level === next;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
     },
     "tts-engine"({ event, target }) {
       event.preventDefault();
       if (!state.draft) return;
-      state.draft.ttsEngine = target.dataset.engine === "qwen" ? "qwen" : "native";
+      const next = target.dataset.engine === "qwen" ? "qwen" : "native";
+      if ((state.draft.ttsEngine === "qwen" ? "qwen" : "native") === next) return;
+      state.draft.ttsEngine = next;
       scheduleSettingsCommit();
-      renderSettingsContent();
+      $$('[data-action="tts-engine"]').forEach((btn) => {
+        const active = btn.dataset.engine === next;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
+      const body = $("#tts-card-body");
+      if (body) {
+        body.innerHTML = ttsCardBodyHtml(state.draft);
+        if (window.TALK_I18N?.lang === "en") window.TALK_I18N.apply(body);
+        requestAnimationFrame(refreshTtsError);
+      } else {
+        renderSettingsContent();
+      }
     },
     "cache-display"({ event, target }) {
       event.preventDefault();
       if (!state.draft) return;
-      state.draft.cacheDisplay = target.dataset.display === "corner" ? "corner" : "borders";
+      const next = target.dataset.display === "corner" ? "corner" : "borders";
+      state.draft.cacheDisplay = next;
       scheduleSettingsCommit();
-      renderSettingsContent();
+      $$('[data-action="cache-display"]').forEach((btn) => {
+        const active = btn.dataset.display === next;
+        btn.classList.toggle("active", active);
+        btn.setAttribute("aria-pressed", String(active));
+      });
     },
     "save-settings"({ event }) {
       event.preventDefault();
@@ -773,18 +984,6 @@ export function createSettingsSheet({
         chip.setAttribute("aria-pressed", String(active));
       });
     },
-    "fold-mode"({ event, target }) {
-      event.preventDefault();
-      const mode = target.dataset.mode === "inline" ? "inline" : "block";
-      if (state.draft) state.draft.foldMode = mode;
-      scheduleSettingsCommit();
-      $$('[data-action="fold-mode"]').forEach((chip) => {
-        const active = chip.dataset.mode === mode;
-        chip.classList.toggle("active", active);
-        chip.setAttribute("aria-pressed", String(active));
-      });
-      if (state.route?.name === "sentence") refreshThemedPage();
-    },
     "reset-example-styles"({ event }) {
       event.preventDefault();
       saveExampleStyles({});
@@ -793,22 +992,10 @@ export function createSettingsSheet({
       });
       toast("已恢复默认例句风格");
     },
-    "theme-toggle"({ event, target }) {
-      event.preventDefault();
-      const row = target.closest(".theme-row");
-      if (!row) return;
-      const willOpen = !row.classList.contains("open");
-      $$(".theme-row.open").forEach((other) => {
-        other.classList.remove("open");
-        const head = other.querySelector(".theme-row-head");
-        if (head) head.setAttribute("aria-expanded", "false");
-      });
-      row.classList.toggle("open", willOpen);
-      target.setAttribute("aria-expanded", String(willOpen));
-    },
     lang({ event, target }) {
       event.preventDefault();
       const next = target.dataset.lang === "en" ? "en" : "zh";
+      if (window.TALK_I18N?.lang === next) return;
       window.TALK_I18N?.set(next);
       if (state.draft) state.draft.lang = next;
       renderSettingsContent();
@@ -817,14 +1004,33 @@ export function createSettingsSheet({
     },
     theme({ event, target }) {
       event.preventDefault();
-      window.TALK_THEME.apply(target.dataset.theme);
+      const nextTheme = target.dataset.theme;
+      if (!nextTheme || window.TALK_THEME.current().id === nextTheme) return;
+      window.TALK_THEME.apply(nextTheme);
       applyContentCopy();
       refreshThemedPage();
       if (state.route?.name === "word") {
         const current = getWord(state.route);
         if (current) scheduleThemeExamples(current);
       }
-      renderSettingsContent();
+      // Update theme cards & sheet chrome in place so scroll position never jumps.
+      $$('[data-action="theme"]').forEach((card) => {
+        const active = card.dataset.theme === nextTheme;
+        card.classList.toggle("is-active", active);
+        card.setAttribute("aria-pressed", String(active));
+        const badge = $(".theme-card-state", card);
+        if (badge) badge.textContent = active ? (window.TALK_I18N?.lang === "en" ? "In use" : "使用中") : "";
+      });
+      const settingsCopy = copyFor("settings");
+      const sheetTitle = $(".sheet-title", overlayRoot);
+      if (sheetTitle) sheetTitle.textContent = settingsCopy.title;
+      const sheetKicker = $(".sheet-head .mono", overlayRoot);
+      if (sheetKicker) sheetKicker.textContent = settingsCopy.kicker;
+      const tabLabelMap = Object.fromEntries(settingsCopy.tabs || []);
+      $$('[data-action="settings-tab"]', overlayRoot).forEach((btn) => {
+        if (tabLabelMap[btn.dataset.tab]) btn.textContent = tabLabelMap[btn.dataset.tab];
+      });
+      if (window.TALK_I18N?.lang === "en") window.TALK_I18N.apply(overlayRoot || document.body);
     },
     async "copy-diagnostics"() {
       const text = diagText();
@@ -837,7 +1043,8 @@ export function createSettingsSheet({
     },
     "clear-diagnostics"() {
       localStorage.removeItem(DIAG_KEY);
-      renderSettingsContent();
+      const pre = $("#diag-preview");
+      if (pre) pre.textContent = diagText().split("\n").slice(-9).join("\n");
       toast("运行日志已清空");
     },
     async "install-app"({ event, target }) {

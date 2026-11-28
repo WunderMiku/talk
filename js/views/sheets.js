@@ -36,17 +36,58 @@ export function createSheetController({
   schedulePrefetch,
   toast
 }) {
-  function openSheetShell({ kicker, title }) {
+  let sheetAnimToken = 0;
+
+  function renderSheetBackMarkup(backAction, backLabel) {
+    if (!backAction) return "";
+    return `<button class="sheet-head-back" type="button" data-action="${attr(backAction)}" aria-label="${attr(backLabel)}">${icon("arrowLeft")}<span>${esc(backLabel)}</span></button>`;
+  }
+
+  function openSheetShell({ kicker, title, reuse = false, backAction = "", backLabel = "返回" }) {
     state.sheetOpenedAt = performance.now();
     if (state.sheetCloseTimer) {
       window.clearTimeout(state.sheetCloseTimer);
       state.sheetCloseTimer = null;
     }
+    const existingBackdrop = $(".sheet-backdrop", overlayRoot);
+    const existingSheet = $(".sheet", overlayRoot);
+    if (reuse && existingBackdrop && existingSheet && $("#sheet-scroll", overlayRoot)) {
+      sheetAnimToken += 1;
+      existingSheet.setAttribute("aria-label", title);
+      const kickerEl = $(".sheet-head .mono", existingSheet);
+      if (kickerEl) kickerEl.textContent = kicker;
+      const titleEl = $(".sheet-title", existingSheet);
+      if (titleEl) titleEl.textContent = title;
+      const head = $(".sheet-head", existingSheet);
+      if (head) {
+        const oldBack = $(".sheet-head-back", head);
+        if (backAction) {
+          if (oldBack) {
+            oldBack.dataset.action = backAction;
+            oldBack.setAttribute("aria-label", backLabel);
+            const span = $("span", oldBack);
+            if (span) span.textContent = backLabel;
+          } else {
+            head.insertAdjacentHTML("afterbegin", renderSheetBackMarkup(backAction, backLabel));
+          }
+        } else if (oldBack) {
+          oldBack.remove();
+        }
+      }
+      state.sheetOpen = true;
+      updateScrollLock();
+      existingBackdrop.classList.add("show");
+      existingSheet.classList.add("show");
+      return;
+    }
+
+    const token = ++sheetAnimToken;
     overlayRoot.innerHTML = `
       <div class="sheet-backdrop" data-action="close-sheet"></div>
       <section class="sheet" role="dialog" aria-modal="true" aria-label="${attr(title)}" tabindex="-1">
         <div class="sheet-handle" aria-hidden="true"></div>
         <div class="sheet-head">
+          ${renderSheetBackMarkup(backAction, backLabel)}
           <div class="sheet-head-left">
             <span class="mono">${esc(kicker)}</span>
             <h2 class="sheet-title">${esc(title)}</h2>
@@ -59,7 +100,9 @@ export function createSheetController({
     state.sheetOpen = true;
     updateScrollLock();
     requestAnimationFrame(() => {
+      if (token !== sheetAnimToken) return;
       requestAnimationFrame(() => {
+        if (token !== sheetAnimToken) return;
         $(".sheet-backdrop", overlayRoot)?.classList.add("show");
         $(".sheet", overlayRoot)?.classList.add("show");
         $(".sheet", overlayRoot)?.focus({ preventScroll: true });
@@ -69,14 +112,22 @@ export function createSheetController({
 
   function closeSheet({ immediate = false } = {}) {
     if (!state.sheetOpen && !overlayRoot.firstElementChild) return;
+    sheetAnimToken += 1;
     if (state.settingsOpen) flushSettingsDraft();
     state.settingsOpen = false;
+    state.settingsSubView = "";
+    state.providerDraft = null;
+    state.providerStatus = null;
     state.sheetOpen = false;
     state.sheetStack = [];
     updateScrollLock();
     const backdrop = $(".sheet-backdrop", overlayRoot);
     const sheet = $(".sheet", overlayRoot);
     if (immediate) {
+      if (state.sheetCloseTimer) {
+        window.clearTimeout(state.sheetCloseTimer);
+        state.sheetCloseTimer = null;
+      }
       overlayRoot.innerHTML = "";
       return;
     }
@@ -225,14 +276,15 @@ export function createSheetController({
   async function renderCacheContent() {
     const holder = $("#sheet-scroll");
     if (!holder) return;
-    holder.innerHTML = `<div class="sheet-content" id="cache-dashboard"><p class="settings-intro">正在读取本机缓存…</p></div>`;
-    const words = wordCacheStats();
-    const audio = await getAudioStats();
-    const quotaEst = getStorageEstimate ? await getStorageEstimate() : { usage: 0, quota: 0, persisted: false };
+    const words = wordCacheStats({ limit: 24 });
+    const average = words.count ? words.bytes / words.count : 2600;
+    const recent = words.entries;
+    const [audio, quotaEst] = await Promise.all([
+      getAudioStats(),
+      getStorageEstimate ? getStorageEstimate() : Promise.resolve({ usage: 0, quota: 0, persisted: false })
+    ]);
     if (!holder.isConnected) return;
-    const estimate = wordCacheEstimate();
     const totalBytes = words.bytes + audio.bytes;
-    const recent = words.entries.slice(0, 24);
     const quotaText = quotaEst.quota > 0
       ? `本机可用配额 ${formatBytes(quotaEst.quota)}${quotaEst.persisted ? " · 已开启持久化" : ""}；书库、词条、寻词与精读均存 IndexedDB。`
       : "只存本机 IndexedDB；导出不含音频。";
@@ -256,7 +308,7 @@ export function createSheetController({
             <span>${words.backend}</span>
           </div>
         </div>
-        <p class="cache-estimate" id="cache-estimate">平均 ${formatBytes(estimate.average)}/词条 · 词条、句子、寻词、翻译与精读均不限数量与时长，仅在手动清空时删除。</p>
+        <p class="cache-estimate" id="cache-estimate">平均 ${formatBytes(average)}/词条 · 词条、句子、寻词、翻译与精读均不限数量与时长，仅在手动清空时删除。</p>
         <div class="cache-list-head">
           <span class="settings-subhead">已缓存词条</span>
           <span class="mono">${words.count} 条</span>
@@ -277,6 +329,7 @@ export function createSheetController({
           <input id="word-cache-file" type="file" accept="application/json,.json" hidden />
         </div>
       </div>`;
+    holder.scrollTop = 0;
   }
 
   function refreshCacheUi() {
@@ -288,7 +341,15 @@ export function createSheetController({
   }
 
   function openCacheSheet() {
-    openSheetShell({ kicker: "本机数据", title: "缓存与空间" });
+    const fromSettings = Boolean(state.settingsOpen);
+    if (fromSettings) state.settingsSubView = "cache";
+    openSheetShell({
+      kicker: "本机数据",
+      title: "缓存与空间",
+      reuse: Boolean(state.sheetOpen),
+      backAction: fromSettings ? "settings-back" : "",
+      backLabel: "返回设置"
+    });
     void renderCacheContent();
   }
 

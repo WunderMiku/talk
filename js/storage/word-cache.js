@@ -27,9 +27,34 @@ export function formatBytes(bytes) {
   return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }
 
+const recordByteCache = new WeakMap();
+
+function utf8ByteLength(str) {
+  let bytes = 0;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      bytes += 4;
+      i += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
 function cacheRecordBytes(record) {
+  if (!record || typeof record !== "object") return 0;
+  const cached = recordByteCache.get(record);
+  if (typeof cached === "number") return cached;
+  if (typeof record.bytes === "number" && record.bytes > 0) {
+    recordByteCache.set(record, record.bytes);
+    return record.bytes;
+  }
   try {
-    return new Blob([JSON.stringify(record)]).size;
+    const size = utf8ByteLength(JSON.stringify(record));
+    recordByteCache.set(record, size);
+    return size;
   } catch (_) {
     return 0;
   }
@@ -53,6 +78,48 @@ export function createWordCacheStore({
   let wordStoreFallback = false;
   const wordCache = new Map();
   const sentenceCache = new Map();
+  let summaryDirty = true;
+  let summaryCount = 0;
+  let summaryBytes = 0;
+
+  function setWordCacheEntry(key, record) {
+    if (!summaryDirty) {
+      const prev = wordCache.get(key);
+      if (prev?.key && prev?.data) {
+        summaryCount -= 1;
+        summaryBytes -= cacheRecordBytes(prev);
+      }
+      if (record?.key && record?.data) {
+        summaryCount += 1;
+        summaryBytes += cacheRecordBytes(record);
+      }
+    }
+    wordCache.set(key, record);
+  }
+
+  function deleteWordCacheEntry(key) {
+    if (!summaryDirty) {
+      const prev = wordCache.get(key);
+      if (prev?.key && prev?.data) {
+        summaryCount -= 1;
+        summaryBytes -= cacheRecordBytes(prev);
+      }
+    }
+    wordCache.delete(key);
+  }
+
+  function recomputeSummary() {
+    let count = 0;
+    let bytes = 0;
+    for (const entry of wordCache.values()) {
+      if (!entry?.key || !entry?.data) continue;
+      count += 1;
+      bytes += cacheRecordBytes(entry);
+    }
+    summaryCount = count;
+    summaryBytes = bytes;
+    summaryDirty = false;
+  }
 
   function legacyWordCache() {
     try {
@@ -74,7 +141,7 @@ export function createWordCacheStore({
   }
 
   async function removeWordRecord(key) {
-    wordCache.delete(key);
+    deleteWordCacheEntry(key);
     if (wordDb) {
       try { await wordDb.delete(WORD_DB_STORE, key); } catch (_) { /* no-op */ }
     } else if (wordStoreFallback) {
@@ -86,6 +153,7 @@ export function createWordCacheStore({
   async function pruneWordCache() {}
 
   async function initWordStore() {
+    summaryDirty = true;
     if (!window.idb?.openDB || !("indexedDB" in window)) {
       wordStoreFallback = true;
       const legacy = legacyWordCache();
@@ -126,6 +194,7 @@ export function createWordCacheStore({
           detail: hit.detail || "standard",
           data: hit.data
         };
+        record.bytes = cacheRecordBytes(record);
         wordCache.set(normalized, record);
         await wordDb.put(WORD_DB_STORE, record);
         migrated += 1;
@@ -163,7 +232,8 @@ export function createWordCacheStore({
     if (!key || !data) return;
     const { context, ...clean } = data;
     const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, gen: gen || data.gen || null, data: clean };
-    wordCache.set(key, record);
+    record.bytes = cacheRecordBytes(record);
+    setWordCacheEntry(key, record);
     if (wordDb) {
       wordDb.put(WORD_DB_STORE, record).catch((error) => {
         console.warn("Could not write word cache to IndexedDB.", error);
@@ -184,7 +254,8 @@ export function createWordCacheStore({
     const key = chunkCacheKey(query);
     if (!key || !data) return;
     const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, data: { ...data, kind: "chunk" } };
-    wordCache.set(key, record);
+    record.bytes = cacheRecordBytes(record);
+    setWordCacheEntry(key, record);
     if (wordDb) {
       wordDb.put(WORD_DB_STORE, record).catch((error) => {
         console.warn("Could not write chunk cache to IndexedDB.", error);
@@ -286,6 +357,9 @@ export function createWordCacheStore({
 
   async function clearWordStore() {
     wordCache.clear();
+    summaryCount = 0;
+    summaryBytes = 0;
+    summaryDirty = false;
     if (wordDb) {
       try { await wordDb.clear(WORD_DB_STORE); } catch (_) { /* no-op */ }
     }
@@ -340,7 +414,8 @@ export function createWordCacheStore({
         schema: Number(entry.schema) >= WORD_CACHE_MIN_SCHEMA ? Number(entry.schema) : WORD_CACHE_MIN_SCHEMA,
         data
       };
-      wordCache.set(key, record);
+      record.bytes = cacheRecordBytes(record);
+      setWordCacheEntry(key, record);
       if (wordDb) await wordDb.put(WORD_DB_STORE, record);
       count += 1;
     }
@@ -351,17 +426,26 @@ export function createWordCacheStore({
     return count;
   }
 
-  function wordCacheStats() {
+  function wordCacheSummary() {
+    if (summaryDirty) recomputeSummary();
+    return {
+      count: summaryCount,
+      unlimited: true,
+      bytes: summaryBytes,
+      backend: wordDb ? "IndexedDB" : "localStorage",
+      fallback: wordStoreFallback
+    };
+  }
+
+  function wordCacheStats({ limit = 0 } = {}) {
+    const summary = wordCacheSummary();
     const entries = [...wordCache.values()]
       .filter((entry) => entry?.key && entry?.data)
       .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
+    const slice = limit > 0 ? entries.slice(0, limit) : entries;
     return {
-      count: entries.length,
-      unlimited: true,
-      bytes: entries.reduce((sum, entry) => sum + cacheRecordBytes(entry), 0),
-      backend: wordDb ? "IndexedDB" : "localStorage",
-      fallback: wordStoreFallback,
-      entries: entries.map((entry) => ({
+      ...summary,
+      entries: slice.map((entry) => ({
         key: entry.key,
         word: entry.data.word || entry.key,
         detail: entry.detail || "standard",
@@ -372,9 +456,9 @@ export function createWordCacheStore({
   }
 
   function wordCacheEstimate() {
-    const stats = wordCacheStats();
-    const average = stats.count ? stats.bytes / stats.count : 2600;
-    return { average, bytes: stats.bytes, label: formatBytes(stats.bytes) };
+    const summary = wordCacheSummary();
+    const average = summary.count ? summary.bytes / summary.count : 2600;
+    return { average, bytes: summary.bytes, label: formatBytes(summary.bytes) };
   }
 
   return {
@@ -395,6 +479,7 @@ export function createWordCacheStore({
     cachePutChunk,
     exportWordCache,
     importWordCache,
+    wordCacheSummary,
     wordCacheStats,
     wordCacheEstimate,
     isWordCached,

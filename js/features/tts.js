@@ -175,8 +175,12 @@ export function createTtsController({ state, usableApiKey, toast }) {
     return new Blob([bytes], { type });
   }
 
+  let audioDbPromise = null;
+  let audioStatsCache = null;
+
   function openAudioDb() {
-    return new Promise((resolve, reject) => {
+    if (audioDbPromise) return audioDbPromise;
+    audioDbPromise = new Promise((resolve, reject) => {
       if (!("indexedDB" in window)) {
         reject(new Error("IndexedDB unavailable"));
         return;
@@ -186,9 +190,18 @@ export function createTtsController({ state, usableApiKey, toast }) {
         const db = request.result;
         if (!db.objectStoreNames.contains(AUDIO_DB_STORE)) db.createObjectStore(AUDIO_DB_STORE);
       };
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+      request.onsuccess = () => {
+        const db = request.result;
+        db.onclose = () => { audioDbPromise = null; };
+        db.onversionchange = () => { db.close(); audioDbPromise = null; };
+        resolve(db);
+      };
+      request.onerror = () => {
+        audioDbPromise = null;
+        reject(request.error);
+      };
     });
+    return audioDbPromise;
   }
 
   async function getCachedAudio(key) {
@@ -205,6 +218,7 @@ export function createTtsController({ state, usableApiKey, toast }) {
   }
 
   async function getAudioStats() {
+    if (audioStatsCache) return audioStatsCache;
     try {
       const db = await openAudioDb();
       const records = await new Promise((resolve) => {
@@ -212,7 +226,7 @@ export function createTtsController({ state, usableApiKey, toast }) {
         req.onsuccess = () => resolve(req.result || []);
         req.onerror = () => resolve([]);
       });
-      return {
+      audioStatsCache = {
         count: records.length,
         bytes: records.reduce((sum, record) => sum + (record?.blob?.size || 0), 0),
         latest: records
@@ -221,12 +235,14 @@ export function createTtsController({ state, usableApiKey, toast }) {
           .slice(0, 8)
           .map((record) => ({ at: Number(record.at), bytes: record?.blob?.size || 0 }))
       };
+      return audioStatsCache;
     } catch (_) {
       return { count: 0, bytes: 0, latest: [] };
     }
   }
 
   async function clearAudioCache() {
+    audioStatsCache = { count: 0, bytes: 0, latest: [] };
     try {
       const db = await openAudioDb();
       await new Promise((resolve) => {
@@ -241,6 +257,7 @@ export function createTtsController({ state, usableApiKey, toast }) {
   }
 
   async function putCachedAudio(key, blob) {
+    audioStatsCache = null;
     try {
       const db = await openAudioDb();
       await new Promise((resolve, reject) => {

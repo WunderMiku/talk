@@ -31,7 +31,8 @@ window.TALK_CONTENT = {
     title: "设置",
     tabs: [
       ["model", "模型"],
-      ["tts", "发音"],
+      ["reading", "阅读"],
+      ["appearance", "外观"],
       ["data", "数据"]
     ]
   },
@@ -161,7 +162,8 @@ window.TALK_CONTENT.themeCopy = {
       title: "指挥台",
       tabs: [
         ["model", "配置"],
-        ["tts", "声音"],
+        ["reading", "研读"],
+        ["appearance", "版式"],
         ["data", "档案"]
       ]
     }
@@ -298,7 +300,8 @@ window.TALK_CONTENT.themeCopy["swiss-lab"] = {
     title: "控制台",
     tabs: [
       ["model", "接口"],
-      ["tts", "声音"],
+      ["reading", "阅读"],
+      ["appearance", "外观"],
       ["data", "数据"]
     ]
   }
@@ -370,7 +373,8 @@ window.TALK_CONTENT.themeCopy["topo-acid"] = {
     title: "控制台",
     tabs: [
       ["model", "接口"],
-      ["tts", "音频"],
+      ["reading", "阅读"],
+      ["appearance", "界面"],
       ["data", "存档"]
     ]
   }
@@ -441,7 +445,8 @@ window.TALK_CONTENT.themeCopy["retro-stub"] = {
     title: "登记处",
     tabs: [
       ["model", "接口"],
-      ["tts", "音频"],
+      ["reading", "阅读"],
+      ["appearance", "版面"],
       ["data", "票册"]
     ]
   }
@@ -512,7 +517,8 @@ window.TALK_CONTENT.themeCopy["archive-grid"] = {
     title: "控制台",
     tabs: [
       ["model", "接口"],
-      ["tts", "音频"],
+      ["reading", "阅读"],
+      ["appearance", "界面"],
       ["data", "存档"]
     ]
   }

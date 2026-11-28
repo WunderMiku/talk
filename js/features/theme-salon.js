@@ -112,16 +112,53 @@ export function createThemeSalon({
     });
   }
 
-  async function themeCacheStats() {
-    const decks = await themeDecksRead();
-    const bytes = new Blob([JSON.stringify(decks)]).size;
+  const themeDeckBytes = new WeakMap();
+
+  function deckByteLength(deck) {
+    if (!deck || typeof deck !== "object") return 0;
+    const cached = themeDeckBytes.get(deck);
+    if (typeof cached === "number") return cached;
+    try {
+      const str = JSON.stringify(deck);
+      let bytes = 0;
+      for (let i = 0; i < str.length; i++) {
+        const code = str.charCodeAt(i);
+        if (code < 0x80) bytes += 1;
+        else if (code < 0x800) bytes += 2;
+        else if (code >= 0xd800 && code <= 0xdbff) {
+          bytes += 4;
+          i += 1;
+        } else bytes += 3;
+      }
+      themeDeckBytes.set(deck, bytes);
+      return bytes;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  function themeCacheStatsSync() {
+    const decks = Array.isArray(state.themeDecks) ? state.themeDecks : [];
+    let bytes = 0;
+    let words = 0;
+    for (const deck of decks) {
+      bytes += deckByteLength(deck);
+      words += deck.words?.length || 0;
+    }
     return {
       count: decks.length,
-      displayCount: state.themeDisplay.length,
+      displayCount: Array.isArray(state.themeDisplay) ? state.themeDisplay.length : 0,
       max: THEME_DISPLAY_LIMIT,
       bytes,
-      words: decks.reduce((sum, deck) => sum + (deck.words?.length || 0), 0)
+      words
     };
+  }
+
+  async function themeCacheStats() {
+    if (Array.isArray(state.themeDecks)) return themeCacheStatsSync();
+    const decks = await themeDecksRead();
+    state.themeDecks = decks;
+    return themeCacheStatsSync();
   }
 
   async function renderThemeCacheStats() {
@@ -129,6 +166,7 @@ export function createThemeSalon({
     if (!target) return;
     try {
       const stats = await themeCacheStats();
+      if (!target.isConnected) return;
       target.innerHTML = `<div class="cache-settings-summary"><span><strong>${stats.count}</strong> 个主题 · 展览 ${stats.displayCount} / ${stats.max}</span><span>${formatBytes(stats.bytes)} · IndexedDB</span></div>
         <p class="api-note">共 ${stats.words} 个词。数据库保留全部主题；首页展览队列最多 ${stats.max} 版，换入新版只会移出最早一版，不删除数据库。</p>`;
     } catch (_) {
@@ -424,6 +462,7 @@ export function createThemeSalon({
     renderThemeSalon,
     renderThemeCacheStats,
     themeCacheStats,
+    themeCacheStatsSync,
     clearThemeStore,
     actions
   };
