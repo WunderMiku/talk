@@ -40,7 +40,8 @@
       bindingMargin: false
     },
     runSeq: 0,
-    abortController: null
+    abortController: null,
+    docScrollTop: 0
   };
 
   /* ---------- Built-in Offline Demo Sample ---------- */
@@ -544,9 +545,9 @@ A more mature generation of tools will learn when to get out of the way—and wh
     return entryHtml + modalHtml;
   }
 
-  function renderInputPage() {
-    const recentHtml = readerState.recentDocs.length
-      ? `<div class="reader-recent">
+  function renderRecentDocsHtml() {
+    if (!readerState.recentDocs.length) return "";
+    return `<div class="reader-recent">
           <div class="pdf-sec-bar" style="margin-top:0;">
             <span class="pdf-sec-num">库</span>
             <span class="pdf-sec-title">本地已精读</span>
@@ -565,9 +566,10 @@ A more mature generation of tools will learn when to get out of the way—and wh
               </div>
             `).join("")}
           </div>
-        </div>`
-      : "";
+        </div>`;
+  }
 
+  function renderInputPage() {
     return `
       ${bridge()?.homeTopbar?.() || ""}
       <section class="reader-page">
@@ -595,7 +597,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
           </div>
         </div>
         ${renderWordbookGeneratorHtml()}
-        ${recentHtml}
+        <div id="reader-recent-slot">${renderRecentDocsHtml()}</div>
       </section>
     `;
   }
@@ -1109,6 +1111,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
 
     readerState.doc = doc;
     readerState.view = "doc";
+    readerState.docScrollTop = 0;
     readerState.overview = null;
     readerState.overviewState = "loading";
     readerState.overviewError = "";
@@ -1226,6 +1229,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
       if (sampleData) readerState.blockResults.set(p.index, { status: "done", data: sampleData });
     });
     readerState.view = "doc";
+    readerState.docScrollTop = 0;
     renderIntoScreen();
     bridge()?.toast?.("已载入外刊精读示例（免 API Key）");
   }
@@ -1246,6 +1250,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
       else readerState.blockResults.set(p.index, { status: "error", error: "尚未生成，点击重试" });
     }
     readerState.view = "doc";
+    readerState.docScrollTop = 0;
     renderIntoScreen();
   }
 
@@ -2116,12 +2121,31 @@ A more mature generation of tools will learn when to get out of the way—and wh
     pageHtml() {
       return readerState.view === "doc" ? renderDocView() : renderInputPage();
     },
-    async onMount(screen) {
-      readerState.recentDocs = await dbListDocs();
-      if (readerState.view === "input") {
-        screen.innerHTML = renderInputPage();
+    onBeforeLeave(screen) {
+      if (readerState.view === "doc" && screen) {
+        readerState.docScrollTop = screen.scrollTop || 0;
+        hideLookupDock(screen);
       }
+    },
+    async onMount(screen) {
       bindReaderDom(screen);
+      if (readerState.view === "doc" && readerState.docScrollTop > 0) {
+        screen.scrollTop = readerState.docScrollTop;
+      }
+      const prevSig = readerState.recentDocs
+        .map((d) => `${d.docHash}:${d.updatedAt || 0}:${d.wordCount || 0}:${d.overview?.titleZh || d.title || ""}`)
+        .join("|");
+      const docs = await dbListDocs();
+      readerState.recentDocs = docs;
+      const nextSig = docs
+        .map((d) => `${d.docHash}:${d.updatedAt || 0}:${d.wordCount || 0}:${d.overview?.titleZh || d.title || ""}`)
+        .join("|");
+      if (nextSig !== prevSig && readerState.view === "input" && screen?.dataset?.page === "reader") {
+        const slot = screen.querySelector("#reader-recent-slot");
+        if (slot) {
+          slot.innerHTML = renderRecentDocsHtml();
+        }
+      }
     },
     refreshTheme() {
       renderIntoScreen();

@@ -222,4 +222,76 @@ suite("ui stability · bug & twitch regressions", { timeout: 60_000 }, (s) => {
     t.expect(htmlTransformed).toBe(false);
     t.expect(page.errors).toEqual([]);
   });
+
+  s.test("3-mode switching including inside an open Reader article avoids ViewTransition, preserves doc scroll, and aligns indicator", async (state, t) => {
+    const page = await state.env.newPage({
+      viewport: { width: 390, height: 844 },
+      reducedMotion: "no-preference"
+    });
+    await page.open("/");
+
+    // Spy on startViewTransition during 3-mode switching.
+    await page.evaluate(() => {
+      window.__vtCalls = 0;
+      const orig = document.startViewTransition?.bind(document);
+      if (orig) {
+        document.startViewTransition = (...args) => {
+          window.__vtCalls += 1;
+          return orig(...args);
+        };
+      }
+    });
+
+    // Switch to Reader and open built-in offline sample article.
+    await page.click('[data-action="module"][data-module="reader"]');
+    await page.waitForPage("reader");
+    await page.click('[data-reader-action="load-sample"]');
+    await page.waitForSelector(".reader-doc-wrap");
+
+    // Scroll mid-article, then rapidly toggle all 3 modules and return to Reader article.
+    await page.evaluate(() => {
+      const scr = document.querySelector(".screen");
+      if (scr) scr.scrollTop = 420;
+    });
+    const savedBefore = await page.evaluate(() => document.querySelector(".screen")?.scrollTop || 0);
+    t.expect(savedBefore).toBeGreaterThan(200);
+
+    let sawScreenTransform = false;
+    for (const mod of ["dictionary", "translator", "reader", "translator", "dictionary", "reader"]) {
+      await page.click(`[data-action="module"][data-module="${mod}"]`);
+      const transform = await page.evaluate(() => getComputedStyle(document.querySelector(".screen")).transform);
+      if (transform && transform !== "none") sawScreenTransform = true;
+      await page.waitForTimeout(45);
+    }
+    await page.waitForTimeout(280);
+
+    const finalState = await page.evaluate(() => {
+      const scr = document.querySelector(".screen");
+      const ind = document.querySelector(".module-indicator");
+      const activeBtn = document.querySelector(".module-btn.active");
+      return {
+        page: scr?.dataset.page || "",
+        hasDoc: Boolean(document.querySelector(".reader-doc-wrap")),
+        restoredScroll: scr?.scrollTop || 0,
+        vtCalls: window.__vtCalls || 0,
+        glideLeftover: scr?.classList.contains("is-module-glide") || false,
+        moduleDirLeftover: document.documentElement.dataset.moduleDir || null,
+        indWidthMatches: ind && activeBtn ? Math.round(parseFloat(ind.style.width)) === activeBtn.offsetWidth : false,
+        activeMod: activeBtn?.dataset.module || ""
+      };
+    });
+
+    t.expect(sawScreenTransform).toBe(false);
+    t.expect(finalState).toEqual({
+      page: "reader",
+      hasDoc: true,
+      restoredScroll: savedBefore,
+      vtCalls: 0,
+      glideLeftover: false,
+      moduleDirLeftover: null,
+      indWidthMatches: true,
+      activeMod: "reader"
+    });
+    t.expect(page.errors).toEqual([]);
+  });
 });

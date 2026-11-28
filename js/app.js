@@ -77,7 +77,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   const CONTENT = window.TALK_CONTENT;
   const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "297"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "298"; // cache-busting build, kept in step with ?v= and sw.js
   const actions = createActionRegistry();
 
   const app = document.getElementById("app");
@@ -621,27 +621,11 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       const rawMod = target.dataset.module;
       const module = rawMod === "translator" ? "translator" : rawMod === "reader" ? "reader" : "dictionary";
       if (module === state.module) return;
-      const modOrder = { dictionary: 0, translator: 1, reader: 2 };
-      const dir = (modOrder[module] ?? 0) >= (modOrder[state.module] ?? 0) ? "next" : "prev";
-      document.documentElement.dataset.moduleDir = dir;
-      state.module = module;
-      updateModuleBar();
       tapFeedback();
       closeAllWordLayers({ immediate: true });
-      if (module === "translator") navigate({ name: "translator" }, { replace: false });
-      else if (module === "reader") navigate({ name: "reader" }, { replace: false });
-      else navigate({ name: "home" }, { replace: false });
-      if (!document.startViewTransition) {
-        screen.classList.remove("is-module-glide");
-        void screen.offsetWidth;
-        screen.classList.add("is-module-glide");
-      }
-      if (state.moduleGlideTimer) window.clearTimeout(state.moduleGlideTimer);
-      state.moduleGlideTimer = window.setTimeout(() => {
-        state.moduleGlideTimer = 0;
-        delete document.documentElement.dataset.moduleDir;
-        screen.classList.remove("is-module-glide");
-      }, 360);
+      if (module === "translator") navigate({ name: "translator" }, { replace: false, instant: true, moduleSwitch: true });
+      else if (module === "reader") navigate({ name: "reader" }, { replace: false, instant: true, moduleSwitch: true });
+      else navigate({ name: "home" }, { replace: false, instant: true, moduleSwitch: true });
     },
     mode({ event, target }) {
       event.preventDefault();
@@ -737,7 +721,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     return { name: "home" };
   }
 
-  function navigate(route, { replace = false, instant = false, direction = "forward" } = {}) {
+  function navigate(route, { replace = false, instant = false, direction = "forward", moduleSwitch = false } = {}) {
     const currentDepth = Number(history.state?.depth) || 0;
     const depth = replace ? currentDepth : route.name === "home" ? 0 : currentDepth + 1;
     const histState = { route, depth };
@@ -748,7 +732,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       /* History can fail in private frames. The screen still works. */
     }
     if (direction === "back" && route.name === "home") setRevealMode("instant-top");
-    renderRoute(route, direction, { instant });
+    renderRoute(route, direction, { instant, moduleSwitch });
   }
 
   function refreshThemedPage() {
@@ -998,15 +982,32 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     });
   }
 
-  function renderRoute(route, direction = "forward", { instant = false } = {}) {
+  function renderRoute(route, direction = "forward", { instant = false, moduleSwitch = false } = {}) {
     if (route.name === "home" && revealMode === "normal") setRevealMode("instant-home");
-    const useViewTransition = Boolean(!instant && !reduceMotion && document.startViewTransition);
+    const prevRoute = state.route;
+    const prevModule = state.module;
+    const nextModule = route.name === "translator" ? "translator" : route.name === "reader" ? "reader" : "dictionary";
+    const isCrossModule = Boolean(moduleSwitch || (prevRoute && prevModule && prevModule !== nextModule));
+    const isReaderRoute = route.name === "reader" || prevRoute?.name === "reader";
+    const useViewTransition = Boolean(!instant && !isCrossModule && !isReaderRoute && !reduceMotion && document.startViewTransition);
+
+    if (!useViewTransition && activeViewTransition) {
+      try { activeViewTransition.skipTransition?.(); } catch (_) { /* ignore */ }
+      activeViewTransition = null;
+      queuedRender = null;
+    }
+
     const apply = (withViewTransition = false) => {
       if (!screen) return;
+      if (prevRoute?.name === "reader" && route.name !== "reader") {
+        window.TALK_READER?.onBeforeLeave?.(screen);
+      }
       state.route = route;
       screen.dataset.page = route.name;
-      state.module = route.name === "translator" ? "translator" : route.name === "reader" ? "reader" : "dictionary";
-      updateModuleBar();
+      screen.classList.remove("is-swipe-selecting");
+      const moduleChanged = state.module !== nextModule;
+      state.module = nextModule;
+      if (moduleChanged || !app?.dataset?.modIndReady) updateModuleBar();
       closeTranslationWorkspace({ immediate: true });
       closeSheet({ immediate: true });
       closeAllWordLayers({ immediate: true });
@@ -1019,7 +1020,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       applyCacheDisplay();
       refreshCacheBorders(screen);
       scrollScreenTo(0, true);
-      if (withViewTransition) {
+      if (withViewTransition || isCrossModule || isReaderRoute) {
         observeReveals(screen, { syncAboveFold: true });
       } else {
         queueReveal(screen);
@@ -1034,8 +1035,37 @@ import { applyInputMode, createHomeView } from "./views/home.js";
         cancelPrefetch();
       }
       resizeSmoothScroll();
-      screen.classList.remove("is-leaving", "is-back-leaving", "is-entering");
-      if (!withViewTransition) {
+      screen.classList.remove("is-leaving", "is-back-leaving", "is-entering", "is-module-glide");
+      if (state.moduleGlideListener) {
+        screen.removeEventListener("animationend", state.moduleGlideListener);
+        state.moduleGlideListener = null;
+      }
+      if (state.moduleGlideTimer) {
+        window.clearTimeout(state.moduleGlideTimer);
+        state.moduleGlideTimer = 0;
+      }
+      if (isCrossModule && !reduceMotion) {
+        void screen.offsetWidth;
+        screen.classList.add("is-module-glide");
+        const finishGlide = () => {
+          screen.classList.remove("is-module-glide");
+          if (state.moduleGlideListener) {
+            screen.removeEventListener("animationend", state.moduleGlideListener);
+            state.moduleGlideListener = null;
+          }
+          if (state.moduleGlideTimer) {
+            window.clearTimeout(state.moduleGlideTimer);
+            state.moduleGlideTimer = 0;
+          }
+        };
+        const onAnimEnd = (event) => {
+          if (event.target !== screen) return;
+          finishGlide();
+        };
+        state.moduleGlideListener = onAnimEnd;
+        screen.addEventListener("animationend", onAnimEnd);
+        state.moduleGlideTimer = window.setTimeout(finishGlide, 240);
+      } else if (!withViewTransition && !isCrossModule && !isReaderRoute && !instant) {
         void screen.offsetWidth;
         screen.classList.add("is-entering");
         if (screenEnterTimer) window.clearTimeout(screenEnterTimer);
@@ -1056,6 +1086,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       }
       if (route.name === "reader") {
         window.TALK_READER?.onMount?.(screen);
+        if (screen.scrollTop > 0) scrollScreenTo(screen.scrollTop, true);
       }
       if (route.name === "translator") {
         updateTranslatorLanguage();
@@ -1092,7 +1123,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       }
     }
 
-    if (!instant && !reduceMotion && !document.startViewTransition) {
+    if (!instant && !isCrossModule && !isReaderRoute && !reduceMotion && !document.startViewTransition) {
       screen.classList.add(direction === "back" ? "is-back-leaving" : "is-leaving");
       window.setTimeout(() => apply(false), 150);
       return;
@@ -1237,6 +1268,8 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     });
   }
 
+  let modIndRaf = 0;
+
   function syncModuleIndicator({ instant = false } = {}) {
     const sw = $(".module-switch", app);
     if (!sw) return;
@@ -1249,22 +1282,36 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     }
     const activeBtn = $(".module-btn.active", sw);
     if (!activeBtn) return;
-    const swRect = sw.getBoundingClientRect();
-    const btnRect = activeBtn.getBoundingClientRect();
-    if (!swRect.width || !btnRect.width) return;
-    const x = btnRect.left - swRect.left;
-    const y = btnRect.top - swRect.top;
+    // Use offset geometry (immune to :active scale transforms) when offsetParent matches.
+    let x = 0;
+    let y = 0;
+    let w = 0;
+    let h = 0;
+    if (activeBtn.offsetParent === sw) {
+      x = activeBtn.offsetLeft;
+      y = activeBtn.offsetTop;
+      w = activeBtn.offsetWidth;
+      h = activeBtn.offsetHeight;
+    } else {
+      const swRect = sw.getBoundingClientRect();
+      const btnRect = activeBtn.getBoundingClientRect();
+      x = btnRect.left - swRect.left;
+      y = btnRect.top - swRect.top;
+      w = btnRect.width;
+      h = btnRect.height;
+    }
+    if (!w || !h) return;
     if (instant) {
       const prev = ind.style.transition;
       ind.style.transition = "none";
-      ind.style.width = `${btnRect.width}px`;
-      ind.style.height = `${btnRect.height}px`;
+      ind.style.width = `${w}px`;
+      ind.style.height = `${h}px`;
       ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
       void ind.offsetWidth;
       ind.style.transition = prev;
     } else {
-      ind.style.width = `${btnRect.width}px`;
-      ind.style.height = `${btnRect.height}px`;
+      ind.style.width = `${w}px`;
+      ind.style.height = `${h}px`;
       ind.style.transform = `translate3d(${x}px, ${y}px, 0)`;
     }
     sw.classList.add("has-indicator");
@@ -1277,8 +1324,19 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       button.classList.toggle("active", active);
       button.setAttribute("aria-pressed", String(active));
     });
-    window.requestAnimationFrame(() => syncModuleIndicator({ instant: !app.dataset.modIndReady }));
-    app.dataset.modIndReady = "1";
+    if (modIndRaf) {
+      window.cancelAnimationFrame(modIndRaf);
+      modIndRaf = 0;
+    }
+    if (app.dataset.modIndReady === "1") {
+      syncModuleIndicator({ instant: false });
+    } else {
+      modIndRaf = window.requestAnimationFrame(() => {
+        modIndRaf = 0;
+        syncModuleIndicator({ instant: true });
+        app.dataset.modIndReady = "1";
+      });
+    }
   }
 
   window.addEventListener("resize", () => syncModuleIndicator({ instant: true }));
@@ -2030,9 +2088,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     openWordbooksSheet: () => openHistorySheet("wordbooks"),
     openReaderWithBook: (bookId) => {
       closeSheet({ immediate: true });
-      state.module = "reader";
-      updateModuleBar();
-      navigate({ name: "reader" }, { replace: false });
+      navigate({ name: "reader" }, { replace: false, instant: true, moduleSwitch: true });
       window.setTimeout(() => window.TALK_READER?.selectWordbook?.(bookId), 80);
     },
     hasModelConfig: () => hasModelConfig(),

@@ -130,63 +130,34 @@
   background: var(--accent, #c72c1c);
 }
 
-/* Zero-overlap sequential glide: outgoing page clears completely (0-90ms) BEFORE incoming page enters (90-270ms) -> ZERO ghosting! */
-@keyframes module-slide-in-next {
-  from { opacity: 0; transform: translate3d(0, 8px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+/* Keep top module bar pinned & un-blurred during page ViewTransitions (e.g., Home <-> Word). */
+.module-bar {
+  view-transition-name: module-bar;
 }
 
-@keyframes module-slide-in-prev {
-  from { opacity: 0; transform: translate3d(0, -8px, 0); }
-  to { opacity: 1; transform: translate3d(0, 0, 0); }
+::view-transition-group(module-bar) {
+  animation-duration: 0s;
 }
 
-@keyframes module-fade-out-next {
-  from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to { opacity: 0; transform: translate3d(0, -5px, 0); }
+::view-transition-old(module-bar),
+::view-transition-new(module-bar) {
+  animation: none;
 }
 
-@keyframes module-fade-out-prev {
-  from { opacity: 1; transform: translate3d(0, 0, 0); }
-  to { opacity: 0; transform: translate3d(0, 5px, 0); }
+/* Pure GPU opacity fade for 3-mode switching: no transform on .screen (so
+   position:fixed docks & position:sticky + backdrop-filter headers in Reader
+   never jump or re-composite) and no ViewTransition raster glitches. */
+@keyframes module-fade-in {
+  from { opacity: 0.01; }
+  to { opacity: 1; }
 }
 
-html[data-module-dir]::view-transition-image-pair(screen) {
-  isolation: auto;
-}
-
-html[data-module-dir="next"]::view-transition-old(screen) {
-  animation: module-fade-out-next 0.09s cubic-bezier(0.4, 0, 1, 1) both;
-  mix-blend-mode: normal;
-}
-
-html[data-module-dir="next"]::view-transition-new(screen) {
-  animation: module-slide-in-next 0.19s cubic-bezier(0.22, 1, 0.36, 1) 0.09s both;
-  mix-blend-mode: normal;
-}
-
-html[data-module-dir="prev"]::view-transition-old(screen) {
-  animation: module-fade-out-prev 0.09s cubic-bezier(0.4, 0, 1, 1) both;
-  mix-blend-mode: normal;
-}
-
-html[data-module-dir="prev"]::view-transition-new(screen) {
-  animation: module-slide-in-prev 0.19s cubic-bezier(0.22, 1, 0.36, 1) 0.09s both;
-  mix-blend-mode: normal;
-}
-
-html[data-module-dir="next"] .screen.is-module-glide {
-  animation: module-slide-in-next 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
-
-html[data-module-dir="prev"] .screen.is-module-glide {
-  animation: module-slide-in-prev 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+.screen.is-module-glide {
+  animation: module-fade-in 0.16s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .module-switch .module-indicator { transition: none !important; }
-  html[data-module-dir]::view-transition-old(screen),
-  html[data-module-dir]::view-transition-new(screen),
   .screen.is-module-glide { animation: none !important; }
 }
 
