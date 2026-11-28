@@ -2,7 +2,7 @@
  * talk. Unified LLM Client (js/llm-client.js)
  * Single source of truth for:
  *  - Active profile resolution (never reads stale root settings when profiles exist)
- *  - Provider protocol detection (Google Gemini vs OpenAI-compatible: DeepSeek, Qwen, Worker, etc.)
+ *  - Provider protocol detection (OpenAI-compatible, Anthropic Claude Messages API, and Google Gemini)
  *  - Automatic thinking suppression on structured JSON tasks so reasoning tokens never truncate JSON
  *  - Unified streaming (SSE + buffered fallback), non-streaming chat, model discovery, and connectivity ping
  *  - Unified timeout, retry, json_object/stream_options 400/422 fallback, and strict JSON extraction

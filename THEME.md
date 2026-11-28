@@ -15,10 +15,13 @@ in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md); this file only covers themes.
 | `js/prompts.js` | Static model system prompts |
 | `js/app.js` | Product logic and rendering |
 
-Load order in `index.html`: `css/styles.css` → `css/theme.css` → `css/themes/constructivist.css` →
-`css/themes/swiss-lab.css` → `css/themes/topo-acid.css` → `css/themes/retro-stub.css`, then `js/data.js`, `js/theme.js`, `js/content.js`, `js/prompts.js`,
-`vendor/idb.js`, `js/app.js`. Theme files therefore win over both base component
-rules and the token defaults.
+Load order in `index.html`: `css/styles.css` → `css/print-reader.css` → `css/theme.css` →
+`css/themes/still.css` → `css/themes/constructivist.css` → `css/themes/swiss-lab.css` →
+`css/themes/topo-acid.css` → `css/themes/archive-grid.css` → `css/themes/retro-stub.css`,
+then `js/data.js`, `js/theme.js`, `js/content.js`, `js/prompts.js`, `js/llm-client.js`,
+`js/i18n.js`, `vendor/idb.js`, `js/wordbooks.js`, `js/doc-parser.js`, `js/doc-reader.js`,
+`js/native-bridge.js`, and `<script type="module" src="js/app.js">`. Theme files therefore
+win over both base component rules and the token defaults.
 
 Every theme selector is scoped with `[data-theme="<id>"]`, so theme files never
 collide with each other or with the base sheet.
@@ -28,7 +31,7 @@ collide with each other or with the base sheet.
 1. Create `css/themes/<id>.css` starting from the token block below. Override only
    what differs; every token not mentioned falls back to `css/theme.css`.
 2. Load it in `index.html` (after `css/theme.css`) and add it to the `SHELL` list in
-   `sw.js` so it is cached offline.
+   `sw.js` (then run `npm run bump` or `npm run check:shell`) so it is cached offline.
 3. Register it in `js/theme.js`:
 
 ```js
@@ -37,20 +40,22 @@ mytheme: {
   label: "My Theme",
   themeColor: "#101010",
   accent: "#ff5500",
+  accentFill: "#ff5500",
   css: "css/themes/mytheme.css",
   copyKey: "mytheme",
-  description: "一句话说明它看起来像什么"
+  description: "一句话说明它看起来像什么",
+  exampleStyle: "默认例句语气描述"
 }
 ```
 
 4. Add `TALK_CONTENT.themeCopy.mytheme` in `js/content.js` when the theme needs its
    own voice. Missing keys fall back to the base copy.
 
-The theme selector in **设置 → 数据** is generated from the registry, so no UI
+The one-tap theme grid in **设置 → 外观** is generated from the registry, so no UI
 change is needed. Selection is stored in `talk.theme.v1`; `js/theme.js` applies it
 before the app renders and updates the browser `theme-color` meta tag.
 
-## The five themes
+## The seven themes
 
 Constructivist carries one piece of art beyond type and colour: a red silhouette of a
 monumental figure, traced from the 80th anniversary emblem and set into the
@@ -59,12 +64,12 @@ bottom corner as a multiply-blended watermark.
 | id | label | voice | geometry |
 | --- | --- | --- | --- |
 | `paper` | Paper | paper and highlighter, the default | soft radii, quiet rules |
+| `still` | Still | minimal modern: whitespace, one ink, soft shadows | hairline cards, 14-20px radii, press-scale feedback |
 | `constructivist` | Constructivist | red/black poster, diagonal blocks | hard cuts, stamps |
 | `swiss-lab` | Swiss Lab | lab index, cool and clinical | hairlines, ticks, numbering |
 | `topo-acid` | Topo Acid | industrial field terminal | square, cut corners, one signal yellow |
-| `still` | Still | minimal modern: whitespace, one ink, soft shadows | hairline cards, 14-20px radii, press-scale feedback |
-| `retro-stub` | Retro Stub | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
 | `archive-grid` | Archive Grid | analysis OS windows, paper + one acid green | square windows, mono labels, scan line |
+| `retro-stub` | Retro Stub | ticket stubs and collage, cream + teal + one red stamp | cut corners, double rules, perforations |
 
 Topo Acid is the most opinionated one, so it is the best example of what a theme
 may own: it flattens every radius with a single `[data-theme="topo-acid"] *`
@@ -87,8 +92,8 @@ Override the semantic tokens, not component colours:
 - text: `--ink`, `--muted`, `--muted-2`, `--text-*`
 - accents: `--lime`, `--lime-deep`, `--lime-wash`, `--coral`, `--lavender`
 - shape: `--radius-*`
-- rhythm: `--space-*`, `--page-gutter`, `--sheet-gutter`
-- typography: `--font`, `--display`, `--mono`
+- rhythm: `--space-*`, `--page-gutter`, `--sheet-gutter`, `--hero-subrow-gap`
+- typography: `--font`, `--display`, `--mono`, `--lh-display`, `--lh-display-phrase`, `--lh-ui-single`
 - motion: `--motion-*`
 
 Component geometry belongs in `css/styles.css`. The only per-theme geometry that

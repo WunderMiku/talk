@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Static word-and-sentence dictionary. package.json exists only for the mock test harness.",
+  "description": "Zero-build static English–Chinese AI dictionary, translator & intensive reader. package.json is used for offline tests, build sync, and Capacitor Android packaging.",
   "scripts": {
     "test": "node tests/run.mjs",
     "test:list": "node tests/run.mjs --list",

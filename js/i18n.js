@@ -104,8 +104,6 @@
     "只给结论": "Verdict only",
     "分块讲解": "Guided blocks",
     "成句拆解": "Full sentences",
-    "缩进块": "Indented block",
-    "句内插入": "Inline",
     "使用这套主题": "Use this theme",
     "当前正在使用": "In use",
     "使用中": "In use",

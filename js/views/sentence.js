@@ -1,5 +1,5 @@
 /* ============================================================
-   talk. — Sentence analysis view, structure tree, onion clauses & actions
+   talk. — Sentence analysis view, 3-view segments, info flow & actions
    ============================================================ */
 
 import {

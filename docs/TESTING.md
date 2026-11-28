@@ -40,26 +40,34 @@ server.mock.requestsOf("word");   // 抓到的请求，用来断言"没有重复
 
 | 文件 | 用途 |
 | --- | --- |
-| `word-min` | 单词页最小可用响应（义项、同根词、近反义、例句、词源） |
-| `word-take` | 嵌套词层里点开的 `take` |
-| `chunk-takeoff` | 意群页完整响应（多义、词眼、槽位、变形、来历、例句） |
-| `chunk-bytheway` | 语境寻词里点开的 `by the way` |
-| `sentence-min` / `sentence-two` | 单句 / 两句分析（tree + keyWords） |
-| `reverse-arrive` | 选词手记（意群 / 词 / 句三种候选） |
-| `theme-min` / `translator-min` | 背景补例句与翻译的兜底 |
+| `word-min` / `word-take` / `word-obfuscate` | 单词页响应、嵌套词层点开的 `take`、防幻觉/缓存校验样本 |
+| `chunk-takeoff` / `chunk-bytheway` | 意群页完整响应（多义、词眼、槽位、变形、来历、例句） |
+| `sentence-min` / `sentence-two` / `sentence-copula` / `sentence-legacy` | 单句 / 多句意群切分、孤立系动词合并与旧版无 `segments` 降级 |
+| `reverse-arrive` | 语境寻词兜底响应 |
+| `reader-overview` / `reader-block` / `reader-quick-gloss` | 长文精读概览、分段解析与行内速查响应 |
+| `theme-min` / `translator-min` | 主题例句补全与多风格翻译兜底 |
 
 加一个场景 = 加一个 fixture，或在套件里用 `{ content: "..." }` 直接给字符串。
 
-## 套件
+## 套件（共 15 组 62 例）
 
-| 套件 | 覆盖 |
-| --- | --- |
-| `word.spec.mjs` | 查词、义项与例句渲染、刷新命中缓存、嵌套词层 |
-| `chunk.spec.mjs` | 多词短语判为意群、六个区块、刷新命中缓存 |
-| `reverse.spec.mjs` | 中文情境 → 三个候选、点卡片按范式路由、返回恢复手记、刷新仍从存储读 |
-| `sentence.spec.mjs` | 两句拆成两个块、单层折叠开合 |
-| `offline.spec.mjs` | 无 key 时的未收录页与改判行（不发请求） |
-| `theme.spec.mjs` | Retro Stub 的 token 生效、卡片直角 |
+| 套件 | 类型 | 覆盖 |
+| --- | --- | --- |
+| `core-and-normalize.spec.mjs` | 单元 | 工具函数、日志脱敏、action 分发、流式预览与数据归一化防幻觉 |
+| `llm-client.spec.mjs` | 单元 | OpenAI 兼容 / Anthropic (Claude) / Google Gemini 协议、SSE 流式、重试与扩展思考 |
+| `reader-parser.spec.mjs` | 单元 | 长文解析、标题提取、SHA-1 hash 与 `registerParser` 扩展点 |
+| `wordbooks.spec.mjs` | 单元 | 多书库迁移、导入导出与 AI 零丢失分册不变式 |
+| `shell.spec.mjs` | 单元 | 构建号同步、`sw.js` 预缓存覆盖完整性与全量 JS 语法校验 |
+| `word.spec.mjs` | E2E | 查词、义项与例句渲染、刷新命中缓存、嵌套词层、生成脚注 |
+| `chunk.spec.mjs` | E2E | 多词短语判为意群、全部区块渲染、刷新命中缓存 |
+| `sentence.spec.mjs` | E2E | 三视角切换（原句 / 意群切分 / 信息焦点）、行几何不变、点击意群与旧缓存降级 |
+| `reverse.spec.mjs` | E2E | Markdown + `[[...]]` 行内锚点、多轮追问、刷新完整恢复线程 |
+| `reader.spec.mjs` | E2E | 内置离线示例精读、AI 导读与分段管线、底部速查 Dock 与 PDF 装订边距 |
+| `cache.spec.mjs` | E2E | 词条缓存 JSON 导出、清空、导入与重新命中校验 |
+| `share.spec.mjs` | E2E | 1080px 宽分享图合成 |
+| `offline.spec.mjs` | E2E | 无 key 时的离线未收录页与改判行（不发请求） |
+| `theme.spec.mjs` | E2E | Retro Stub 主题 token 生效与直角卡片 |
+| `ui-stability.spec.mjs` | E2E | 设置四页签与死设置清除、设置按钮幂等性、500 词条缓存性能、词头下伸间距、嵌套抽屉、Android 返回键、三模式切换与 IDB 迁移 |
 
 ## 加用例
 
