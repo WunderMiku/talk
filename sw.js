@@ -36,7 +36,12 @@ const SHELL = [
   "./js/model/normalize.js",
   "./js/model/stream-preview.js",
   "./js/storage/vault.js",
+  "./js/views/chunk.js",
+  "./js/views/reverse.js",
+  "./js/views/sentence.js",
+  "./js/views/status.js",
   "./js/views/translator.js",
+  "./js/views/word.js",
   // @shell-esm-end
   "./vendor/idb.js",
   "./vendor/html-to-image.js?v=295",

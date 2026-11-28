@@ -55,14 +55,7 @@ import {
 } from "./storage/vault.js";
 import { streamPreviewFromJson } from "./model/stream-preview.js";
 import {
-  REVERSE_ANCHOR_RE,
-  reverseAnchorWords,
-  stripReverseAnchors,
-  markdownLite
-} from "./model/markdown.js";
-import {
   isHallucinatedWord,
-  SEGMENT_ROLE_LABELS,
   normalizeExamplesByTheme,
   splitSentences,
   alignSentenceParts,
@@ -81,6 +74,11 @@ import {
 import { createShareController } from "./features/share.js";
 import { createThemeSalon } from "./features/theme-salon.js";
 import { createTranslatorView } from "./views/translator.js";
+import { createStatusViews } from "./views/status.js";
+import { relationGloss, createWordView } from "./views/word.js";
+import { createChunkView } from "./views/chunk.js";
+import { createSentenceView } from "./views/sentence.js";
+import { createReverseView } from "./views/reverse.js";
 
 (() => {
   "use strict";
@@ -543,11 +541,124 @@ import { createTranslatorView } from "./views/translator.js";
     runTranslation
   } = translator;
 
+  const statusViews = createStatusViews({
+    state,
+    data: DATA,
+    backTopbar,
+    runSearch,
+    lookupDemo,
+    addHistory,
+    navigate,
+    toast
+  });
+  const { loadingBody, loadingPage, missPage, errorPage, hasDemo } = statusViews;
+
+  const wordView = createWordView({
+    state,
+    screen,
+    data: DATA,
+    reduceMotion,
+    backTopbar,
+    layerTopbar,
+    isSavedKey,
+    hasModelConfig,
+    exampleForTheme,
+    themesMissingExamples,
+    fillThemeExamples,
+    activeWordData,
+    getActiveSurface,
+    removeWordRecord,
+    deleteWordCacheFor,
+    hydrateLayerWithModel,
+    runSearch,
+    scrollScreenTo,
+    applyCacheDisplay,
+    refreshCacheBorders,
+    persistSettings,
+    refreshThemedPage,
+    closeTopWordLayer: popWordLayer,
+    goBack,
+    toast
+  });
+  const { moveWordPos, updateExamplesBlock, wordPage } = wordView;
+
+  const chunkView = createChunkView({
+    state,
+    copyFor,
+    backTopbar,
+    layerTopbar,
+    isSavedKey,
+    hasModelConfig,
+    activeWordData,
+    getActiveSurface,
+    chunkCacheKey,
+    removeWordRecord,
+    hydrateChunkLayer,
+    runSearch,
+    closeTopWordLayer: popWordLayer,
+    toast
+  });
+  const { chunkPage } = chunkView;
+
+  const sentenceView = createSentenceView({
+    state,
+    data: DATA,
+    backTopbar,
+    layerTopbar,
+    isSavedKey,
+    hasModelConfig,
+    openSheetShell,
+    cacheGetChunk,
+    navigate,
+    runSearch,
+    getActiveSurface,
+    sentenceLevelOf,
+    sentenceKey,
+    removeSentenceRecord,
+    clearSentenceCache,
+    hydrateSentenceLayer,
+    closeTopWordLayer: popWordLayer,
+    toast
+  });
+  const { sentencePage } = sentenceView;
+
+  const reverseView = createReverseView({
+    state,
+    copyFor,
+    uiLang,
+    reverseIdFor,
+    reverseBudget,
+    reverseStyleName,
+    modelLookup,
+    closeAllWordLayers,
+    closeSheet,
+    navigate,
+    runSearch,
+    openHistorySheet,
+    renderHistoryContent,
+    toast
+  });
+  const {
+    loadReverseThread,
+    listReverseThreads,
+    cacheGetReverseFirst,
+    reversePage,
+    updateReverseStream,
+    startReverse,
+    submitReverseComposer,
+    gotoReverseAnchor
+  } = reverseView;
+
   actions.register({
     ...tts.actions,
     ...share.actions,
     ...themeSalon.actions,
-    ...translator.actions
+    ...translator.actions,
+    ...statusViews.actions,
+    ...wordView.actions,
+    ...chunkView.actions,
+    ...sentenceView.actions,
+    ...reverseView.actions
   });
 
   /* ============================================================
@@ -2114,1488 +2225,6 @@ import { createTranslatorView } from "./views/translator.js";
 
   function sentenceLevelOf(value) {
     return SENTENCE_LEVELS.find((level) => level.id === value) || SENTENCE_LEVELS.find((level) => level.id === SENTENCE_LEVEL_DEFAULT);
-  }
-
-  /* ============================================================
-     Word page
-     ============================================================ */
-
-  function spellingBanner(spelling) {
-    return `
-      <aside class="spelling-banner reveal" style="--d:0" aria-label="拼写校正" title="${attr(spelling.note || "")}">
-        <span class="spelling-label">拼写</span>
-        <span class="spelling-wrong">${esc(spelling.input)}</span>
-        <span class="spelling-arrow" aria-hidden="true">→</span>
-        <span class="spelling-right">${esc(spelling.corrected)}</span>
-      </aside>`;
-  }
-
-  /* Relation cards speak Chinese only. A model (or an older cached entry) may
-     hand back an English definition; that is dropped rather than mixed in. */
-  function relationGloss(item) {
-    const zh = String(item?.zh || "").trim();
-    if (/[\u3400-\u9fff]/.test(zh)) return zh;
-    const stub = DATA.lexicon[normalizeWord(item?.word || "")];
-    if (stub?.zh) return stub.zh;
-    // Demo corpus words carry their own Chinese translation; prefer it over an
-    // English gloss so the offline cards read Chinese too.
-    const entry = DATA.words?.[normalizeWord(item?.word || "")];
-    if (entry?.translation && /[\u3400-\u9fff]/.test(entry.translation)) return entry.translation;
-    const gloss = String(item?.gloss || "").trim();
-    return /[\u3400-\u9fff]/.test(gloss) ? gloss : "";
-  }
-
-  function wordPosGroups(word) {
-    const groups = Array.isArray(word.posGroups) ? word.posGroups.filter((group) => group && group.senses?.length) : [];
-    return groups.length ? groups : [{ pos: word.pos || "", senses: word.senses || [] }];
-  }
-
-  function wordPosSwitchHtml(groups) {
-    return `<div class="pos-switch" role="tablist" aria-label="词性">
-      ${groups.map((group, index) => `<button class="pos-tab pos-pill ${index === 0 ? "active" : ""}" type="button" role="tab" aria-selected="${index === 0}" data-action="word-pos" data-index="${index}" title="${attr(posLabel(group.pos))}">${esc(posLabel(group.pos))}</button>`).join("")}
-    </div>`;
-  }
-
-  function wordSensesPagerHtml(groups) {
-    const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
-    return `<div class="meaning-card meaning-pager" data-word-pos-index="0" data-pos-count="${groups.length}">
-      <div class="meaning-track">
-        ${groups.map((group, index) => `<section class="meaning-slide" data-pos="${attr(group.pos)}" data-pos-label="${attr(posLabel(group.pos))}" data-sense-count="${group.senses.length}" aria-hidden="${index === 0 ? "false" : "true"}">
-          ${group.senses.map((sense, senseIndex) => `
-            <div class="sense">
-              <span class="sense-num">${String(senseIndex + 1).padStart(2, "0")}</span>
-              <div>
-                <p class="sense-zh">${esc(sense.zh || sense.en)}</p>
-                ${sense.zh && sense.en ? `<p class="sense-en">${esc(sense.en)}</p>` : ""}
-                ${sense.tag ? `<span class="micro-tag">${esc(tagLabel(sense.tag))}</span>` : ""}
-              </div>
-            </div>`).join("")}
-        </section>`).join("")}
-      </div>
-      ${groups.length > 1 ? `<div class="meaning-pager-foot">
-        <button class="meaning-pager-arrow" type="button" data-action="word-pos-prev" aria-label="上一组词义">‹</button>
-        <span class="meaning-pager-dots" aria-hidden="true">${groups.map((_, index) => `<i class="${index === 0 ? "active" : ""}"></i>`).join("")}</span>
-        <span class="meaning-pager-count" data-word-pos-label>1 / ${groups.length}</span>
-        <button class="meaning-pager-arrow" type="button" data-action="word-pos-next" aria-label="下一组词义">›</button>
-      </div>` : ""}
-    </div>`;
-  }
-
-  function setWordPos(pager, index) {
-    if (!pager) return;
-    const slides = $$(".meaning-slide", pager);
-    const count = slides.length;
-    if (!count) return;
-    const next = Math.max(0, Math.min(count - 1, Number(index) || 0));
-    pager.dataset.wordPosIndex = String(next);
-    const track = $(".meaning-track", pager);
-    if (track) track.style.transform = `translateX(-${next * 100}%)`;
-    slides.forEach((slide, slideIndex) => {
-      slide.setAttribute("aria-hidden", slideIndex === next ? "false" : "true");
-    });
-    const page = pager.closest(".result-page");
-    if (page) {
-      $$(".pos-tab", page).forEach((tab) => {
-        const active = Number(tab.dataset.index) === next;
-        tab.classList.toggle("active", active);
-        tab.setAttribute("aria-selected", String(active));
-      });
-    }
-    $$(".meaning-pager-dots i", pager).forEach((dot, dotIndex) => {
-      dot.classList.toggle("active", dotIndex === next);
-    });
-    const label = $("[data-word-pos-label]", pager);
-    if (label) label.textContent = `${next + 1} / ${count}`;
-  }
-
-  function moveWordPos(pager, delta) {
-    if (!pager) return;
-    const current = Number(pager.dataset.wordPosIndex) || 0;
-    setWordPos(pager, current + Number(delta || 0));
-  }
-
-  function wordPagerForTarget(target) {
-    const page = target?.closest?.('.result-page');
-    return page ? $('.meaning-pager', page) : null;
-  }
-
-  function exampleBlockHtml(word, no) {
-    const exampleTheme = window.TALK_THEME?.current?.() || { id: "paper", label: "Paper" };
-    const themedExamples = exampleForTheme(word, exampleTheme.id);
-    if (!themedExamples.length) return "";
-    return `
-        <section class="block word-example-block reveal" data-block-no="${attr(no)}" style="--d:2.4">
-          ${blockHead(no, "例句", `${themedExamples.length} 条`)}
-          <div class="example-toolbar">
-            <button class="link-btn" type="button" data-action="regen-examples" data-word="${attr(word.word)}">换一批</button>
-          </div>
-          ${themedExamples.map((example) => `
-            <div class="example-card">
-              <span class="example-quote">“</span>
-              <p class="example-en">${highlightPlain(example.en, word.word)}</p>
-              ${example.zh ? `<p class="example-zh">${esc(example.zh)}</p>` : ""}
-              <div class="example-foot${example.source ? "" : " is-solo"}">
-                ${example.source ? `<span class="example-source">${esc(example.source)}</span>` : ""}
-                <div class="example-actions">
-                  <button class="example-speak" type="button" data-action="speak" data-text="${attr(example.en)}" aria-label="朗读例句">${icon("volume")}</button>
-                  <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${example.en}${example.zh ? `\n${example.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
-                </div>
-              </div>
-            </div>`).join("")}
-        </section>`;
-  }
-
-  function updateExamplesBlock(word) {
-    if (!screen || state.route?.name !== "word") return false;
-    // A slow theme-example refill must not overwrite another word's page.
-    if (normalizeWord(state.route.word) !== normalizeWord(word.word)) return false;
-    const section = $(".word-example-block", screen);
-    const no = section?.dataset?.blockNo;
-    if (!section || !no) return false;
-    const scroll = screen.scrollTop;
-    const html = exampleBlockHtml(word, no);
-    if (!html) {
-      section.remove();
-    } else {
-      section.outerHTML = html;
-    }
-    scrollScreenTo(scroll, true);
-    applyCacheDisplay();
-    refreshCacheBorders(screen);
-    return true;
-  }
-
-  function genMetaText(gen) {
-    const parts = [];
-    const ms = Number(gen?.ms || 0);
-    if (ms > 0) parts.push(`${Math.round(ms)} ms`);
-    if (gen?.model) parts.push(String(gen.model));
-    if (gen?.tokens != null && Number(gen.tokens) > 0) parts.push(`${Number(gen.tokens).toLocaleString("zh-CN")} tok`);
-    return parts.join(" · ");
-  }
-
-  function genMetaChipHtml(gen) {
-    const text = genMetaText(gen);
-    if (!text) return "";
-    return `<span class="gen-meta" title="本次生成：耗时 · 模型 · token">${esc(text)}<button class="gen-meta-close" type="button" data-action="hide-gen-meta" aria-label="隐藏生成信息" title="关闭生成信息">×</button></span>`;
-  }
-
-  function wordPage(word, layer = null) {
-    const showGen = state.settings?.showGenMeta !== false;
-    const gen = word.gen || null;
-    const genChip = showGen && gen && !word.cached ? genMetaChipHtml(gen) : "";
-    const genFooter = showGen && gen && word.cached ? `<p class="page-gen-note">By ${esc(gen.model || "—")}</p>` : "";
-    let blockNo = 0;
-    const nextNo = () => String(++blockNo).padStart(2, "0");
-    const bookmark = `word:${normalizeWord(word.word)}`;
-    const heroNote = word.note ? rich(word.note) : "";
-    const header = layer
-      ? layerTopbar({
-          label: "词义探索",
-          title: word.word,
-          bookmark,
-          origin: layer.origin,
-          relation: layer.relation,
-          depth: layer.depth
-        })
-      : backTopbar({ label: `单词 · ${word.level}`, title: word.word, bookmark, share: true });
-    return `
-      ${header}
-      <main class="result-page">
-        <section class="result-hero">
-          ${word.spelling ? spellingBanner(word.spelling) : ""}
-          <div class="result-kicker reveal" style="--d:0">
-            <span class="kicker-pill accent">单词</span>
-            <span class="kicker-pill">${esc(word.level)}</span>
-            <span class="kicker-pill">${esc(registerLabel(word.register))}</span>
-            <span class="cache-state-pill ${word.source === "demo" ? "is-builtin" : word.cached ? "is-cached" : "is-generated"}">${word.source === "demo" ? "内置词条" : word.cached ? "本机缓存" : "本次生成"}</span>${genChip ? `
-            ${genChip}` : ""}
-          </div>
-          <h1 class="word-title" aria-label="${attr(word.word)}">${letterTitle(word.word)}</h1>
-          <div class="word-subrow reveal" style="--d:1">
-            <span class="ipa">${esc(word.phonetic || "—")}</span>
-            <span class="dot-sep"></span>
-            ${wordPosSwitchHtml(wordPosGroups(word))}
-            <button class="speak-btn" type="button" data-action="speak" data-text="${attr(word.word)}">${icon("volume")} 发音</button>
-            <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(word.word)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
-            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(word.word)}" aria-label="复制单词" title="复制单词">${icon("copy")}</button>
-          </div>
-          <div class="word-gloss-row reveal" style="--d:1.1">
-            <p class="word-gloss">${esc(word.translation || word.short)}</p>
-            <span class="word-gloss-tag">核心义</span>
-          </div>
-          ${word.translation && word.short ? `<p class="word-short reveal" style="--d:1.2">${esc(word.short)}</p>` : ""}
-          ${heroNote ? `<div class="hero-note reveal" style="--d:1.5">
-            ${icon("sparkle")}
-            <span>${heroNote}</span>
-          </div>` : ""}
-          ${word.context ? `<div class="context-note reveal" style="--d:1.7">
-            <span class="mono">在本句中</span>
-            <p>${esc(word.context.meaningZh || word.context.meaning || "")}</p>
-            ${word.context.meaningZh && word.context.meaning ? `<span class="context-note-en">${esc(word.context.meaning)}</span>` : ""}
-            ${word.context.why ? `<span class="context-note-why">${esc(word.context.why)}</span>` : ""}
-          </div>` : ""}
-        </section>
-
-        <section class="block word-meaning-block reveal" style="--d:1.8">
-          ${(() => {
-            const groups = wordPosGroups(word);
-            const totalSenses = groups.reduce((sum, group) => sum + group.senses.length, 0);
-            return `${blockHead(nextNo(), "词义", `${totalSenses} 个义项`)}${wordSensesPagerHtml(groups)}`;
-          })()}
-        </section>
-
-        ${word.family.length ? `
-        <section class="block word-family-block reveal" style="--d:2">
-          ${blockHead(nextNo(), "同根词", "派生词")}
-          <div class="h-scroll">
-            ${word.family.map((item) => `
-              <button class="family-card" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="同根词">
-                <span class="family-top">
-                  <span class="family-pos">${esc(posLabel(item.pos))}</span>
-                  ${icon("arrowUpRight", "family-arrow")}
-                </span>
-                <strong class="family-word">${esc(item.word)}</strong>
-                <span class="family-gloss">${esc(relationGloss(item))}</span>
-              </button>`).join("")}
-          </div>
-        </section>` : ""}
-
-        ${(word.synonyms.length || word.antonyms.length) ? `
-        <section class="block word-relation-block reveal" style="--d:2.2">
-          ${blockHead(nextNo(), "近义与反义", "点击继续查")}
-          <div class="relation-grid">
-            <div class="relation-card syn">
-              <div class="relation-head"><h3>近义词</h3><span class="relation-icon">+</span></div>
-              <div class="rel-list">
-                ${word.synonyms.map((item) => `
-                  <button class="rel-chip" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="近义词">
-                    <span class="rel-word">${esc(item.word)}</span>
-                    <span class="rel-gloss">${esc(relationGloss(item))}</span>
-                  </button>`).join("")}
-              </div>
-            </div>
-            <div class="relation-card ant">
-              <div class="relation-head"><h3>反义词</h3><span class="relation-icon">−</span></div>
-              <div class="rel-list">
-                ${word.antonyms.map((item) => `
-                  <button class="rel-chip" type="button" data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(item.pos)}" data-relation="反义词">
-                    <span class="rel-word">${esc(item.word)}</span>
-                    <span class="rel-gloss">${esc(relationGloss(item))}</span>
-                  </button>`).join("")}
-              </div>
-            </div>
-          </div>
-        </section>` : ""}
-
-        ${exampleBlockHtml(word, nextNo())}
-
-        ${word.collocations.length ? `
-        <section class="block word-collocation-block reveal" style="--d:2.6">
-          ${blockHead(nextNo(), "常见搭配", "固定说法")}
-          <div class="collocation-row">
-            ${word.collocations.map((item) => `<button class="collocation" type="button" data-action="lookup" data-query="${attr(item)}" data-type="word">${esc(item)}</button>`).join("")}
-          </div>
-        </section>` : ""}
-
-        ${word.memory ? `
-        <section class="block word-memory-block reveal" style="--d:2.8">
-          ${blockHead(nextNo(), "记法", "一个记忆钩子")}
-          <div class="memory-card">
-            <span class="memory-label">顺着这根线</span>
-            <p class="memory-text">${rich(word.memory)}</p>
-          </div>
-        </section>` : ""}
-
-        ${word.origin ? `
-        <section class="block word-origin-block reveal" style="--d:3">
-          ${blockHead(nextNo(), "词源与演变", "从词根看")}
-          <div class="origin-card">
-            <span class="origin-root">${esc(word.origin.root)}</span>
-            <p class="origin-story">${rich(word.origin.story)}</p>
-            ${word.origin.original ? `<p class="origin-original"><b>最初的意思</b> ${esc(word.origin.original)}</p>` : ""}
-          </div>
-          ${word.origin.stages.length ? `
-          <div class="origin-timeline">
-            ${word.origin.stages.map((stage) => `
-              <div class="origin-stage">
-                <span class="origin-when">${esc(stage.when)}</span>
-                <div>
-                  <strong class="origin-label">${esc(stage.label)}</strong>
-                  <p class="origin-text">${esc(stage.text)}</p>
-                </div>
-              </div>`).join("")}
-          </div>` : ""}
-        </section>` : ""}
-
-        ${word.related.length ? `
-        <section class="block word-related-block reveal" style="--d:3.2">
-          ${blockHead(word.origin ? "08" : "07", "继续漫游", "下一组词")}
-          <div class="related-row">
-            ${word.related.map((item) => `
-              <button class="related-pill" type="button" data-action="word-layer" data-word="${attr(item)}" data-cache-word="${attr(item)}" data-relation="相关词">
-                ${esc(item)} <span>↗</span>
-              </button>`).join("")}
-          </div>
-        </section>` : ""}
-
-
-
-        ${reclassifyRow("word")}
-        <div class="page-actions reveal" style="--d:3.2">
-          <button class="btn btn-primary${isSavedKey(bookmark) ? " is-saved" : ""}" type="button" data-action="save" data-save-label="收藏单词" aria-pressed="${isSavedKey(bookmark)}">${icon("bookmark")} ${isSavedKey(bookmark) ? "已收藏" : "收藏单词"}</button>
-          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="word" data-subject="${attr(word.word)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
-          <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
-          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-word">${icon("refresh")} 重新生成词条</button>` : ""}
-          ${word.source !== "demo" ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-word-cache" data-word="${attr(word.word)}">${icon("trash")} 删除缓存</button>` : ""}
-        </div>
-        ${genFooter}
-      </main>`;
-  }
-
-  /* ============================================================
-     Chunk page (sense group)
-     ============================================================ */
-
-  function currentLookupText() {
-    const route = state.route;
-    if (route.name === "word") return activeWordData()?.word || route.word || "";
-    if (route.name === "chunk") return route.result?.chunk || route.query || "";
-    if (route.name === "sentence") return route.result?.text || route.query || "";
-    if (route.name === "reverse") return route.result?.text || "";
-    return route.query || "";
-  }
-
-  function reclassifyRow(current, text = "") {
-    const items = [["word", "词"], ["chunk", "意群"], ["sentence", "句"]];
-    return `<div class="reclassify reveal" style="--d:2.9">
-      <span class="reclassify-label">当它是</span>
-      <span class="reclassify-group" role="group" aria-label="改判颗粒度">
-        ${items.map(([id, label]) => `<button class="reclassify-btn${id === current ? " is-current" : ""}" type="button"
-          data-action="reclassify" data-paradigm="${id}"
-          ${id === current ? 'disabled aria-disabled="true"' : ""}>${label}</button>`).join("")}
-      </span>
-    </div>`;
-  }
-
-  function chunkPage(chunk, layer = null) {
-    let blockNo = 0;
-    const nextNo = () => String(++blockNo).padStart(2, "0");
-    const copy = copyFor("chunk");
-    const sections = copy.sections || {};
-    const formLabel = copy.forms?.[chunk.form] || "固定搭配";
-    const bookmark = `chunk:${chunkSlug(chunk.chunk)}`;
-    const note = chunk.note ? rich(chunk.note) : "";
-    const cachePill = chunk.source === "demo"
-      ? "内置意群"
-      : chunk.cached
-        ? "本机缓存"
-        : "本次生成";
-    const exampleRow = (item, index) => `
-      <article class="chunk-example reveal" style="--d:0">
-        <div class="chunk-example-head">
-          <span class="chunk-example-index">${String(index + 1).padStart(2, "0")}</span>
-          <p class="chunk-example-en"><span class="chunk-example-link" role="button" tabindex="0" data-action="example-lookup" data-text="${attr(item.en)}">${esc(item.en)}</span></p>
-        </div>
-        ${item.zh ? `<p class="chunk-example-zh">${esc(item.zh)}</p>` : ""}
-        <div class="example-actions">
-          <button class="example-speak" type="button" data-action="speak" data-text="${attr(item.en)}" aria-label="朗读例句">${icon("volume")}</button>
-          <button class="example-speak example-copy" type="button" data-action="copy-text" data-copy="${attr(`${item.en}${item.zh ? `\n${item.zh}` : ""}`)}" aria-label="复制例句">${icon("copy")}</button>
-        </div>
-      </article>`;
-
-    return `
-      ${layer
-        ? layerTopbar({
-            label: `${copy.label || "意群"} · ${formLabel}`,
-            title: shorten(chunk.chunk, 26),
-            bookmark,
-            origin: layer.origin,
-            relation: layer.relation,
-            depth: layer.depth
-          })
-        : backTopbar({ label: `${copy.label || "意群"} · ${formLabel}`, title: shorten(chunk.chunk, 26), bookmark, share: true })}
-      <main class="result-page chunk-page">
-        <section class="result-hero chunk-hero">
-          <div class="result-kicker reveal" style="--d:0">
-            <span class="kicker-pill accent">${esc(copy.label || "意群")}</span>
-            <span class="kicker-pill">${esc(formLabel)}</span>
-            <span class="kicker-pill">${esc(registerLabel(chunk.register))}</span>
-            <span class="cache-state-pill ${chunk.cached ? "is-cached" : "is-generated"}">${esc(cachePill)}</span>
-          </div>
-          <h1 class="chunk-title reveal" style="--d:0.4">${esc(chunk.chunk)}</h1>
-          <div class="word-subrow reveal" style="--d:1">
-            <span class="ipa">${esc(chunk.phonetic || "—")}</span>
-            <span class="dot-sep"></span>
-            <button class="speak-btn" type="button" data-action="speak" data-text="${attr(chunk.chunk)}">${icon("volume")} 发音</button>
-            <button class="speak-btn word-copy" type="button" data-action="copy-text" data-copy="${attr(chunk.chunk)}" aria-label="复制意群" title="复制意群">${icon("copy")}</button>
-          </div>
-          <div class="word-gloss-row reveal" style="--d:1.1">
-            <p class="word-gloss">${esc(chunk.translation || chunk.chunk)}</p>
-          </div>
-          ${chunk.short ? `<p class="word-short reveal" style="--d:1.2">${esc(chunk.short)}</p>` : ""}
-          ${note ? `<div class="hero-note reveal" style="--d:1.5">${note}</div>` : ""}
-        </section>
-
-        ${chunk.senses.length ? `
-        <section class="block chunk-senses reveal" style="--d:1.8">
-          ${blockHead(nextNo(), sections.senses?.[0] || "整体意思", sections.senses?.[1] || "")}
-          <div class="sense-list">
-            ${chunk.senses.map((sense) => `
-              <article class="sense-card">
-                <p class="sense-zh">${esc(sense.zh)}</p>
-                ${sense.en ? `<p class="sense-en">${esc(sense.en)}</p>` : ""}
-                ${sense.when ? `<p class="sense-when">${esc(sense.when)}</p>` : ""}
-              </article>`).join("")}
-          </div>
-        </section>` : ""}
-
-        ${chunk.keyWords.length ? `
-        <section class="block chunk-keywords reveal" style="--d:2">
-          ${blockHead(nextNo(), sections.keyWords?.[0] || "词眼", sections.keyWords?.[1] || "")}
-          <div class="keyeye-row">
-            ${chunk.keyWords.map((item) => `
-              <button class="keyeye" type="button" data-action="word-layer"
-                data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}"
-                data-gloss="${attr(item.gloss)}" data-pos="${attr(item.pos)}" data-relation="词眼">
-                <span class="keyeye-word">${esc(item.word)}</span>
-                <span class="keyeye-pos">${esc(item.pos || "—")}</span>
-                <span class="keyeye-gloss">${esc(item.gloss)}</span>
-                ${icon("arrowUpRight")}
-              </button>`).join("")}
-          </div>
-        </section>` : ""}
-
-        ${chunk.slots.length ? `
-        <section class="block chunk-slots reveal" style="--d:2.2">
-          ${blockHead(nextNo(), sections.slots?.[0] || "句法槽位", sections.slots?.[1] || "")}
-          <div class="slot-list">
-            ${chunk.slots.map((slot) => `
-              <div class="slot-row">
-                <code class="slot-code">${esc(slot.slot)}</code>
-                <span class="slot-role">${esc(slot.role)}</span>
-                ${slot.example ? `<p class="slot-example"><span>${esc(slot.example.en)}</span><em>${esc(slot.example.zh)}</em></p>` : ""}
-              </div>`).join("")}
-          </div>
-        </section>` : ""}
-
-        ${chunk.variants.length ? `
-        <section class="block chunk-variants reveal" style="--d:2.4">
-          ${blockHead(nextNo(), sections.variants?.[0] || "变形与替换", sections.variants?.[1] || "")}
-          <div class="variant-list">
-            ${chunk.variants.map((variant) => `
-              <div class="variant-row">
-                <p class="variant-form">${esc(variant.form)}</p>
-                ${variant.example ? `<p class="variant-example"><span>${esc(variant.example.en)}</span><em>${esc(variant.example.zh)}</em></p>` : ""}
-              </div>`).join("")}
-          </div>
-        </section>` : ""}
-
-        ${chunk.origin ? `
-        <section class="block chunk-origin reveal" style="--d:2.6">
-          ${blockHead(nextNo(), sections.origin?.[0] || "来历", sections.origin?.[1] || "")}
-          <div class="origin-story">
-            ${chunk.origin.era ? `<span class="origin-era">${esc(chunk.origin.era)}</span>` : ""}
-            <p>${esc(chunk.origin.story)}</p>
-          </div>
-        </section>` : ""}
-
-        ${chunk.examples.length ? `
-        <section class="block chunk-examples reveal" style="--d:2.8">
-          ${blockHead(nextNo(), sections.examples?.[0] || "例句", sections.examples?.[1] || "")}
-          <div class="chunk-example-list">
-            ${chunk.examples.map(exampleRow).join("")}
-          </div>
-        </section>` : ""}
-
-        ${reclassifyRow("chunk", chunk.chunk)}
-        <div class="page-actions reveal" style="--d:3">
-          <button class="btn btn-primary${isSavedKey(bookmark) ? " is-saved" : ""}" type="button" data-action="save" data-save-label="${attr(copy.bookmark || "收藏意群")}" aria-pressed="${isSavedKey(bookmark)}">${icon("bookmark")} ${isSavedKey(bookmark) ? "已收藏" : esc(copy.bookmark || "收藏意群")}</button>
-          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="chunk" data-subject="${attr(chunk.chunk)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
-          <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} ${esc(copy.copy || "复制")}</button>
-          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-chunk">${icon("refresh")} 重新生成意群</button>` : ""}
-          ${chunk.cached ? `<button class="btn btn-secondary word-delete" type="button" data-action="delete-chunk-cache">${icon("trash")} 删除缓存</button>` : ""}
-        </div>
-      </main>`;
-  }
-
-  /* ============================================================
-     Reverse search (context → candidates)
-     ============================================================ */
-
-  function reverseThreadsKey() {
-    return "talk.reverse.threads.v1" + (uiLang() === "en" ? ".en" : "");
-  }
-  const REVERSE_THREAD_LIMIT = 30;
-  function reverseFirstKey() {
-    return "talk.reverse.v2" + (uiLang() === "en" ? ".en" : "");
-  }
-
-  function readLocalJson(key, fallback) {
-    try {
-      const raw = localStorage.getItem(key);
-      const parsed = raw ? JSON.parse(raw) : null;
-      return parsed && typeof parsed === "object" ? parsed : fallback;
-    } catch (_) {
-      return fallback;
-    }
-  }
-
-  function writeLocalJson(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* storage can be full */ }
-  }
-
-  function loadReverseThreads() {
-    return readLocalJson(reverseThreadsKey(), {});
-  }
-
-  function saveReverseThreads(map) {
-    const entries = Object.values(map).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
-    const kept = {};
-    entries.slice(0, REVERSE_THREAD_LIMIT).forEach((entry) => { kept[entry.id] = entry; });
-    writeLocalJson(reverseThreadsKey(), kept);
-  }
-
-  function reverseThreadTitle(thread) {
-    const first = (thread || []).find((turn) => turn.role === "user" && turn.content);
-    return String(first?.content || "语境寻词").replace(/\s+/g, " ").trim().slice(0, 60);
-  }
-
-  function persistReverseThread() {
-    const id = state.reverseThreadId;
-    const thread = Array.isArray(state.reverseThread) ? state.reverseThread : [];
-    if (!id || !thread.length) return;
-    const messages = thread
-      .filter((turn) => turn && !turn.pending)
-      .map((turn) => ({
-        role: turn.role === "assistant" ? "assistant" : "user",
-        content: String(turn.content || ""),
-        ...(turn.reasoning ? { reasoning: String(turn.reasoning) } : {})
-      }))
-      .filter((turn) => turn.content);
-    if (!messages.length) return;
-    const map = loadReverseThreads();
-    map[id] = {
-      id,
-      title: reverseThreadTitle(thread),
-      updatedAt: Date.now(),
-      budget: Number(state.reverseBudget) || null,
-      style: state.reverseStyle || "",
-      messages
-    };
-    saveReverseThreads(map);
-  }
-
-  function loadReverseThread(id) {
-    if (!id) return null;
-    return loadReverseThreads()[id] || null;
-  }
-
-  function listReverseThreads() {
-    return Object.values(loadReverseThreads())
-      .filter((entry) => entry && entry.id && Array.isArray(entry.messages) && entry.messages.length)
-      .sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
-  }
-
-  function deleteReverseThread(id) {
-    if (!id) return;
-    const map = loadReverseThreads();
-    delete map[id];
-    saveReverseThreads(map);
-  }
-
-  function currentReverseThread() {
-    return Array.isArray(state.reverseThread) ? state.reverseThread : [];
-  }
-
-  function cacheGetReverseFirst(text) {
-    return readLocalJson(reverseFirstKey(), {})[reverseIdFor(text)] || null;
-  }
-
-  function cachePutReverseFirst(text, data) {
-    const map = readLocalJson(reverseFirstKey(), {});
-    map[reverseIdFor(text)] = { ...data, at: Date.now() };
-    const entries = Object.entries(map).sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0));
-    writeLocalJson(reverseFirstKey(), Object.fromEntries(entries.slice(0, 40)));
-  }
-
-  function reverseSuggestions() {
-    const thread = currentReverseThread();
-    const sent = new Set(thread.filter((turn) => turn.role === "user").map((turn) => String(turn.content || "").trim()));
-    const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content);
-    const anchors = [...String(last?.content || "").matchAll(REVERSE_ANCHOR_RE)].map((hit) => hit[1].trim()).filter(Boolean);
-    const first = anchors[0] ? anchors[0].slice(0, 16) : "";
-    const second = anchors[1] ? anchors[1].slice(0, 16) : "";
-    const pool = [];
-    if (first) pool.push(`「${first}」更口语怎么说`);
-    if (first && second) pool.push(`「${first}」和「${second}」怎么选`);
-    if (first) pool.push(`把「${first}」放进正式句子`);
-    if (!pool.length) pool.push("再口语一点怎么说", "放进正式写作里怎么改");
-    return [...new Set(pool)].filter((text) => !sent.has(text)).slice(0, 2);
-  }
-
-  function reverseTurnHtml(turn) {
-    if (turn.role === "user") {
-      return `<div class="reverse-turn-mine"><div class="reverse-bubble">${esc(turn.content)}</div></div>`;
-    }
-    if (turn.pending) {
-      return `<article class="reverse-turn is-pending" data-surface="elevated">
-        <div class="reverse-turn-head"><span class="reverse-turn-dot" aria-hidden="true"></span><span>talk.</span></div>
-        <div class="reverse-typing" aria-label="正在组织语言"><i></i><i></i><i></i></div>
-        <div class="typing-skeleton"><span></span><span></span><span></span></div>
-        <div class="reverse-stream-body" id="reverse-stream"></div>
-      </article>`;
-    }
-    if (turn.error) {
-      return `<article class="reverse-turn is-error" data-surface="stamp"><p class="reverse-error">${esc(turn.error)}</p></article>`;
-    }
-    return `<article class="reverse-turn" data-surface="elevated">
-      <div class="reverse-turn-head"><span class="reverse-turn-dot" aria-hidden="true"></span><span>talk.</span></div>
-      <div class="reverse-markdown">${markdownLite(turn.content, true)}</div>
-      ${turn.reasoning ? `<details class="rev-reasoning"><summary>模型思考</summary><p>${esc(String(turn.reasoning).slice(0, 4000))}</p></details>` : ""}
-    </article>`;
-  }
-
-  function reverseThreadHtml() {
-    const copy = copyFor("reverse");
-    const thread = currentReverseThread();
-    const chips = reverseSuggestions();
-    const last = thread[thread.length - 1];
-    const showActions = last && last.role === "assistant" && !last.pending && !last.error && last.content;
-    return `
-      <header class="reverse-topbar">
-        <button class="icon-btn" type="button" data-action="back" aria-label="返回">${icon("arrowLeft")}</button>
-        <div class="reverse-topbar-copy">
-          <span class="reverse-kicker">${esc(copy.label || "语境寻词")}</span>
-          <strong>${esc(copy.title || "语境寻词")}</strong>
-        </div>
-        <div class="reverse-topbar-actions">
-          <button class="icon-btn reverse-hist-btn" type="button" data-action="reverse-history" aria-label="历史对话" title="历史对话">${icon("clock")}${(() => { const n = listReverseThreads().length; return n ? `<span class="reverse-hist-badge">${n}</span>` : ""; })()}</button>
-          <button class="icon-btn reverse-new" type="button" data-action="reverse-new" aria-label="新对话" title="新对话"><span aria-hidden="true">+</span></button>
-        </div>
-      </header>
-      <main class="reverse-page reverse-thread">
-        <div class="reverse-scroll">
-          ${thread.map(reverseTurnHtml).join("")}
-          ${showActions ? `<div class="reverse-actions">
-            ${chips.map((chip) => `<button class="reverse-chip" type="button" data-action="reverse-follow" data-prompt="${attr(chip)}">${esc(chip)}</button>`).join("")}
-            <button class="reverse-chip" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
-            <button class="reverse-chip is-icon" type="button" data-action="reverse-copy" aria-label="复制">${icon("copy")}</button>
-          </div>
-          <p class="reverse-hint">带下划线或底色的表达可以直接点开看完整档案。</p>` : ""}
-        </div>
-        <form class="reverse-composer" autocomplete="off">
-          <input id="reverse-input" type="text" name="q" placeholder="输入英文句子，或长按正文选词加入…" />
-          <button class="reverse-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
-        </form>
-      </main>`;
-  }
-
-  function reverseScrollToEnd() {
-    const scroller = document.querySelector(".reverse-page");
-    if (scroller) scroller.scrollTop = scroller.scrollHeight;
-  }
-
-  function redrawReverse() {
-    const screen = document.querySelector('.screen[data-page="reverse"]');
-    if (!screen) return;
-    screen.innerHTML = reverseThreadHtml();
-    reverseScrollToEnd();
-  }
-
-  function reversePage(result = {}) {
-    if (!currentReverseThread().length) {
-      const stored = loadReverseThread(result.id || state.reverseThreadId);
-      if (stored) {
-        state.reverseThreadId = stored.id;
-        state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
-      }
-    }
-    state.reverse = null;
-    return reverseThreadHtml();
-  }
-
-  function updateReverseStream(text) {
-    const body = document.querySelector(".reverse-turn.is-pending .reverse-stream-body");
-    if (!body) return;
-    body.innerHTML = markdownLite(String(text || ""), false);
-    body.classList.add("has-text");
-    const pending = body.closest(".is-pending");
-    if (pending) pending.classList.add("has-text");
-    reverseScrollToEnd();
-  }
-
-  function openReverseForSubject(kind, rawSubject) {
-    const subject = String(rawSubject || "").trim();
-    if (!subject) return;
-    const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    state.reverseBudget = reverseBudget();
-    state.reverseStyle = reverseStyleName(state.reverseBudget);
-    state.reverseThreadId = id;
-
-    const kindLabel = kind === "chunk" ? "意群" : kind === "sentence" ? "句子" : "单词";
-    const seedUser = kind === "sentence"
-      ? `我想围绕这句英文向你提问：\n"${subject}"`
-      : `我想围绕英文${kindLabel}「${subject}」向你提问。`;
-    const seedAssistant = kind === "sentence"
-      ? `已载入这句英文语境。你可以直接问我它的语气潜台词、长难句逻辑，或让我给出更地道的改写方案。`
-      : `已载入 ${kindLabel} [[${subject}]]。你可以直接追问它的近义词区别、真实外刊造句、搭配限制或常见误用。`;
-
-    state.reverseTitle = shorten(subject, 28);
-    state.reverseThread = [
-      { role: "user", content: seedUser },
-      { role: "assistant", content: seedAssistant }
-    ];
-    persistReverseThread();
-    closeAllWordLayers({ immediate: true });
-    navigate({ name: "reverse", id });
-    window.requestAnimationFrame(() => {
-      const inp = document.querySelector("#reverse-input");
-      if (inp) {
-        inp.placeholder = kind === "sentence"
-          ? "追问这句的语法、语气或更地道改写…"
-          : `追问「${shorten(subject, 18)}」的用法、近义词或造句…`;
-        inp.focus();
-      }
-    });
-  }
-
-  async function startReverse(query) {
-    const text = String(query || "").trim();
-    if (!text) return;
-    const cached = cacheGetReverseFirst(text);
-    const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    state.reverseBudget = reverseBudget();
-    state.reverseStyle = reverseStyleName(state.reverseBudget);
-    state.reverseThreadId = id;
-    state.reverseTitle = reverseThreadTitle([{ role: "user", content: text }]);
-    state.reverseThread = [{ role: "user", content: text }];
-    if (cached?.content) {
-      state.reverseThread.push({ role: "assistant", content: String(cached.content), reasoning: String(cached.reasoning || "") });
-      persistReverseThread();
-      navigate({ name: "reverse", id });
-      return;
-    }
-    const placeholder = { role: "assistant", content: "", pending: true };
-    state.reverseThread.push(placeholder);
-    navigate({ name: "reverse", id });
-    const owner = state.reverseThread;
-    const alive = () => state.reverseThread === owner;
-    try {
-      const result = await modelLookup(text, "reverse", state.settings, {
-        reverseStyle: state.reverseStyle,
-        reverseBudget: state.reverseBudget,
-        onPreview: (preview) => {
-          if (!alive() || !preview?.narrative) return;
-          updateReverseStream(preview.narrative);
-        }
-      });
-      placeholder.pending = false;
-      placeholder.content = String(result?.data?.narrative || "");
-      placeholder.reasoning = String(result?.data?.reasoning || "");
-      if (placeholder.content) cachePutReverseFirst(text, { content: placeholder.content, reasoning: placeholder.reasoning });
-      persistReverseThread();
-      if (alive()) redrawReverse();
-    } catch (error) {
-      placeholder.pending = false;
-      placeholder.error = error?.message || "这次没有写完，再试一次。";
-      if (alive()) redrawReverse();
-    }
-  }
-
-  function reverseHistory(excludeIndex = -1) {
-    return currentReverseThread()
-      .filter((turn, index) => index !== excludeIndex && turn.role && turn.content && !turn.pending)
-      .map((turn) => ({
-        role: turn.role,
-        content: turn.role === "assistant" ? stripReverseAnchors(turn.content) : String(turn.content)
-      }));
-  }
-
-  async function askReverseFollowUp(text) {
-    const query = String(text || "").trim();
-    if (!query) return;
-    const history = reverseHistory();
-    const placeholder = { role: "assistant", content: "", pending: true };
-    state.reverseThread.push({ role: "user", content: query }, placeholder);
-    persistReverseThread();
-    redrawReverse();
-    const owner = state.reverseThread;
-    const alive = () => state.reverseThread === owner;
-    try {
-      const result = await modelLookup(query, "reverse", state.settings, {
-        history,
-        skipCache: true,
-        reverseStyle: state.reverseStyle,
-        reverseBudget: state.reverseBudget,
-        onPreview: (preview) => {
-          if (!alive() || !preview?.narrative) return;
-          updateReverseStream(preview.narrative);
-        }
-      });
-      placeholder.pending = false;
-      placeholder.content = String(result?.data?.narrative || "");
-      placeholder.reasoning = String(result?.data?.reasoning || "");
-      persistReverseThread();
-      if (alive()) redrawReverse();
-    } catch (error) {
-      placeholder.pending = false;
-      placeholder.error = error?.message || "这次没有写完，再试一次。";
-      if (alive()) redrawReverse();
-    }
-  }
-
-  async function regenerateReverse() {
-    const thread = currentReverseThread();
-    const last = thread[thread.length - 1];
-    if (!last || last.role !== "assistant" || last.pending) return;
-    const prompt = reverseHistory(thread.length - 1).filter((turn) => turn.role === "user").pop()?.content || "";
-    if (!prompt) return;
-    thread.pop();
-    const placeholder = { role: "assistant", content: "", pending: true };
-    thread.push(placeholder);
-    redrawReverse();
-    const history = reverseHistory(thread.length - 1);
-    const owner = thread;
-    const alive = () => state.reverseThread === owner;
-    try {
-      const result = await modelLookup(prompt, "reverse", state.settings, {
-        history,
-        skipCache: true,
-        reverseStyle: state.reverseStyle,
-        reverseBudget: state.reverseBudget,
-        onPreview: (preview) => {
-          if (!alive() || !preview?.narrative) return;
-          updateReverseStream(preview.narrative);
-        }
-      });
-      placeholder.pending = false;
-      placeholder.content = String(result?.data?.narrative || "");
-      placeholder.reasoning = String(result?.data?.reasoning || "");
-      persistReverseThread();
-      if (alive()) redrawReverse();
-    } catch (error) {
-      placeholder.pending = false;
-      placeholder.error = error?.message || "这次没有写完，再试一次。";
-      if (alive()) redrawReverse();
-    }
-  }
-
-  function submitReverseComposer() {
-    const field = $("#reverse-input");
-    const text = String(field?.value || "").trim();
-    if (!text) return;
-    field.value = "";
-    void askReverseFollowUp(text);
-  }
-
-  function gotoReverseAnchor(expression) {
-    const text = String(expression || "").trim();
-    if (!text) return;
-    persistReverseThread();
-    state.restoreScroll = document.querySelector(".screen")?.scrollTop || 0;
-    const type = reverseAnchorWords(text) <= 2 ? "word" : "chunk";
-    runSearch(text, type);
-  }
-
-  /* ============================================================
-     Sentence page
-     ============================================================ */
-
-  function treeKindLabel(kind) {
-    return ({ main: "主干", clause: "从句", phrase: "短语", modifier: "修饰" })[kind] || "结构";
-  }
-
-  function registerTreeNodes(nodes, bucket) {
-    (nodes || []).forEach((node) => {
-      bucket[node.id] = node;
-      registerTreeNodes(node.children, bucket);
-    });
-    return bucket;
-  }
-
-  function structureTreeHtml(nodes, depth = 0) {
-    if (!Array.isArray(nodes) || !nodes.length) return "";
-    return `<ul class="tree-list" data-depth="${depth}">
-      ${nodes.map((node) => `
-        <li class="tree-node kind-${esc(node.kind)}">
-          <div class="tree-row">
-            ${node.children?.length ? `<button class="tree-expand" type="button" data-action="tree-expand" aria-expanded="false" aria-label="展开这一层">${icon("chevronDown")}</button>` : `<span class="tree-expand is-leaf" aria-hidden="true"></span>`}
-            <button class="tree-main" type="button" data-action="structure-node" data-node-id="${attr(node.id)}">
-              <span class="tree-kind">${treeKindLabel(node.kind)}</span>
-              <span class="tree-text">${esc(node.text)}</span>
-              ${node.role ? `<span class="tree-role">${esc(node.role)}</span>` : ""}
-            </button>
-          </div>
-          ${node.children?.length ? `<div class="tree-children" hidden>${structureTreeHtml(node.children, depth + 1)}</div>` : ""}
-        </li>`).join("")}
-    </ul>`;
-  }
-
-  function openSegmentSheet(seg) {
-    const role = segmentRole(seg.dataset.role);
-    const clone = seg.cloneNode(true);
-    clone.querySelectorAll(".seg-no, .seg-arrow").forEach((node) => node.remove());
-    const text = String(clone.textContent || "").replace(/\s+/g, " ").trim();
-    const gloss = String(seg.dataset.gloss || "").trim();
-    const chunk = String(seg.dataset.chunk || "").trim();
-    openSheetShell({ kicker: "意群", title: text || "这一段在做什么" });
-    const holder = $("#sheet-scroll");
-    if (!holder) return;
-    holder.innerHTML = `
-      <div class="insight-sheet segment-sheet">
-        <div class="insight-rows">
-          <div class="insight-row is-key">
-            <span class="insight-label">作用</span>
-            <p class="insight-value">${esc(role)}</p>
-          </div>
-          ${gloss ? `<div class="insight-row">
-            <span class="insight-label">大意</span>
-            <p class="insight-value">${esc(gloss)}</p>
-          </div>` : ""}
-        </div>
-        ${chunk ? `<button class="segment-open-chunk" type="button" data-action="chunk-jump" data-chunk="${attr(chunk)}">
-          <span>${esc(chunk)}</span><i aria-hidden="true">↗</i>
-        </button>` : ""}
-        <p class="segment-hint">这段在下方「02 信息推进」里对应该编号；可复用的搭配会单独收进意群页。</p>
-      </div>`;
-  }
-
-  function openInsightSheet(node) {
-    const kind = treeKindLabel(node.kind);
-    const depthLabel = Number(node.depth) > 0 ? `第 ${Number(node.depth) + 1} 层` : "";
-    openSheetShell({ kicker: [kind, depthLabel].filter(Boolean).join(" · "), title: node.label || "这一层在做什么" });
-    const holder = $("#sheet-scroll");
-    if (!holder) return;
-    const rows = [
-      { label: "作用", value: node.role, key: true },
-      { label: "大意", value: node.gloss },
-      { label: "阅读提示", value: node.note }
-    ].filter((row) => row.value);
-    holder.innerHTML = `
-      <div class="insight-sheet">
-        <p class="insight-clause">${esc(node.text || "")}</p>
-        <div class="insight-rows">
-          ${rows.map((row) => `
-            <div class="insight-row ${row.key ? "is-key" : ""}">
-              <span class="insight-label">${row.label}</span>
-              <p class="insight-value">${esc(row.value)}</p>
-            </div>`).join("")}
-        </div>
-        ${node.children?.length ? `
-          <div class="insight-nested">
-            <span class="insight-label">里面还有</span>
-            <ul>${node.children.map((child) => `<li>${esc(child.label || child.text || "")}</li>`).join("")}</ul>
-          </div>` : ""}
-      </div>`;
-  }
-
-  function onionSlot(node, keyWords, depth = 1, suffix = "") {
-    const inner = onionCompose(node.text || "", Array.isArray(node.children) ? node.children : [], keyWords, depth + 1);
-    return `<span class="onion-slot" data-node-id="${attr(node.id)}"><button class="onion-mark" type="button" data-action="onion-toggle" aria-expanded="false" aria-label="展开这层修饰">+</button><span class="onion-wrap"><span class="onion-clause depth-${Math.min(depth, 3)}" data-depth="${Math.min(depth, 3)}" data-action="onion-open" data-node-id="${attr(node.id)}" role="button" tabindex="0">${inner}${esc(suffix)}</span></span></span>`;
-  }
-
-  function tidyClauseText(text) {
-    return String(text || "")
-      .replace(/\s+([,.;:!?])/g, "$1")
-      .replace(/([,;:])(\s*[,;:])+/g, "$1")
-      .replace(/\s{2,}/g, " ")
-      .trim();
-  }
-
-  function onionCompose(text, children, keyWords, depth = 1) {
-    const source = String(text || "");
-    const plain = (chunk) => annotateSentence(chunk, keyWords || []);
-    const list = (Array.isArray(children) ? children : []).filter((child) => child && child.text && !/…|\.{2,}/.test(child.text));
-    if (!list.length) return plain(source);
-
-    const hits = [];
-    list.forEach((child) => {
-      const at = source.indexOf(child.text);
-      if (at >= 0) hits.push({ child, start: at, end: at + child.text.length });
-    });
-    hits.sort((a, b) => a.start - b.start);
-
-    const segments = [];
-    let cursor = 0;
-    const nested = new Set();
-    hits.forEach((hit) => {
-      let { start, end } = hit;
-      if (start < cursor) { nested.add(hit.child); return; }
-      const before = source.slice(0, start);
-      if (/,\s*$/.test(before)) start = before.replace(/,\s*$/, "").length;
-      const rest = source.slice(end);
-      if (/^\s*,/.test(rest)) end += rest.match(/^\s*,/)[0].length;
-      segments.push({ kind: "text", html: plain(tidyClauseText(source.slice(cursor, start))) });
-      const tail = source.slice(end).match(/^\s*([.,;:!?]+)\s*$/);
-      segments.push({
-        kind: "slot",
-        node: hit.child,
-        suffix: tail ? tail[1] : "",
-        html: onionSlot(hit.child, keyWords, hit.child.__depth || depth, tail ? tail[1] : "")
-      });
-      cursor = end + (tail ? tail[0].length : 0);
-    });
-    segments.push({ kind: "text", html: plain(tidyClauseText(source.slice(cursor))) });
-
-    const placed = new Set(hits.map((hit) => hit.child));
-    list.forEach((child) => {
-      if (placed.has(child) || nested.has(child)) return;
-      segments.push({ kind: "slot", node: child, suffix: "", html: onionSlot(child, keyWords, child.__depth || depth) });
-    });
-
-    const flow = segments.filter((segment) => segment.kind === "slot" || segment.html !== "");
-    let html = "";
-    for (let i = 0; i < flow.length; i += 1) {
-      const segment = flow[i];
-      if (segment.kind === "text") { html += segment.html; continue; }
-      const run = [segment];
-      while (i + 1 < flow.length && flow[i + 1].kind === "slot") { i += 1; run.push(flow[i]); }
-      const padBefore = /[\s]$/.test(html) || !html ? "" : " ";
-      const padAfter = /^\s/.test(flow[i + 1]?.html || "") ? "" : " ";
-      const body = run.map((item) => item.html).join("");
-      html += padBefore + body + padAfter;
-    }
-    return html;
-  }
-
-  function hoistDetached(nodes, depth = 1, out = []) {
-    (Array.isArray(nodes) ? nodes : []).forEach((node) => {
-      if (!node || !node.text) return;
-      node.__depth = depth;
-      const kids = Array.isArray(node.children) ? node.children : [];
-      const inside = [];
-      const detached = [];
-      kids.forEach((child) => {
-        if (!child || !child.text) return;
-        (String(node.text).includes(child.text) ? inside : detached).push(child);
-      });
-      node.children = inside;
-      out.push(node);
-      hoistDetached(detached, depth + 1, out);
-    });
-    return out;
-  }
-
-  function onionLine(text, tree, keyWords) {
-    const nodes = Array.isArray(tree) ? tree.filter((node) => node && (node.text || node.children?.length)) : [];
-    if (!nodes.length) return annotateSentence(text, keyWords);
-    const main = nodes.find((node) => node.kind === "main");
-    // Models often return only the folded layers; treat them as children of the sentence itself.
-    const children = main
-      ? hoistDetached((main.children || []).concat(nodes.filter((node) => node !== main)), 1)
-      : hoistDetached(nodes, 1);
-    if (!children.length) return annotateSentence(text, keyWords);
-    return onionCompose(text, children, keyWords, 1);
-  }
-
-  function segmentRole(role) {
-    return SEGMENT_ROLE_LABELS[role] || "推进";
-  }
-
-  function segmentLine(part, keyWords) {
-    const text = String(part.text || "");
-    const segments = Array.isArray(part.segments) ? part.segments : [];
-    if (!segments.length) return `<p class="sentence-line">${annotateSentence(text, keyWords)}</p>`;
-    const spans = segments.map((segment, index) => {
-      const chunk = segment.chunk ? ` data-chunk="${attr(segment.chunk)}"` : "";
-      const raw = String(segment.text || "");
-      const lead = raw.match(/^\s+/)?.[0] || "";
-      const rest = lead ? raw.slice(lead.length) : raw;
-      const tail = rest.match(/\s+$/)?.[0] || "";
-      const core = tail ? rest.slice(0, -tail.length) : rest;
-      const marker = String(index + 1).padStart(2, "0");
-      const arrow = segment.chunk ? `<i class="seg-arrow" aria-hidden="true">↗</i>` : "";
-      return (lead ? `<span class="seg-space" aria-hidden="true">${esc(lead)}</span>` : "")
-        + `<span class="seg" data-action="seg-open" data-role="${esc(segment.role)}" data-seg="${marker}" data-gloss="${attr(segment.gloss || "")}"${chunk}>`
-        + `<i class="seg-no" aria-hidden="true">${marker}</i>${annotateSentence(core, keyWords)}${arrow}</span>`
-        + `<span class="seg-space" aria-hidden="true">${esc(tail)}</span>`;
-    }).join("");
-    return `<p class="sentence-line is-segmented">${spans}</p>`;
-  }
-
-  function sentenceViewSwitch() {
-    return `<div class="seg-switch" role="group" aria-label="句子显示方式">
-      <button class="seg-switch-btn is-active" type="button" data-action="sentence-view" data-view="original">原句</button>
-      <button class="seg-switch-btn" type="button" data-action="sentence-view" data-view="segments">意群切分</button>
-      <button class="seg-switch-btn" type="button" data-action="sentence-view" data-view="focus">信息焦点</button>
-    </div>
-    <p class="seg-legend" aria-live="polite">
-      <span data-for="original">— 重点词（点击查词）</span>
-      <span data-for="segments">01–04 阅读意群边界（编号对应下方信息推进） · ↗ 可点进意群页</span>
-      <span data-for="focus">深色：信息起点与末端焦点　浅色：修饰背景（已降噪）</span>
-    </p>`;
-  }
-
-  function sentenceFlow(part) {
-    const segments = Array.isArray(part.segments) ? part.segments : [];
-    if (!segments.length) return "";
-    return `<ol class="flow">
-      ${segments.map((segment, index) => `
-        <li class="flow-row" data-role="${esc(segment.role)}">
-          <span class="flow-no">${String(index + 1).padStart(2, "0")}</span>
-          <div class="flow-body">
-            <div class="flow-line">
-              <span class="flow-role">${segmentRole(segment.role)}</span>
-              <span class="flow-text">${esc(segment.text.trim())}</span>
-            </div>
-            ${segment.gloss ? `<p class="flow-gloss">${esc(segment.gloss)}</p>` : ""}
-          </div>
-        </li>`).join("")}
-    </ol>
-    ${part.orderNote ? `<p class="flow-note">${esc(part.orderNote)}</p>` : ""}`;
-  }
-
-  function sentenceConstructions(part) {
-    const rows = (Array.isArray(part.segments) ? part.segments : []).filter((segment) => segment.chunk);
-    if (!rows.length) return "";
-    return `<div class="construction-list">
-      ${rows.map((segment) => `
-        <button class="construction-row" type="button" data-action="chunk-jump" data-chunk="${attr(segment.chunk)}">
-          <span class="construction-text">
-            <span class="construction-chunk">${esc(segment.chunk)}</span>
-            <span class="construction-gloss">${esc(segment.gloss || "看意群卡片")}</span>
-          </span>
-          <span class="construction-go" aria-hidden="true">↗</span>
-        </button>`).join("")}
-    </div>`;
-  }
-
-  function contrastCard(part) {
-    const contrast = part.contrast;
-    if (!contrast?.text) return "";
-    return `<div class="contrast-card">
-      <span class="contrast-label">${esc(contrast.label || "结构对照")}</span>
-      <p class="contrast-en">${esc(contrast.text)}</p>
-      ${contrast.zh ? `<p class="contrast-zh">${esc(contrast.zh)}</p>` : ""}
-    </div>`;
-  }
-
-  function sentencePartBlocks(part, index, keyWords, nextNo) {
-    return `<section class="block sentence-part reveal">
-      ${blockHead(nextNo(), `句子 ${index + 1}`, part.segments?.length ? "意群" : "分析")}
-      <div class="sentence-stage part-stage">${segmentLine(part, keyWords)}</div>
-      ${part.translation ? `<p class="sentence-part-zh">${esc(part.translation)}</p>` : ""}
-      ${sentenceFlow(part)}
-      ${sentenceConstructions(part)}
-      ${contrastCard(part)}
-      ${part.incomplete ? `<p class="sentence-part-missing">模型把这几句并成了一段，这一句没有单独分析；重试或逐句查询即可。</p>` : ""}
-      ${part.keyWords?.length ? `<div class="key-list">${part.keyWords.map((keyWord, n) => keyCard(keyWord, index * 100 + n)).join("")}</div>` : ""}
-    </section>`;
-  }
-
-  function sentencePage(sentence, layer = null) {
-    let blockNo = 0;
-    const nextNo = () => String(++blockNo).padStart(2, "0");
-    const parts = Array.isArray(sentence.sentences) && sentence.sentences.length
-      ? sentence.sentences
-      : [{
-        text: sentence.text,
-        translation: sentence.translation,
-        summary: sentence.summary || "",
-        segments: sentence.segments || [],
-        orderNote: sentence.orderNote || "",
-        contrast: sentence.contrast || null
-      }];
-    const multi = parts.length > 1;
-    const topKeyWords = Array.isArray(sentence.keyWords) ? sentence.keyWords : [];
-    const renderParts = parts.map((part, index) => ({
-      ...part,
-      keyWords: Array.isArray(part.keyWords) ? part.keyWords : [],
-      segments: Array.isArray(part.segments) && part.segments.length
-        ? part.segments
-        : (index === 0 && Array.isArray(sentence.segments) ? sentence.segments : []),
-      orderNote: String(part.orderNote || ""),
-      contrast: part.contrast || null
-    }));
-    const wholeTranslation = sentence.translation
-      || renderParts.map((part) => part.translation).filter(Boolean).join(" ");
-    const primary = renderParts[0];
-    const primaryKeyWords = primary.keyWords.length ? primary.keyWords : topKeyWords;
-    const bookmark = `sentence:${sentence.text || sentence.id}`;
-    const single = !multi;
-    return `
-      ${layer
-        ? layerTopbar({
-            label: multi ? "多句" : "句子",
-            title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`,
-            bookmark,
-            origin: layer.origin,
-            relation: layer.relation,
-            depth: layer.depth
-          })
-        : backTopbar({ label: multi ? "多句" : "句子", title: multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`, bookmark, share: true })}
-      <main class="result-page sentence-page" data-view="original">
-        <section class="sentence-hero">
-          <div class="result-kicker reveal" style="--d:0">
-            <span class="kicker-pill accent">句子</span>
-            <span class="kicker-pill">${multi ? `${renderParts.length} 句` : `${topKeyWords.length} 个重点词`}</span>
-          </div>
-          ${single ? `<div class="sentence-stage reveal" style="--d:0.4">${segmentLine(primary, primaryKeyWords)}</div>
-          ${primary.segments?.length ? `<div class="reveal" style="--d:0.55">${sentenceViewSwitch()}</div>` : ""}` : ""}
-          <div class="sentence-source reveal" style="--d:1">
-            <span>${esc(sentence.source || "Talk corpus")}</span>
-            <span class="wave"></span>
-            <button class="speak-btn" type="button" data-action="speak" data-text="${attr(sentence.text)}">${icon("volume")} 朗读</button>
-            <button class="speak-btn speak-regen" type="button" data-action="regenerate-audio" data-text="${attr(sentence.text)}" title="跳过语音缓存，重新生成">${icon("refresh")}</button>
-            <button class="speak-btn" type="button" data-action="copy-text" data-copy="${attr(sentence.text)}" aria-label="复制句子" title="复制句子">${icon("copy")}</button>
-          </div>
-        </section>
-
-        <section class="block reveal" style="--d:1.2">
-          ${blockHead(nextNo(), multi ? "整段意译" : "整句意译", "中文翻译")}
-          <div class="translation-card">
-            <span class="translation-label">${icon("quote")} ${multi ? "整段理解" : "整句理解"}</span>
-            <p class="translation-text">${esc(wholeTranslation || "连接模型后生成翻译。")}</p>
-            ${sentence.tone ? `<span class="translation-tone">${esc(sentence.tone)}</span>` : ""}
-          </div>
-          ${(sentence.tone || sentence.syntax || sentence.structure) ? `
-          <div class="insight-grid">
-            <div class="insight">
-              <span class="mono">语气</span>
-              <p>${esc(sentence.tone || "—")}</p>
-            </div>
-            <div class="insight">
-              <span class="mono">句式</span>
-              <p>${esc(sentence.syntax || sentence.structure || "—")}</p>
-            </div>
-          </div>` : ""}
-        </section>
-
-        ${single && primary.segments?.length ? `
-        <section class="block reveal" style="--d:1.4">
-          ${blockHead(nextNo(), "信息推进", "从起点到焦点")}
-          ${sentence.summary ? `<p class="flow-lead">${esc(sentence.summary)}</p>` : ""}
-          ${sentenceFlow(primary)}
-        </section>` : ""}
-
-        ${single && sentenceConstructions(primary) ? `
-        <section class="block reveal" style="--d:1.55">
-          ${blockHead(nextNo(), "句中构式", "点开看意群")}
-          ${sentenceConstructions(primary)}
-        </section>` : ""}
-
-        ${single && contrastCard(primary) ? `
-        <section class="block reveal" style="--d:1.7">
-          ${blockHead(nextNo(), "结构对照", "换一种说法")}
-          ${contrastCard(primary)}
-        </section>` : ""}
-
-        ${multi ? renderParts.map((part, index) => sentencePartBlocks(part, index, part.keyWords.length ? part.keyWords : topKeyWords, nextNo)).join("") : ""}
-
-        ${sentence.summary && multi ? `
-        <section class="block reveal" style="--d:1.8">
-          ${blockHead(nextNo(), "整段主旨", "一句话记住")}
-          <div class="summary-card">${esc(sentence.summary)}</div>
-        </section>` : ""}
-
-        ${single && topKeyWords.length ? `
-        <section class="block reveal" style="--d:1.85">
-          ${blockHead(nextNo(), "值得注意的词", "点击展开")}
-          <div class="key-list">
-            ${topKeyWords.map((keyWord, index) => keyCard(keyWord, index)).join("")}
-          </div>
-        </section>` : ""}
-
-        ${reclassifyRow("sentence")}
-        <div class="page-actions reveal" style="--d:2">
-          <button class="btn btn-primary${isSavedKey(bookmark) ? " is-saved" : ""}" type="button" data-action="save" data-save-label="收藏句子" aria-pressed="${isSavedKey(bookmark)}">${icon("bookmark")} ${isSavedKey(bookmark) ? "已收藏" : "收藏句子"}</button>
-          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="ask-ai-about" data-kind="sentence" data-subject="${attr(sentence.text)}">${icon("sparkle")} 向 AI 提问</button>` : ""}
-          ${hasModelConfig() ? `<button class="btn btn-secondary" type="button" data-action="regenerate-sentence">${icon("refresh")} 重新生成分析</button>` : ""}
-          <button class="btn btn-secondary" type="button" data-action="forget-sentence">删除缓存</button>
-          <button class="btn btn-secondary" type="button" data-action="copy">${icon("copy")} 复制</button>
-        </div>
-      </main>`;
-  }
-
-  function keyCard(keyWord, index) {
-    const open = index === 0;
-    const relations = [
-      ...keyWord.family.map((item) => ({ ...item, kind: "family" })),
-      ...keyWord.synonyms.map((item) => ({ ...item, kind: "syn" })),
-      ...keyWord.antonyms.map((item) => ({ ...item, kind: "ant" }))
-    ].slice(0, 7);
-    return `
-      <article class="key-card ${open ? "open" : ""}">
-        <button class="key-toggle" type="button" data-action="key-toggle" aria-expanded="${open}" aria-controls="key-body-${index}">
-          <span class="key-number">${String(index + 1).padStart(2, "0")}</span>
-          <span class="key-main">
-            <span class="key-word-line">
-              <span class="key-word">${esc(keyWord.word)}</span>
-              <span class="key-ipa">${esc(keyWord.phonetic || "")}</span>
-              <span class="key-pos">${esc(posLabel(keyWord.pos))}</span>
-            </span>
-            <span class="key-context">${esc(keyWord.meaningZh || keyWord.meaning || "")}</span>
-          </span>
-          <span class="key-chevron">${icon("chevronDown")}</span>
-        </button>
-        <div class="key-body" id="key-body-${index}">
-          <div class="key-body-inner">
-            <div class="key-content">
-              <div class="key-meaning"><strong>在本句中</strong> · ${esc(keyWord.meaningZh || keyWord.meaning || "")}</div>
-              ${keyWord.meaningZh && keyWord.meaning ? `<p class="key-meaning-en">${esc(keyWord.meaning)}</p>` : ""}
-              ${keyWord.why ? `<p class="key-why"><b>为什么重要：</b> ${esc(keyWord.why)}</p>` : ""}
-              ${relations.length ? `
-              <div class="mini-relations">
-                ${relations.map((item) => `
-                  <button class="mini-rel ${item.kind === "syn" ? "syn" : item.kind === "ant" ? "ant" : ""}" type="button"
-                    data-action="word-layer" data-word="${attr(item.word)}" data-cache-word="${attr(item.word)}" data-gloss="${attr(relationGloss(item))}" data-pos="${attr(posAbbr(item.pos))}"
-                    data-relation="${item.kind === "syn" ? "近义词" : item.kind === "ant" ? "反义词" : "同根词"}"
-                    title="${attr(item.gloss)}">${esc(item.word)}</button>`).join("")}
-              </div>` : ""}
-              ${keyWord.example?.en ? `
-              <div class="key-example">
-                ${highlightPlain(keyWord.example.en, keyWord.word)}
-                ${keyWord.example.zh ? `<span>${esc(keyWord.example.zh)}</span>` : ""}
-              </div>` : ""}
-              <button class="key-open" type="button" data-action="word-layer" data-word="${attr(keyWord.word)}" data-relation="重点词">
-                查看完整词条 ${icon("arrowUpRight")}
-              </button>
-            </div>
-          </div>
-        </div>
-      </article>`;
-  }
-
-  function annotateSentence(text, keyWords) {
-    const items = keyWords
-      .map((keyWord, index) => ({
-        index,
-        surface: String(keyWord.surface || keyWord.word || ""),
-        word: String(keyWord.word || keyWord.surface || ""),
-        tip: String(keyWord.meaningZh || keyWord.meaning || "").slice(0, 46)
-      }))
-      .filter((item) => item.surface)
-      .sort((a, b) => b.surface.length - a.surface.length);
-
-    if (!items.length) return esc(text);
-    let re;
-    try {
-      re = new RegExp(items.map((item) => escapeRegExp(item.surface)).join("|"), "gi");
-    } catch (_) {
-      return esc(text);
-    }
-
-    let out = "";
-    let last = 0;
-    for (const match of text.matchAll(re)) {
-      out += esc(text.slice(last, match.index));
-      const matched = items.find((item) => item.surface.toLowerCase() === match[0].toLowerCase()) || items[0];
-      out += `<button class="kw" type="button" data-action="open-key" data-index="${matched.index}"${matched.tip ? ` data-tip="${attr(matched.tip)}"` : ""} aria-label="查看 ${attr(matched.word)}">${esc(match[0])}</button>`;
-      last = match.index + match[0].length;
-    }
-    out += esc(text.slice(last));
-    return out;
-  }
-
-  /* ============================================================
-     Loading / missing / error
-     ============================================================ */
-
-  function loadingBody(query, type, { statusText, withPreview = false } = {}) {
-    const statusByName = {
-      sentence: "找出真正重要的词",
-      chunk: "拆开它的槽位",
-      reverse: "翻找贴切的表达",
-      word: "正在理解词义"
-    };
-    const status = statusText || statusByName[type] || statusByName.word;
-    const typePill = type === "sentence" ? "句子" : type === "chunk" ? "意群" : type === "reverse" ? "寻词" : "单词";
-    return `
-      <main class="result-page loading-page">
-        <div class="loading-lead">
-          <div class="result-kicker reveal" style="--d:0">
-            <span class="kicker-pill accent">${typePill}</span>
-            <span class="kicker-pill">正在整理</span>
-          </div>
-          <h1 class="loading-query reveal" style="--d:0.4">${esc(query)}</h1>
-          <div class="loading-status reveal" style="--d:0.8">
-            <span class="loading-dots"><i></i><i></i><i></i></span>
-            <span${withPreview ? ' id="loading-status-text"' : ""}>${status}</span>
-          </div>
-
-          ${withPreview ? '<div class="live-preview" id="live-preview" hidden></div>' : ""}
-          <div class="skeleton-stack">
-            <div class="skeleton hero"></div>
-            <div class="skeleton line"></div>
-            <div class="skeleton line short"></div>
-          </div>
-        </div>
-        <div class="skeleton-blocks">
-          <div class="skeleton card tall"></div>
-          <div class="skeleton card"></div>
-          <div class="skeleton line"></div>
-        </div>
-      </main>`;
-  }
-
-  function loadingPage(query, type) {
-    return `
-      ${backTopbar({ label: type === "sentence" ? "正在理解句子" : type === "chunk" ? "正在辨认意群" : type === "reverse" ? "正在挑选说法" : "正在查询单词", title: shorten(query, 28) })}
-      ${loadingBody(query, type, { withPreview: true })}`;
-  }
-
-  function missPage(type, query, suggestions = []) {
-    const isSentence = type === "sentence";
-    const isChunk = type === "chunk";
-    const isReverse = type === "reverse";
-    const fallback = suggestions.length
-      ? suggestions
-      : isSentence
-        ? DATA.sentences.slice(0, 2).map((item) => item.text)
-        : isChunk
-          ? ["by and large", "take off", "in the end"]
-          : isReverse
-            ? ["怎么礼貌地拒绝", "表达“顺便说一下”", "形容雨很小"]
-            : ["serendipity", "ephemeral", "resilient"];
-    const typeForChip = isSentence ? "sentence" : "auto";
-    return `
-      ${backTopbar({ label: "离线演示", title: isSentence ? "句子尚未收录" : isChunk ? "意群尚未收录" : isReverse ? "还没连上模型" : "单词尚未收录" })}
-      <main class="result-page state-page">
-        <div class="state-orb reveal" style="--d:0">?</div>
-        <h1 class="state-title reveal" style="--d:0.4">离线词库还没收录。</h1>
-        <p class="state-copy reveal" style="--d:0.6">离线词库很小。连接模型后，可以${isSentence ? "把任何句子拆成重点词，读懂语气与结构" : isChunk ? "拆开任何固定搭配，看它的槽位与来历" : isReverse ? "用一句中文描述，找到最贴切的英文说法" : "查任何单词，连带近义词、反义和例句"}。也可以先看下面的示例。</p>
-        <span class="state-query reveal" style="--d:0.8">${esc(shorten(query, 88))}</span>
-        <div class="state-actions reveal" style="--d:1">
-          <button class="btn btn-primary" type="button" data-action="settings">${icon("wand")} 连接模型</button>
-          <button class="btn btn-secondary" type="button" data-action="lookup" data-query="${attr(fallback[0])}" data-type="${typeForChip}">先看示例</button>
-        </div>
-        ${reclassifyRow("")}
-        <div class="recent-row reveal" style="--d:1.2; padding-left:0; padding-right:0; margin-top:22px; flex-wrap:wrap;">
-          ${fallback.slice(0, 3).map((item) => `
-            <button class="chip" type="button" data-action="lookup" data-query="${attr(item)}" data-type="${typeForChip}">
-              ${isSentence ? '<span class="quote-dot"></span>' : ""}${esc(shorten(item, 43))}
-            </button>`).join("")}
-        </div>
-      </main>`;
-  }
-
-  function errorPage(route) {
-    const isCors = /failed to fetch|network|cors|load failed/i.test(route.message || "");
-    return `
-      ${backTopbar({ label: "模型请求", title: "请求中断" })}
-      <main class="result-page state-page">
-        <div class="state-orb coral reveal" style="--d:0">!</div>
-        <h1 class="state-title reveal" style="--d:0.4">这次没接住。</h1>
-        <p class="state-copy reveal" style="--d:0.6">模型请求没有完整返回。${isCors ? "浏览器直连常会被 CORS 拦截；可以把 API 地址换成你自己的代理。" : "请检查接口地址、模型名和密钥，然后再试一次。"}</p>
-        <span class="state-query reveal" style="--d:0.8">${esc(shorten(route.query || "", 88))}</span>
-        ${route.message ? `<div class="error-detail reveal" style="--d:1">${esc(shorten(route.message, 320))}</div>` : ""}
-        <div class="state-actions reveal" style="--d:1.1">
-          <button class="btn btn-primary" type="button" data-action="retry">${icon("refresh")} 重试</button>
-          <button class="btn btn-secondary" type="button" data-action="settings">${icon("settings")} 模型设置</button>
-          <button class="btn btn-secondary" type="button" data-action="copy-diagnostics">${icon("copy")} 复制诊断</button>
-          ${hasDemo(route.query, route.type) ? `<button class="btn btn-secondary" type="button" data-action="demo">使用演示词条</button>` : ""}
-        </div>
-      </main>`;
-  }
-
-  function hasDemo(query, type) {
-    try {
-      if (type === "word") return Boolean(DATA.words[normalizeWord(query)]);
-      return Boolean(DATA.sentences.find((item) => normalizeSentence(item.text) === normalizeSentence(query)));
-    } catch (_) {
-      return false;
-    }
   }
 
   /* ============================================================
@@ -5969,78 +4598,6 @@ import { createTranslatorView } from "./views/translator.js";
         break;
       }
 
-      case "reclassify": {
-        event.preventDefault();
-        const paradigm = target.dataset.paradigm || "";
-        const text = currentLookupText();
-        if (!text || !paradigm) break;
-        runSearch(text, paradigm);
-        break;
-      }
-
-      case "reverse-anchor": {
-        event.preventDefault();
-        gotoReverseAnchor(target.dataset.text || "");
-        break;
-      }
-
-      case "reverse-again":
-      case "reverse-new": {
-        event.preventDefault();
-        state.reverseThread = [];
-        state.reverseThreadId = "";
-        navigate({ name: "home" });
-        const field = $("#search-input");
-        if (field) requestAnimationFrame(() => field.focus());
-        break;
-      }
-
-      case "reverse-regen": {
-        void regenerateReverse();
-        break;
-      }
-      case "ask-ai-about": {
-        event.preventDefault();
-        tapFeedback();
-        openReverseForSubject(target.dataset.kind || "word", target.dataset.subject || "");
-        break;
-      }
-
-      case "reverse-follow": {
-        event.preventDefault();
-        void askReverseFollowUp(target.dataset.prompt || "");
-        break;
-      }
-
-      case "reverse-copy": {
-        event.preventDefault();
-        const thread = currentReverseThread();
-        const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content);
-        if (!last) break;
-        void copyText(String(last.content).trim(), "正文已复制");
-        break;
-      }
-
-      case "regenerate-chunk": {
-        event.preventDefault();
-        const surface = getActiveSurface();
-        if (surface.kind !== "chunk" || !surface.query) break;
-        await removeWordRecord(chunkCacheKey(surface.query));
-        if (surface.isLayer) await hydrateChunkLayer(surface.record, surface.query);
-        else runSearch(surface.query, "chunk", { skipCache: true });
-        break;
-      }
-
-      case "delete-chunk-cache": {
-        event.preventDefault();
-        const surface = getActiveSurface();
-        if (surface.kind !== "chunk" || !surface.query) break;
-        await removeWordRecord(chunkCacheKey(surface.query));
-        toast("已删除这份意群缓存");
-        if (surface.isLayer) closeTopWordLayer();
-        break;
-      }
-
       case "lookup":
         event.preventDefault();
         tapFeedback();
@@ -6054,59 +4611,11 @@ import { createTranslatorView } from "./views/translator.js";
         openWordRoute(target.dataset.word || "");
         break;
 
-      case "word-pos": {
-        event.preventDefault();
-        const pager = wordPagerForTarget(target);
-        if (pager) {
-          setWordPos(pager, Number(target.dataset.index) || 0);
-          pager.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "nearest" });
-        }
-        break;
-      }
-
-      case "word-pos-prev":
-        event.preventDefault();
-        moveWordPos(wordPagerForTarget(target), -1);
-        break;
-
-      case "word-pos-next":
-        event.preventDefault();
-        moveWordPos(wordPagerForTarget(target), 1);
-        break;
-
       case "open-key":
         event.preventDefault();
         tapFeedback();
         openKeySheet(Number(target.dataset.index || 0));
         break;
-
-      case "seg-open": {
-        const seg = target.closest(".seg");
-        const view = document.querySelector(".sentence-page")?.dataset.view;
-        if (!seg || view !== "segments") break;
-        event.preventDefault();
-        if (seg.dataset.chunk) {
-          tapFeedback();
-          if (cacheGetChunk(chunkSlug(seg.dataset.chunk))) {
-            navigate({ name: "chunk", query: seg.dataset.chunk });
-          } else {
-            void runSearch(seg.dataset.chunk, "chunk");
-          }
-          break;
-        }
-        openSegmentSheet(seg);
-        break;
-      }
-
-      case "key-toggle": {
-        event.preventDefault();
-        const card = target.closest(".key-card");
-        if (!card) break;
-        const open = !card.classList.contains("open");
-        card.classList.toggle("open", open);
-        target.setAttribute("aria-expanded", String(open));
-        break;
-      }
 
       case "word-layer":
         event.preventDefault();
@@ -6141,53 +4650,6 @@ import { createTranslatorView } from "./views/translator.js";
         toggleSaved(target);
         break;
 
-      case "regenerate-sentence": {
-        event.preventDefault();
-        const surface = getActiveSurface();
-        if (surface.kind !== "sentence" || !surface.query || !hasModelConfig()) break;
-        const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
-        const detail = state.settings?.detailLevel || "standard";
-        removeSentenceRecord(await sentenceKey(surface.query, level, detail));
-        if (surface.isLayer) await hydrateSentenceLayer(surface.record, surface.query);
-        else await runSearch(surface.query, "sentence", { skipCache: true });
-        break;
-      }
-
-      case "forget-sentence": {
-        event.preventDefault();
-        const surface = getActiveSurface();
-        if (surface.kind !== "sentence" || !surface.query) break;
-        const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
-        const detail = state.settings?.detailLevel || "standard";
-        removeSentenceRecord(await sentenceKey(surface.query, level, detail));
-        toast("已删除这条句子缓存");
-        if (surface.isLayer) closeTopWordLayer();
-        break;
-      }
-
-      case "clear-sentence-cache":
-        event.preventDefault();
-        clearSentenceCache();
-        toast("句子缓存已清除");
-        break;
-
-      case "regenerate-word": {
-        event.preventDefault();
-        const surface = getActiveSurface();
-        if (surface.kind !== "word" || !surface.query) break;
-        const key = normalizeWord(surface.query);
-        if (!key || !hasModelConfig()) break;
-        await removeWordRecord(key);
-        if (surface.isLayer) {
-          surface.record.word = key;
-          surface.record.data = null;
-          await hydrateLayerWithModel(surface.record);
-        } else {
-          await runSearch(key, "word");
-        }
-        break;
-      }
-
       case "sentence-level": {
         event.preventDefault();
         const level = sentenceLevelOf(target.dataset.level);
@@ -6205,15 +4667,7 @@ import { createTranslatorView } from "./views/translator.js";
         event.preventDefault();
         const on = target.dataset.on === "1";
         if (state.draft) state.draft.showGenMeta = on;
-        promise = scheduleSettingsCommit();
-        break;
-      }
-
-      case "hide-gen-meta": {
-        event.preventDefault();
-        state.settings = { ...(state.settings || {}), showGenMeta: false };
-        persistSettings(state.settings);
-        refreshThemedPage();
+        scheduleSettingsCommit();
         break;
       }
 
@@ -6238,65 +4692,6 @@ import { createTranslatorView } from "./views/translator.js";
           input.value = exampleStyleFor(input.dataset.exampleStyle);
         });
         toast("已恢复默认例句风格");
-        break;
-      }
-
-      case "regen-examples": {
-        event.preventDefault();
-        const active = activeWordData();
-        if (!active) break;
-        if (!hasModelConfig()) {
-          toast("先连接模型，才能按主题换例句。");
-          break;
-        }
-        const themeId = window.TALK_THEME?.current?.().id || "paper";
-        const needed = [themeId, ...themesMissingExamples(active).filter((id) => id !== themeId)];
-        await fillThemeExamples(active, needed).catch(() => {});
-        toast("已按当前主题换了一批例句");
-        break;
-      }
-
-      case "tree-expand": {
-        event.preventDefault();
-        const row = target.closest(".tree-node");
-        const box = row?.querySelector(":scope > .tree-children");
-        if (!box) break;
-        box.hidden = !box.hidden;
-        row.classList.toggle("open", !box.hidden);
-        target.setAttribute("aria-expanded", String(!box.hidden));
-        break;
-      }
-
-      case "tree-toggle-all": {
-        event.preventDefault();
-        const expand = target.dataset.mode !== "collapse";
-        $$(".tree-children").forEach((box) => { box.hidden = !expand; });
-        $$(".tree-node").forEach((node) => node.classList.toggle("open", expand));
-        $$(".tree-expand").forEach((btn) => btn.setAttribute("aria-expanded", String(expand)));
-        break;
-      }
-
-      case "sentence-view": {
-        event.preventDefault();
-        const page = target.closest(".sentence-page");
-        if (!page) break;
-        const view = ["original", "segments", "focus"].includes(target.dataset.view) ? target.dataset.view : "original";
-        page.dataset.view = view;
-        $$(".seg-switch-btn", page).forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
-        break;
-      }
-
-      case "chunk-jump": {
-        event.preventDefault();
-        const row = target.closest("[data-action='chunk-jump']");
-        const chunk = String(row?.dataset.chunk || "").trim();
-        if (!chunk) break;
-        tapFeedback();
-        if (cacheGetChunk(chunkSlug(chunk))) {
-          navigate({ name: "chunk", query: chunk });
-        } else {
-          void runSearch(chunk, "chunk");
-        }
         break;
       }
 
@@ -6494,18 +4889,6 @@ import { createTranslatorView } from "./views/translator.js";
         break;
       }
 
-      case "delete-word-cache": {
-        event.preventDefault();
-        const targetWord = target.dataset.word || "";
-        if (!targetWord) break;
-        if (!window.confirm("删除这个词的本地缓存？相关拼写也会一起删除。")) break;
-        const removed = await deleteWordCacheFor(targetWord);
-        toast(removed ? "已删除这条缓存" : "没有找到对应缓存");
-        if (state.wordLayers.length) closeTopWordLayer();
-        else goBack();
-        break;
-      }
-
       case "delete-profile": {
         event.preventDefault();
         if (!state.draft || state.draft.profiles.length <= 1) break;
@@ -6560,36 +4943,6 @@ import { createTranslatorView } from "./views/translator.js";
         event.preventDefault();
         testConnection();
         break;
-
-      case "retry":
-        event.preventDefault();
-        if (state.lastAttempt) runSearch(state.lastAttempt.query, state.lastAttempt.type);
-        break;
-
-      case "demo":
-        event.preventDefault();
-        if (state.lastAttempt) {
-          try {
-            const result = lookupDemo(state.lastAttempt.query, state.lastAttempt.type);
-            if (result.type === "word") {
-              addHistory("word", state.lastAttempt.query);
-              navigate({ name: "word", word: result.data.word, result: result.data }, { replace: true });
-            } else {
-              addHistory("sentence", state.lastAttempt.query);
-              navigate({ name: "sentence", id: result.data.id, result: result.data }, { replace: true });
-            }
-          } catch (_) {
-            toast("No demo entry for that one");
-          }
-        }
-        break;
-
-      case "example-lookup": {
-        event.preventDefault();
-        const text = String(target.dataset.text || "").trim();
-        if (text) void runSearch(text, "sentence");
-        break;
-      }
 
       case "history-item":
         event.preventDefault();
@@ -6899,52 +5252,6 @@ import { createTranslatorView } from "./views/translator.js";
         wordbookMenuOpen = false;
         const bid = target.dataset.bookId || "";
         window.__TALK_BRIDGE__?.openReaderWithBook?.(bid);
-        break;
-      }
-
-      case "reverse-history": {
-        event.preventDefault();
-        tapFeedback();
-        openHistorySheet("reverse");
-        break;
-      }
-
-      case "reverse-open-thread": {
-        event.preventDefault();
-        const id = target.dataset.id || "";
-        const stored = loadReverseThread(id);
-        if (!stored) break;
-        tapFeedback();
-        closeSheet({ immediate: true });
-        state.reverseThreadId = stored.id;
-        state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
-        state.reverseBudget = Number(stored.budget) || state.reverseBudget;
-        state.reverseStyle = stored.style || state.reverseStyle;
-        navigate({ name: "reverse", id: stored.id });
-        break;
-      }
-
-      case "reverse-delete-thread": {
-        event.preventDefault();
-        const id = target.dataset.id || "";
-        if (!id) break;
-        deleteReverseThread(id);
-        if (state.reverseThreadId === id) {
-          state.reverseThread = [];
-          state.reverseThreadId = "";
-        }
-        renderHistoryContent();
-        toast("已删除这条寻词记录");
-        break;
-      }
-
-      case "clear-reverse-threads": {
-        event.preventDefault();
-        writeLocalJson(reverseThreadsKey(), {});
-        state.reverseThread = [];
-        state.reverseThreadId = "";
-        renderHistoryContent();
-        toast("已清空寻词记录");
         break;
       }
 
