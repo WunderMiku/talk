@@ -83,7 +83,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   const CONTENT = window.TALK_CONTENT;
   const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "299"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "300"; // cache-busting build, kept in step with ?v= and sw.js
   const actions = createActionRegistry();
 
   const app = document.getElementById("app");
@@ -1577,23 +1577,6 @@ import { applyInputMode, createHomeView } from "./views/home.js";
 
   function handleInput(event) {
     const target = event.target;
-    if (target.matches("[data-cache-setting]")) {
-      const key = target.dataset.cacheSetting;
-      let value = Number(target.value);
-      if (!Number.isFinite(value)) return;
-      if (key === "cacheMax") value = Math.max(10, Math.min(2000, Math.round(value)));
-      if (key === "cacheTtlDays") value = Math.max(1, Math.min(3650, Math.round(value)));
-      state.settings = { ...state.settings, [key]: value };
-      if (state.draft) state.draft[key] = value;
-      persistSettings(state.settings);
-      if (event.type === "change") {
-        void pruneWordCache().then(() => refreshCacheUi());
-      } else {
-        const estimate = $("#cache-estimate");
-        if (estimate) estimate.textContent = `按当前平均 ${formatBytes(wordCacheEstimate().average)}/词条估算，上限占用约 ${wordCacheEstimate().label}；语音缓存另计。`;
-      }
-      return;
-    }
     if (target.id === "word-cache-file") {
       const file = target.files?.[0];
       target.value = "";

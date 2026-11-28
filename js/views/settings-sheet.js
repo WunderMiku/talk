@@ -422,7 +422,7 @@ export function createSettingsSheet({
         </div>
       </div>
       <div class="cache-settings-summary">
-        <span><strong>${stats.count}</strong> / ${stats.max} 个词条</span>
+        <span><strong>${stats.count}</strong> 个词条 · 永久保留</span>
         <span>${formatBytes(stats.bytes)} · ${stats.backend}</span>
       </div>
       <p class="field-hint">句子分析缓存 ${sentenceCache.size} 条（按原文、深度、水平区分），可单独删除或整表清空。</p>

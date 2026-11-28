@@ -54,20 +54,6 @@ export function createWordCacheStore({
   const wordCache = new Map();
   const sentenceCache = new Map();
 
-  function cacheMax() {
-    const value = Number(state.settings?.cacheMax) || DEFAULT_CACHE_MAX;
-    return Math.max(10, Math.min(20000, Math.round(value)));
-  }
-
-  function cacheTtlDays() {
-    const value = Number(state.settings?.cacheTtlDays) || DEFAULT_CACHE_TTL_DAYS;
-    return Math.max(1, Math.min(3650, Math.round(value)));
-  }
-
-  function cacheTtlMs() {
-    return cacheTtlDays() * 86400000;
-  }
-
   function legacyWordCache() {
     try {
       const parsed = JSON.parse(localStorage.getItem(WORD_CACHE_KEY) || "{}");
@@ -79,8 +65,7 @@ export function createWordCacheStore({
 
   function persistFallbackWordCache() {
     const entries = [...wordCache.values()]
-      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
-      .slice(0, cacheMax());
+      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
     try {
       localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(Object.fromEntries(entries.map((item) => [item.key, item]))));
     } catch (_) {
@@ -97,16 +82,8 @@ export function createWordCacheStore({
     }
   }
 
-  async function pruneWordCache() {
-    const now = Date.now();
-    const entries = [...wordCache.entries()].sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
-    for (const [key, entry] of entries) {
-      if (now - Number(entry.at || 0) > cacheTtlMs()) await removeWordRecord(key);
-    }
-    for (const [key] of entries.slice(cacheMax())) {
-      if (wordCache.has(key)) await removeWordRecord(key);
-    }
-  }
+  // IndexedDB caches are unlimited and never auto-expire; users can clear manually.
+  async function pruneWordCache() {}
 
   async function initWordStore() {
     if (!window.idb?.openDB || !("indexedDB" in window)) {
@@ -156,7 +133,6 @@ export function createWordCacheStore({
       if (migrated) {
         try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
       }
-      await pruneWordCache();
     } catch (error) {
       console.warn("IndexedDB word store unavailable; using localStorage fallback.", error);
       wordStoreFallback = true;
@@ -172,12 +148,6 @@ export function createWordCacheStore({
     const hit = wordCache.get(key);
     if (!hit || !hit.data) return null;
     if (Number(hit.schema || 0) < WORD_CACHE_MIN_SCHEMA) {
-      void removeWordRecord(key);
-      return null;
-    }
-    // Detail is metadata only. A cached word is reusable across fast/standard/deep;
-    // the user can explicitly regenerate if a different depth is desired.
-    if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
       void removeWordRecord(key);
       return null;
     }
@@ -201,27 +171,13 @@ export function createWordCacheStore({
     } else if (wordStoreFallback) {
       persistFallbackWordCache();
     }
-    void pruneWordCache();
   }
 
   function cacheGetChunk(query) {
     const key = chunkCacheKey(query);
     const hit = wordCache.get(key);
     if (!hit?.data || hit.data.kind !== "chunk") return null;
-    if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
-      void removeWordRecord(key);
-      return null;
-    }
     return { ...ensureChunk(hit.data), cached: true };
-  }
-
-  async function pruneChunkCache() {
-    const chunks = [...wordCache.entries()]
-      .filter(([key]) => key.startsWith(CHUNK_CACHE_PREFIX))
-      .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
-    for (const [key] of chunks.slice(CHUNK_CACHE_LIMIT)) {
-      if (wordCache.has(key)) await removeWordRecord(key);
-    }
   }
 
   function cachePutChunk(query, data, detail = state.settings?.detailLevel || "standard") {
@@ -236,7 +192,6 @@ export function createWordCacheStore({
     } else if (wordStoreFallback) {
       persistFallbackWordCache();
     }
-    void pruneChunkCache();
   }
 
   async function sentenceKey(text, level, detail) {
@@ -258,10 +213,6 @@ export function createWordCacheStore({
   function cacheGetSentence(key) {
     const record = sentenceCache.get(key);
     if (!record || !(record.schema >= 1)) return null;
-    if (Date.now() - Number(record.savedAt || 0) > cacheTtlMs()) {
-      removeSentenceRecord(key);
-      return null;
-    }
     return record.data || null;
   }
 
@@ -270,13 +221,6 @@ export function createWordCacheStore({
     sentenceCache.set(key, record);
     if (wordDb) {
       wordDb.put(SENTENCE_DB_STORE, record).catch(() => {});
-    }
-    if (sentenceCache.size > SENTENCE_LIMIT) {
-      const ordered = [...sentenceCache.values()].sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
-      ordered.slice(0, sentenceCache.size - SENTENCE_LIMIT).forEach((entry) => {
-        sentenceCache.delete(entry.key);
-        if (wordDb) wordDb.delete(SENTENCE_DB_STORE, entry.key).catch(() => {});
-      });
     }
   }
 
@@ -349,9 +293,8 @@ export function createWordCacheStore({
   }
 
   function exportWordCache() {
-    const now = Date.now();
     const entries = [...wordCache.values()]
-      .filter((entry) => entry?.key && entry?.data && now - Number(entry.at || 0) <= cacheTtlMs())
+      .filter((entry) => entry?.key && entry?.data)
       .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
     if (!entries.length) {
       toast("还没有可导出的词条缓存");
@@ -378,7 +321,7 @@ export function createWordCacheStore({
 
   async function importWordCache(file) {
     if (!file) return;
-    if (file.size > 8 * 1024 * 1024) throw new Error("缓存文件超过 8MB");
+    if (file.size > 200 * 1024 * 1024) throw new Error("缓存文件超过 200MB");
     const text = await file.text();
     const parsed = JSON.parse(text);
     const entries = Array.isArray(parsed) ? parsed : parsed?.entries;
@@ -409,14 +352,12 @@ export function createWordCacheStore({
   }
 
   function wordCacheStats() {
-    const now = Date.now();
     const entries = [...wordCache.values()]
-      .filter((entry) => entry?.key && entry?.data && now - Number(entry.at || 0) <= cacheTtlMs())
+      .filter((entry) => entry?.key && entry?.data)
       .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
     return {
       count: entries.length,
-      max: cacheMax(),
-      ttlDays: cacheTtlDays(),
+      unlimited: true,
       bytes: entries.reduce((sum, entry) => sum + cacheRecordBytes(entry), 0),
       backend: wordDb ? "IndexedDB" : "localStorage",
       fallback: wordStoreFallback,
@@ -433,8 +374,7 @@ export function createWordCacheStore({
   function wordCacheEstimate() {
     const stats = wordCacheStats();
     const average = stats.count ? stats.bytes / stats.count : 2600;
-    const bytes = Math.round(average * stats.max);
-    return { average, bytes, label: formatBytes(bytes) };
+    return { average, bytes: stats.bytes, label: formatBytes(stats.bytes) };
   }
 
   return {

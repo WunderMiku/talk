@@ -231,7 +231,6 @@ export function createSheetController({
     const quotaEst = getStorageEstimate ? await getStorageEstimate() : { usage: 0, quota: 0, persisted: false };
     if (!holder.isConnected) return;
     const estimate = wordCacheEstimate();
-    const percent = Math.min(100, words.max ? (words.count / words.max) * 100 : 0);
     const totalBytes = words.bytes + audio.bytes;
     const recent = words.entries.slice(0, 24);
     const quotaText = quotaEst.quota > 0
@@ -243,8 +242,8 @@ export function createSheetController({
         <div class="cache-summary-grid">
           <div class="cache-summary-card">
             <span class="cache-summary-label">词条</span>
-            <strong>${words.count}<small> / ${words.max}</small></strong>
-            <span>${formatBytes(words.bytes)} · ${words.ttlDays} 天</span>
+            <strong>${words.count}</strong>
+            <span>${formatBytes(words.bytes)} · 永久保留</span>
           </div>
           <div class="cache-summary-card">
             <span class="cache-summary-label">语音</span>
@@ -257,18 +256,7 @@ export function createSheetController({
             <span>${words.backend}</span>
           </div>
         </div>
-        <div class="cache-meter" aria-label="词条缓存占用 ${percent.toFixed(0)}%">
-          <span style="width:${percent}%"></span>
-        </div>
-        <div class="cache-limit-grid">
-          <label>词条上限
-            <input type="number" min="10" max="20000" step="10" value="${words.max}" data-cache-setting="cacheMax" inputmode="numeric" />
-          </label>
-          <label>保留天数
-            <input type="number" min="1" max="3650" step="1" value="${words.ttlDays}" data-cache-setting="cacheTtlDays" inputmode="numeric" />
-          </label>
-        </div>
-        <p class="cache-estimate" id="cache-estimate">按当前平均 ${formatBytes(estimate.average)}/词条估算，上限占用约 <strong>${estimate.label}</strong>。</p>
+        <p class="cache-estimate" id="cache-estimate">平均 ${formatBytes(estimate.average)}/词条 · 词条、句子、寻词、翻译与精读均不限数量与时长，仅在手动清空时删除。</p>
         <div class="cache-list-head">
           <span class="settings-subhead">已缓存词条</span>
           <span class="mono">${words.count} 条</span>

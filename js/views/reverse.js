@@ -11,9 +11,6 @@ import {
   markdownLite
 } from "../model/markdown.js";
 
-const REVERSE_THREAD_LIMIT = 200;
-const REVERSE_FIRST_LIMIT = 200;
-
 function readLocalJson(key, fallback) {
   try {
     const raw = localStorage.getItem(key);
@@ -71,7 +68,7 @@ export function createReverseView({
   function saveReverseThreads(map) {
     const entries = Object.values(map).sort((a, b) => Number(b.updatedAt || 0) - Number(a.updatedAt || 0));
     const kept = {};
-    entries.slice(0, REVERSE_THREAD_LIMIT).forEach((entry) => { kept[entry.id] = entry; });
+    entries.forEach((entry) => { if (entry?.id) kept[entry.id] = entry; });
     kvSet(reverseThreadsKey(), kept);
   }
 
@@ -133,8 +130,7 @@ export function createReverseView({
   function cachePutReverseFirst(text, data) {
     const map = readStoreMap(reverseFirstKey());
     map[reverseIdFor(text)] = { ...data, at: Date.now() };
-    const entries = Object.entries(map).sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0));
-    kvSet(reverseFirstKey(), Object.fromEntries(entries.slice(0, REVERSE_FIRST_LIMIT)));
+    kvSet(reverseFirstKey(), map);
   }
 
   function reverseSuggestions() {

@@ -6,9 +6,6 @@ import { $, $$, esc, attr, shorten, detectSourceLanguage, copyText } from "../co
 import { icon } from "../core/icons.js";
 import { diagLog } from "../core/diagnostics.js";
 
-const TRANSLATION_CACHE_MAX = 200;
-const TRANSLATION_CACHE_TTL = 30 * 86400000;
-
 function readLocalCache(key, fallback) {
   try {
     const parsed = JSON.parse(localStorage.getItem(key) || "null");
@@ -103,17 +100,14 @@ export function createTranslatorView({
 
   function translationCacheGet(text) {
     const entry = translationCacheAll()[text];
-    if (!entry?.result || Date.now() - Number(entry.at || 0) > TRANSLATION_CACHE_TTL) return null;
+    if (!entry?.result) return null;
     return { ...entry.result, cached: true };
   }
 
   function translationCachePut(text, result) {
     const all = translationCacheAll();
     all[text] = { at: Date.now(), result };
-    const entries = Object.entries(all)
-      .sort((a, b) => Number(b[1]?.at || 0) - Number(a[1]?.at || 0))
-      .slice(0, TRANSLATION_CACHE_MAX);
-    kvSet(translationCacheKey(), Object.fromEntries(entries));
+    kvSet(translationCacheKey(), all);
   }
 
   function translatorEmptyHtml() {

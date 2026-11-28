@@ -314,13 +314,6 @@ A more mature generation of tools will learn when to get out of the way—and wh
     if (!db) return;
     try {
       await db.put("docs", record);
-      const all = await db.getAll("docs");
-      if (all.length > MAX_DOCS) {
-        all.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
-        for (const old of all.slice(0, all.length - MAX_DOCS)) {
-          await db.delete("docs", old.docHash);
-        }
-      }
     } catch (_) {}
   }
 
@@ -556,7 +549,7 @@ A more mature generation of tools will learn when to get out of the way—and wh
             ${readerState.recentDocs.length > 1 ? `<button type="button" class="reader-recent-clear" data-reader-action="clear-recent">清空</button>` : ""}
           </div>
           <div class="reader-recent-list">
-            ${readerState.recentDocs.slice(0, 12).map((d) => `
+            ${readerState.recentDocs.map((d) => `
               <div class="reader-recent-row">
                 <button type="button" class="reader-recent-item" data-reader-action="open-recent" data-doc-hash="${esc(d.docHash)}">
                   <span class="reader-recent-title">${esc(d.overview?.titleZh || d.title)}</span>
