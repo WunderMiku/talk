@@ -8,65 +8,50 @@ import {
   $$,
   esc,
   attr,
-  rich,
   shorten,
   sanitizeQuery,
   normalizeWord,
   normalizeSentence,
-  normalizeChunk,
   chunkSlug,
   chunkFromSlug,
-  hasCJK,
-  detectSourceLanguage,
   hashText,
-  countWords,
   detectParadigm,
-  detectType,
-  escapeRegExp,
   wait,
   tapFeedback,
-  blockHead,
-  letterTitle,
-  highlightPlain,
-  timeAgo,
   titleCase,
-  registerLabel,
-  posAbbr,
-  posLabel,
-  tagLabel,
-  asArray,
-  normalizeStrings,
-  secureRemoteUrl,
   copyText
 } from "./core/utils.js";
 import { icon } from "./core/icons.js";
-import {
-  DIAG_KEY,
-  diagLog,
-  formatDiagText,
-  installGlobalErrorLogging
-} from "./core/diagnostics.js";
+import { formatDiagText, installGlobalErrorLogging } from "./core/diagnostics.js";
 import { createActionRegistry } from "./core/actions.js";
 import {
-  SEAL_PREFIX,
-  canSeal,
-  sealText,
-  unlockSettingsKeys
-} from "./storage/vault.js";
-import { streamPreviewFromJson } from "./model/stream-preview.js";
+  SENTENCE_LEVELS,
+  DETAIL_LEVELS,
+  CUSTOM_TEMPLATE,
+  PROVIDER_TEMPLATES,
+  sentenceLevelOf,
+  applyProfileToSettings,
+  sanitizeHistory,
+  exampleStyleOverrides,
+  exampleStyleFor,
+  saveExampleStyles,
+  exampleForTheme,
+  themesMissingExamples,
+  createSettingsStore
+} from "./storage/settings.js";
 import {
-  isHallucinatedWord,
-  normalizeExamplesByTheme,
-  splitSentences,
-  alignSentenceParts,
-  normalizeModelWord,
-  normalizeModelSentence,
-  ensureWord,
-  ensureChunk,
-  ensureSentence
-} from "./model/normalize.js";
+  PREFETCH_LIMIT,
+  formatBytes,
+  chunkCacheKey,
+  createWordCacheStore
+} from "./storage/word-cache.js";
+import { ensureWord, ensureChunk, ensureSentence } from "./model/normalize.js";
 import {
-  isQwenProfile,
+  MODEL_TIMEOUT_MS,
+  MODEL_TIMEOUT_TEXT,
+  createLookupService
+} from "./model/lookup.js";
+import {
   qwenTtsProfile,
   qwenTtsEndpoint,
   createTtsController
@@ -79,10 +64,11 @@ import { createWordView } from "./views/word.js";
 import { createChunkView } from "./views/chunk.js";
 import { createSentenceView } from "./views/sentence.js";
 import { createReverseView } from "./views/reverse.js";
-import { uniqueWords, createLayerController } from "./views/layers.js";
+import { createLayerController } from "./views/layers.js";
 import { createSheetController } from "./views/sheets.js";
 import { createSettingsSheet } from "./views/settings-sheet.js";
 import { createHistorySheet } from "./views/history-sheet.js";
+import { applyInputMode, createHomeView } from "./views/home.js";
 
 (() => {
   "use strict";
@@ -94,13 +80,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
   const APP_BUILD = "295"; // cache-busting build, kept in step with ?v= and sw.js
   const actions = createActionRegistry();
 
-  function copyFor(section) {
-    const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
-    const base = CONTENT[section] || {};
-    const key = theme.copyKey || theme.id;
-    const override = CONTENT.themeCopy?.[key]?.[section];
-    return override ? { ...base, ...override } : base;
-  }
   const app = document.getElementById("app");
   const screen = document.getElementById("screen");
   const layerRoot = document.getElementById("layer-root");
@@ -110,23 +89,35 @@ import { createHistorySheet } from "./views/history-sheet.js";
   const toastEl = document.getElementById("toast");
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const isDesktop = () => window.matchMedia("(min-width: 861px)").matches;
+  const usableApiKey = (value) => LLM.usableApiKey(value);
 
-  const CONFIG_KEY = "talk.model.v1";
-  const PREFERENCES_KEY = "talk.prefs.v1";
-  const PREFERENCE_FIELDS = ["prefetch", "cacheDisplay", "ttsEngine", "qwenTtsModel", "qwenTtsVoice", "detailLevel", "cacheMax", "cacheTtlDays", "sentenceLevel", "foldMode", "showGenMeta", "reverseMaxTokens"];
-  const EXAMPLE_STYLE_KEY = "talk.exampleStyles.v1";
-  // One table drives the prompt, the settings picker and the on-page slicing.
-  const SENTENCE_LEVELS = [
-    { id: "zhongkao", label: "中考", maxKeyWords: 3, hint: "基础词与固定搭配优先" },
-    { id: "gaokao", label: "高考", maxKeyWords: 4, hint: "常见高频词与基本句型" },
-    { id: "cet4", label: "CET-4", maxKeyWords: 5, hint: "四级核心词与常见从句" },
-    { id: "cet6", label: "CET-6", maxKeyWords: 6, hint: "六级词与复杂修饰" },
-    { id: "kaoyan", label: "考研", maxKeyWords: 7, hint: "考研长难句与学术表达" },
-    { id: "ielts", label: "雅思", maxKeyWords: 7, hint: "雅思阅读句式与同义替换" },
-    { id: "toefl", label: "托福", maxKeyWords: 8, hint: "托福学术句与抽象概念" }
-  ];
-  const SENTENCE_LEVEL_DEFAULT = "gaokao";
+  installGlobalErrorLogging();
+
+  function copyFor(section) {
+    const theme = window.TALK_THEME?.current?.() || { id: "paper", copyKey: null };
+    const base = CONTENT[section] || {};
+    const key = theme.copyKey || theme.id;
+    const override = CONTENT.themeCopy?.[key]?.[section];
+    return override ? { ...base, ...override } : base;
+  }
+
+  function uiLang() {
+    return window.TALK_I18N?.lang === "en" ? "en" : "zh";
+  }
+
+  function langSuffix() {
+    return uiLang() === "en" ? "::en" : "";
+  }
+
+  function englishDirective() {
+    if (uiLang() !== "en") return "";
+    return "\n\nIMPORTANT: The interface language is English. Write every human-readable string in English — translation, note, memory, zh, gloss, why, tag, summary, verdict, tone, structure, examples[].zh. Never contain Chinese characters. Keep JSON keys, English words, phonetics and pos abbreviations unchanged.";
+  }
+
+  function reverseIdFor(text) {
+    return `r${hashText(normalizeSentence(text))}${uiLang() === "en" ? "e" : ""}`;
+  }
+
   function diagText() {
     return formatDiagText({
       version: APP_VERSION,
@@ -135,313 +126,21 @@ import { createHistorySheet } from "./views/history-sheet.js";
       lastModelRaw: state.lastModelRaw
     });
   }
-  installGlobalErrorLogging();
 
-  // Sentences now carry a summary, a parse tree and level-tagged key words,
-  // which no longer fits in the old per-detail ceiling.
-  const SENTENCE_MAX_TOKENS = { fast: 6000, standard: 12000, deep: 20000 };
-  // The depth option shapes the prompt; these ceilings only stop a runaway reply.
-  const SENTENCE_DEPTH_BRIEF = {
-    fast: "需要多少写多少即可，但偏向精简：tree 一般 3–5 个节点，重点词 2–4 个，每层解释一句话。",
-    standard: "按内容需要完整展开：tree 一般 6–9 个节点，重点词按等级上限，解释具体但不铺陈。",
-    deep: "尽量讲透：tree 可到 12–14 个节点，重点词到上限，补语域、易错点与阅读提示，但不要重复。"
-  };
-  // Single source for the model-request deadline; error copy derives from it.
-  const MODEL_TIMEOUT_MS = 180_000;
-  const MODEL_TIMEOUT_TEXT = `请求超过 ${MODEL_TIMEOUT_MS / 1000} 秒`;
-  const HISTORY_KEY = "talk.history.v1";
-  const SAVED_KEY = "talk.saved.v1";
-  // Bumped when the shape of a cached entry changes (POS spelled out, English
-  // glosses, ...). Older records are ignored and quietly replaced on the next
-  // lookup, so nobody keeps reading a stale mix of Chinese and English.
-  // Bumped when the stored shape grows, never to invalidate old entries:
-  // schema 2 payloads stay readable and are upgraded in place on next write.
-  const WORD_CACHE_SCHEMA = 3;
-  const WORD_CACHE_MIN_SCHEMA = 2;
-  const REVERSE_KEY = "talk.reverse.v1";
-  const REVERSE_LIMIT = 20;
-  const REVERSE_TTL = 7 * 24 * 60 * 60 * 1000;
-  const WORD_CACHE_KEY = "talk.wordcache.v1";
-  const WORD_DB_NAME = "talk.words.v1";
-  const WORD_DB_STORE = "entries";
-  const SENTENCE_DB_STORE = "sentences";
-  const SENTENCE_CACHE_SCHEMA = 2;
-  const SENTENCE_LIMIT = 120;
-  const sentenceCache = new Map();
-  const DEFAULT_CACHE_MAX = 300;
-  const PREFETCH_LIMIT = 4;
-  const DEFAULT_CACHE_TTL_DAYS = 90;
-  let wordDb = null;
-  let wordStoreFallback = false;
-  const wordCache = new Map();
-
-  let storedKeysPlain = false;
-  let storageChain = Promise.resolve();
-
-  function unlockStoredKeys() {
-    return unlockSettingsKeys(state.settings, activeProfile);
+  function updateScrollLock() {
+    if (!screen) return;
+    screen.classList.toggle("is-locked", state.sheetOpen || state.workspaceOpen || state.wordLayers.length > 0);
   }
 
-  // A still-sealed key means unsealing failed (e.g. no WebCrypto here).
-  // Never send the ciphertext as a credential; ask the user to re-enter it.
-  const usableApiKey = (value) => LLM.usableApiKey(value);
-
-  const DEFAULT_SETTINGS = {
-    provider: "deepseek",
-    baseUrl: "https://api.deepseek.com",
-    model: "deepseek-chat",
-    apiKey: "",
-    enableThinking: false,
-    thinkingBudget: 0,
-    remember: false,
-    prefetch: false,
-    cacheDisplay: "borders",
-    detailLevel: "standard",
-    ttsEngine: "native",
-    qwenTtsModel: "qwen-audio-3.1-tts-plus",
-    qwenTtsVoice: "longanhuan_v3.1",
-    showGenMeta: true,
-    reverseMaxTokens: 1500
-  };
-
-  const DETAIL_LEVELS = {
-    fast: {
-      label: "快速",
-      maxTokens: 1200,
-      senses: 1,
-      family: 2,
-      synonyms: 2,
-      antonyms: 1,
-      examples: 1,
-      collocations: 2,
-      stages: 2,
-      keyWords: 3
-    },
-    standard: {
-      label: "标准",
-      maxTokens: 2200,
-      senses: 2,
-      family: 3,
-      synonyms: 3,
-      antonyms: 2,
-      examples: 2,
-      collocations: 4,
-      stages: 3,
-      keyWords: 4
-    },
-    deep: {
-      label: "深入",
-      maxTokens: 3200,
-      senses: 3,
-      family: 4,
-      synonyms: 4,
-      antonyms: 3,
-      examples: 3,
-      collocations: 5,
-      stages: 4,
-      keyWords: 5
-    }
-  };
-
-  const PROVIDERS = {
-    deepseek: { baseUrl: "https://api.deepseek.com", model: "deepseek-chat" },
-    openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-    google: { baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-3.6-flash" },
-    custom: { baseUrl: "", model: "" }
-  };
-
-  const MODEL_PRESETS = [
-    {
-      id: "deepseek",
-      name: "DeepSeek",
-      provider: "deepseek",
-      baseUrl: "https://api.deepseek.com",
-      model: "deepseek-chat",
-      protocol: "openai",
-      note: "OpenAI 兼容；浏览器直连 CORS 可用。"
-    },
-    {
-      id: "openai",
-      name: "OpenAI",
-      provider: "openai",
-      baseUrl: "https://api.openai.com/v1",
-      model: "gpt-4o-mini",
-      protocol: "openai",
-      note: "OpenAI 官方接口；浏览器直连可能受 CORS 限制。"
-    },
-    {
-      id: "google",
-      name: "Google Gemini",
-      provider: "google",
-      baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-      model: "gemini-3.6-flash",
-      protocol: "google",
-      note: "Google AI Studio 原生接口（generateContent）；模型名可改，例如 gemini-2.5-flash。"
-    },
-    {
-      id: "qwen",
-      name: "Qwen",
-      provider: "custom",
-      baseUrl: "https://cn-beijing.maas.qianwenaiapi.com/compatible-mode/v1",
-      model: "qwen3.7-flash",
-      note: "Qwen3.7 Flash 混合思考模型；默认关闭思考以降低延迟，可在下方单独调整。",
-      thinkingCapable: true,
-      enableThinking: false,
-      thinkingBudget: 0
-    },
-    {
-      id: "kimi",
-      name: "Kimi",
-      provider: "custom",
-      baseUrl: "https://api.moonshot.cn/v1",
-      model: "moonshot-v1-8k",
-      note: "Moonshot 开放平台；浏览器直连可能受 CORS 限制。"
-    },
-    {
-      id: "glm",
-      name: "GLM",
-      provider: "custom",
-      baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-      model: "glm-4-flash",
-      note: "智谱开放平台；浏览器直连可能受 CORS 限制。"
-    },
-    {
-      id: "openrouter",
-      name: "OpenRouter",
-      provider: "custom",
-      baseUrl: "https://openrouter.ai/api/v1",
-      model: "anthropic/claude-3.5-sonnet",
-      note: "OpenRouter 可转接 Claude 等多种模型。"
-    },
-    {
-      id: "claude",
-      name: "Claude",
-      provider: "custom",
-      baseUrl: "",
-      model: "claude-sonnet-4-5",
-      note: "Anthropic 原生协议不是 OpenAI 格式；请填写兼容代理地址。"
-    },
-    {
-      id: "custom",
-      name: "自定义",
-      provider: "custom",
-      baseUrl: "",
-      model: "",
-      note: "任意 OpenAI 兼容服务。"
-    }
-  ];
-  const CUSTOM_TEMPLATE = {
-    id: "custom",
-    name: "自定义（OpenAI 兼容）",
-    provider: "custom",
-    protocol: "openai",
-    baseUrl: "",
-    model: "",
-    note: "任何兼容 /chat/completions 的服务：填地址、模型名和密钥即可。"
-  };
-
-  const PROVIDER_TEMPLATES = [...MODEL_PRESETS, CUSTOM_TEMPLATE];
-
-
-  function defaultModelProfiles() {
-    return [];
-  }
-
-  function legacyModelProfiles(parsed = {}) {
-    const baseUrl = String(parsed.baseUrl || "").trim();
-    const model = String(parsed.model || "").trim();
-    const apiKey = String(parsed.apiKey || "");
-    if (!baseUrl && !model && !apiKey) return { profiles: [], activeProfileId: "" };
-    return {
-      profiles: [{
-        id: "legacy-custom",
-        name: "我的配置",
-        provider: parsed.provider || "custom",
-        protocol: String(baseUrl).includes("generativelanguage") ? "google" : "openai",
-        baseUrl,
-        model,
-        apiKey,
-        note: "从旧版单配置迁移而来。"
-      }],
-      activeProfileId: "legacy-custom"
-    };
-  }
-
-  function normalizeModelProfiles(raw, parsed = {}) {
-    if (!Array.isArray(raw) || !raw.length) return legacyModelProfiles(parsed);
-    const profiles = raw.map((profile, index) => {
-      const id = String(profile.id || `profile-${index + 1}`);
-      const isQwen = id === "qwen";
-      const oldQwen = isQwen && String(profile.baseUrl || "").includes("dashscope.aliyuncs.com") && profile.model === "qwen-plus";
-      const preset = MODEL_PRESETS.find((item) => item.id === id);
-      return {
-        id,
-        name: String(profile.name || `模型 ${index + 1}`),
-        provider: String(profile.provider || "custom"),
-        baseUrl: oldQwen ? preset.baseUrl : String(profile.baseUrl || ""),
-        model: oldQwen ? preset.model : String(profile.model || ""),
-        apiKey: String(profile.apiKey || ""),
-        note: String(profile.note || (oldQwen ? preset.note : "")),
-        protocol: String(profile.protocol || (String(profile.baseUrl || "").includes("generativelanguage") ? "google" : "openai")),
-        templateId: String(profile.templateId || (profile.baseUrl ? "" : "custom")),
-        thinkingCapable: Boolean(profile.thinkingCapable) || isQwen,
-        enableThinking: Boolean(profile.enableThinking),
-        thinkingBudget: Math.max(0, Math.min(262144, Number(profile.thinkingBudget) || 0))
-      };
-    });
-    const active = String(parsed.activeProfileId || profiles[0]?.id || "");
-    const kept = profiles.filter((profile) => {
-      const preset = MODEL_PRESETS.some((item) => item.id === profile.id);
-      if (!preset) return true;
-      if (profile.id === active) return true;
-      return Boolean(String(profile.apiKey || "").trim());
-    });
-    return { profiles: kept, activeProfileId: kept.some((item) => item.id === active) ? active : (kept[0]?.id || "") };
-  }
-
-  const activeProfile = (settings) => LLM.activeProfile(settings);
-  const profileSupportsThinking = (profile) => LLM.profileSupportsThinking(profile);
-
-  function applyProfileToSettings(settings, profile) {
-    if (!profile) return settings;
-    return {
-      ...settings,
-      provider: profile.provider || "custom",
-      baseUrl: profile.baseUrl || "",
-      model: profile.model || "",
-      apiKey: profile.apiKey || "",
-      enableThinking: Boolean(profile.enableThinking),
-      thinkingBudget: Number(profile.thinkingBudget) || 0,
-      activeProfileId: profile.id
-    };
-  }
-
-  function syncDraftProfile(draft) {
-    if (!draft?.profiles?.length) return;
-    const profile = activeProfile(draft);
-    if (!profile) return;
-    profile.provider = draft.provider || profile.provider || "custom";
-    profile.protocol = profile.protocol || (String(profile.provider).toLowerCase() === "google" ? "google" : "openai");
-    profile.baseUrl = String(draft.baseUrl || "");
-    profile.model = String(draft.model || "");
-    profile.apiKey = String(draft.apiKey || "");
-    profile.enableThinking = Boolean(draft.enableThinking);
-    profile.thinkingBudget = Math.max(0, Math.min(262144, Number(draft.thinkingBudget) || 0));
-  }
-
-  const wordRequests = new Map();
-  const wordPreviewListeners = new Map();
-  let prefetchToken = 0;
   let suppressNextPopstate = false;
-
   let activeViewTransition = null;
   let queuedRender = null;
 
   const state = {
     mode: "auto",
-    settings: loadSettings(),
-    history: loadHistory(),
-    saved: loadSaved(),
+    settings: null,
+    history: [],
+    saved: [],
     route: { name: "home" },
     sheetOpen: false,
     sheetStack: [],
@@ -475,12 +174,115 @@ import { createHistorySheet } from "./views/history-sheet.js";
     installPrompt: null
   };
 
+  /* ============================================================
+     Stores, services & view controllers
+     ============================================================ */
+
+  const settingsStore = createSettingsStore({ state, data: DATA, llm: LLM, toast });
+  const {
+    activeProfile,
+    profileSupportsThinking,
+    syncDraftProfile,
+    loadSettings,
+    persistSettings,
+    unlockStoredKeys,
+    hadPlainKeys,
+    hasModelConfig,
+    loadHistory,
+    persistHistory,
+    addHistory,
+    loadSaved,
+    persistSaved,
+    syncSavedFromWordbooks,
+    parseSavedEntry,
+    findSavedIndex,
+    isSavedKey
+  } = settingsStore;
+
+  state.settings = loadSettings();
+  state.history = loadHistory();
+  state.saved = loadSaved();
+
+  const cacheStore = createWordCacheStore({
+    state,
+    data: DATA,
+    appEl: app,
+    cacheCornerEl: cacheCorner,
+    uiLang,
+    langSuffix,
+    renderCacheContent: () => sheets.renderCacheContent(),
+    toast
+  });
+  const {
+    sentenceCache,
+    initWordStore,
+    removeWordRecord,
+    deleteWordCacheFor,
+    pruneWordCache,
+    clearWordStore,
+    sentenceKey,
+    cacheGetSentence,
+    cachePutSentence,
+    removeSentenceRecord,
+    clearSentenceCache,
+    cacheGetWord,
+    cachePutWord,
+    cacheGetChunk,
+    cachePutChunk,
+    exportWordCache,
+    importWordCache,
+    wordCacheStats,
+    wordCacheEstimate,
+    applyCacheDisplay,
+    refreshCacheBorders,
+    updateCacheCorner,
+    hideCacheCorner
+  } = cacheStore;
+
+  const lookup = createLookupService({
+    state,
+    data: DATA,
+    llm: LLM,
+    englishDirective,
+    reverseIdFor,
+    sentenceLevelOf,
+    exampleStyleFor,
+    themesMissingExamples,
+    hasModelConfig,
+    cacheGetWord,
+    cachePutWord,
+    cacheGetChunk,
+    cachePutChunk,
+    cacheGetSentence,
+    cachePutSentence,
+    sentenceKey,
+    cacheGetReverseFirst: (...args) => reverseView.cacheGetReverseFirst(...args),
+    updateReverseStream: (...args) => reverseView.updateReverseStream(...args),
+    updateExamplesBlock: (...args) => wordView.updateExamplesBlock(...args),
+    refreshCacheBorders,
+    updateCacheCorner,
+    hideCacheCorner
+  });
+  const {
+    reverseBudget,
+    reverseZoneName,
+    reverseStyleName,
+    modelLookup,
+    lookupWordDeduped,
+    schedulePrefetch,
+    cancelPrefetch,
+    scheduleThemeExamples,
+    fillThemeExamples,
+    updateStreamPreview,
+    callWordbookAi
+  } = lookup;
+
   const tts = createTtsController({
     state,
     usableApiKey,
     toast
   });
-  const { stopSpeech, getAudioStats, clearAudioCache, refreshTtsError, speakText, testTts } = tts;
+  const { getAudioStats, clearAudioCache, refreshTtsError, speakText } = tts;
 
   const sheets = createSheetController({
     state,
@@ -502,7 +304,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
     schedulePrefetch,
     toast
   });
-  const { openSheetShell, closeSheet, renderCacheContent, refreshCacheUi } = sheets;
+  const { openSheetShell, closeSheet, refreshCacheUi } = sheets;
 
   const share = createShareController({
     state,
@@ -512,7 +314,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     openSheetShell,
     toast
   });
-  const { openShareSheet, renderShareChooser, renderSharePreview } = share;
 
   const themeSalon = createThemeSalon({
     state,
@@ -530,10 +331,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
     initThemeStore,
     currentThemeDeck,
     themeSalonMarkup,
-    renderThemeSalon,
-    renderThemeCacheStats,
-    themeCacheStats,
-    clearThemeStore
+    renderThemeCacheStats
   } = themeSalon;
 
   const translator = createTranslatorView({
@@ -577,7 +375,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
     navigate,
     toast
   });
-  const { loadingBody, loadingPage, missPage, errorPage, hasDemo } = statusViews;
+  const { loadingBody, loadingPage, missPage, errorPage } = statusViews;
 
   const wordView = createWordView({
     state,
@@ -606,7 +404,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
     goBack,
     toast
   });
-  const { moveWordPos, updateExamplesBlock, wordPage } = wordView;
+  const { moveWordPos, wordPage } = wordView;
 
   const chunkView = createChunkView({
     state,
@@ -667,9 +465,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
   const {
     loadReverseThread,
     listReverseThreads,
-    cacheGetReverseFirst,
     reversePage,
-    updateReverseStream,
     startReverse,
     submitReverseComposer,
     gotoReverseAnchor
@@ -781,6 +577,17 @@ import { createHistorySheet } from "./views/history-sheet.js";
   });
   const { openHistorySheet, isTermLocallyCached, updateWordbookImportHint } = historySheet;
 
+  const homeView = createHomeView({
+    state,
+    data: DATA,
+    copyFor,
+    sanitizeHistory,
+    homeTopbar,
+    themeSalonMarkup,
+    currentThemeDeck
+  });
+  const { renderMoods, homePage } = homeView;
+
   actions.register({
     ...tts.actions,
     ...sheets.actions,
@@ -876,732 +683,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     }
   });
 
-  function updateScrollLock() {
-    if (!screen) return;
-    screen.classList.toggle("is-locked", state.sheetOpen || state.workspaceOpen || state.wordLayers.length > 0);
-  }
-
-  /* ============================================================
-     Small app-scoped helpers
-     ============================================================ */
-
-  function chunkCacheKey(value) {
-    return CHUNK_CACHE_PREFIX + normalizeChunk(value);
-  }
-
-  function reverseIdFor(text) {
-    return `r${hashText(normalizeSentence(text))}${uiLang() === "en" ? "e" : ""}`;
-  }
-
-  /* ============================================================
-     Persistence
-     ============================================================ */
-
-  function loadSettings() {
-    const fallback = { ...DEFAULT_SETTINGS };
-    let preferences = {};
-    let parsed = {};
-    try {
-      const rawPrefs = localStorage.getItem(PREFERENCES_KEY);
-      if (rawPrefs) {
-        const value = JSON.parse(rawPrefs);
-        if (value && typeof value === "object") preferences = value;
-      }
-    } catch (_) { /* no-op */ }
-    try {
-      const raw = localStorage.getItem(CONFIG_KEY) || sessionStorage.getItem(CONFIG_KEY);
-      if (raw) {
-        const value = JSON.parse(raw);
-        if (value && typeof value === "object") parsed = value;
-      }
-    } catch (_) { /* no-op */ }
-
-    const normalized = normalizeModelProfiles(parsed.profiles, parsed);
-    const activeKeys = [parsed.apiKey, ...(normalized.profiles || []).map((profile) => profile.apiKey)];
-    storedKeysPlain = activeKeys.some(
-      (value) => typeof value === "string" && value.trim() && !value.startsWith(SEAL_PREFIX)
-    );
-    const selected = normalized.profiles.find((profile) => profile.id === normalized.activeProfileId) || normalized.profiles[0];
-    return applyProfileToSettings({
-      ...fallback,
-      ...preferences,
-      ...parsed,
-      prefetch: Boolean(preferences.prefetch || parsed.prefetch),
-      remember: Boolean(parsed.remember),
-      ttsEngine: preferences.ttsEngine || parsed.ttsEngine || "native",
-      detailLevel: preferences.detailLevel || parsed.detailLevel || "standard",
-      cacheMax: Number(preferences.cacheMax || parsed.cacheMax || DEFAULT_CACHE_MAX),
-      cacheTtlDays: Number(preferences.cacheTtlDays || parsed.cacheTtlDays || DEFAULT_CACHE_TTL_DAYS),
-      qwenTtsModel: preferences.qwenTtsModel || parsed.qwenTtsModel || "qwen-audio-3.1-tts-plus",
-      qwenTtsVoice: preferences.qwenTtsVoice || parsed.qwenTtsVoice || "longanhuan_v3.1",
-      enableThinking: Boolean(selected?.enableThinking),
-      thinkingBudget: Number(selected?.thinkingBudget) || 0,
-      profiles: normalized.profiles,
-      activeProfileId: selected?.id || ""
-    }, selected);
-  }
-
-  function persistSettings(settings) {
-    const active = activeProfile(settings);
-    if (active) {
-      active.baseUrl = String(settings.baseUrl || "");
-      active.model = String(settings.model || "");
-      active.apiKey = String(settings.apiKey || "");
-      active.provider = String(settings.provider || active.provider || "custom");
-    }
-    const raw = JSON.parse(JSON.stringify(settings));
-    storageChain = storageChain
-      .then(async () => {
-        await sealSettingsSnapshot(raw);
-        const payload = JSON.stringify(raw);
-        try { sessionStorage.setItem(CONFIG_KEY, payload); } catch (_) { /* no-op */ }
-        try {
-          if (raw.remember) localStorage.setItem(CONFIG_KEY, payload);
-          else localStorage.removeItem(CONFIG_KEY);
-        } catch (_) { /* no-op */ }
-        try {
-          const preferences = {};
-          for (const key of PREFERENCE_FIELDS) preferences[key] = settings[key];
-          localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
-        } catch (_) { /* no-op */ }
-      })
-      .catch((error) => console.warn("Could not save settings.", error));
-    return storageChain;
-  }
-
-  let plainKeyDropWarned = false;
-
-  async function sealSettingsSnapshot(snapshot) {
-    const sealKey = async (value) => {
-      const text = String(value || "");
-      if (!text || text.startsWith(SEAL_PREFIX)) return text;
-      const sealed = canSeal() ? await sealText(text) : text;
-      if (sealed.startsWith(SEAL_PREFIX)) return sealed;
-      // Cannot encrypt here: keep the key in memory for this session only,
-      // never write it to localStorage/sessionStorage in plain text.
-      if (!plainKeyDropWarned) {
-        plainKeyDropWarned = true;
-        toast("当前环境无法加密存储，密钥仅保留在本次会话");
-      }
-      return "";
-    };
-    snapshot.apiKey = await sealKey(snapshot.apiKey);
-    for (const profile of snapshot.profiles || []) {
-      profile.apiKey = await sealKey(profile.apiKey);
-    }
-    return snapshot;
-  }
-
-  function loadHistory() {
-    try {
-      const raw = localStorage.getItem(HISTORY_KEY);
-      if (!raw) return sanitizeHistory(DATA.recent);
-      const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return sanitizeHistory(DATA.recent);
-      return sanitizeHistory(parsed);
-    } catch (_) {
-      return sanitizeHistory(DATA.recent);
-    }
-  }
-
-  function sanitizeHistory(items) {
-    return items
-      .filter((item) => item && ["word", "chunk", "sentence", "translation"].includes(item.type) && item.query)
-      .map((item) => ({
-        type: item.type,
-        query: String(item.query),
-        at: Number(item.at) || 0
-      }))
-      .slice(0, 10);
-  }
-
-  function persistHistory() {
-    try { localStorage.setItem(HISTORY_KEY, JSON.stringify(state.history)); } catch (_) { /* no-op */ }
-  }
-
-  function addHistory(type, query) {
-    const clean = String(query).trim();
-    if (!clean) return;
-    state.history = [
-      { type, query: clean, at: Date.now() },
-      ...state.history.filter((item) => !(item.type === type && item.query.toLowerCase() === clean.toLowerCase()))
-    ].slice(0, 10);
-    persistHistory();
-  }
-
-  function loadSaved() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(SAVED_KEY) || "[]");
-      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
-    } catch (_) {
-      return [];
-    }
-  }
-
-  function persistSaved() {
-    try { localStorage.setItem(SAVED_KEY, JSON.stringify(state.saved)); } catch (_) { /* no-op */ }
-  }
-
-  function syncSavedFromWordbooks() {
-    if (!window.TALK_WORDBOOKS) return;
-    window.TALK_WORDBOOKS.loadStore(state.saved);
-    state.saved = window.TALK_WORDBOOKS.allTermsFlat();
-    persistSaved();
-  }
-
-  function cacheMax() {
-    const value = Number(state.settings?.cacheMax) || DEFAULT_CACHE_MAX;
-    return Math.max(10, Math.min(2000, Math.round(value)));
-  }
-
-  function cacheTtlDays() {
-    const value = Number(state.settings?.cacheTtlDays) || DEFAULT_CACHE_TTL_DAYS;
-    return Math.max(1, Math.min(3650, Math.round(value)));
-  }
-
-  function cacheTtlMs() {
-    return cacheTtlDays() * 86400000;
-  }
-
-  function formatBytes(bytes) {
-    const value = Math.max(0, Number(bytes) || 0);
-    if (value < 1024) return `${value} B`;
-    if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
-    return `${(value / 1024 / 1024).toFixed(1)} MB`;
-  }
-
-  function cacheRecordBytes(record) {
-    try {
-      return new Blob([JSON.stringify(record)]).size;
-    } catch (_) {
-      return 0;
-    }
-  }
-
-  function legacyWordCache() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(WORD_CACHE_KEY) || "{}");
-      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function persistFallbackWordCache() {
-    const entries = [...wordCache.values()]
-      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0))
-      .slice(0, cacheMax());
-    try {
-      localStorage.setItem(WORD_CACHE_KEY, JSON.stringify(Object.fromEntries(entries.map((item) => [item.key, item]))));
-    } catch (_) {
-      try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
-    }
-  }
-
-  async function initWordStore() {
-    if (!window.idb?.openDB || !("indexedDB" in window)) {
-      wordStoreFallback = true;
-      const legacy = legacyWordCache();
-      for (const [key, hit] of Object.entries(legacy)) {
-        if (hit?.data) wordCache.set(normalizeWord(key), { ...hit, key: normalizeWord(key) });
-      }
-      return;
-    }
-    try {
-      wordDb = await window.idb.openDB(WORD_DB_NAME, 2, {
-        upgrade(db) {
-          if (!db.objectStoreNames.contains(WORD_DB_STORE)) {
-            db.createObjectStore(WORD_DB_STORE, { keyPath: "key" });
-          }
-          if (!db.objectStoreNames.contains(SENTENCE_DB_STORE)) {
-            db.createObjectStore(SENTENCE_DB_STORE, { keyPath: "key" });
-          }
-        }
-      });
-      const entries = await wordDb.getAll(WORD_DB_STORE);
-      for (const entry of entries) {
-        if (entry?.key && entry?.data) wordCache.set(entry.key, entry);
-      }
-      try {
-        const storedSentences = await wordDb.getAll(SENTENCE_DB_STORE);
-        for (const record of storedSentences) {
-          if (record?.key && record?.data) sentenceCache.set(record.key, record);
-        }
-      } catch (_) { /* older databases may not have the store yet */ }
-      const legacy = legacyWordCache();
-      let migrated = 0;
-      for (const [key, hit] of Object.entries(legacy)) {
-        const normalized = normalizeWord(key);
-        if (!hit?.data || wordCache.has(normalized)) continue;
-        const record = {
-          key: normalized,
-          at: Number(hit.at) || Date.now(),
-          detail: hit.detail || "standard",
-          data: hit.data
-        };
-        wordCache.set(normalized, record);
-        await wordDb.put(WORD_DB_STORE, record);
-        migrated += 1;
-      }
-      if (migrated) {
-        try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
-      }
-      await pruneWordCache();
-    } catch (error) {
-      console.warn("IndexedDB word store unavailable; using localStorage fallback.", error);
-      wordStoreFallback = true;
-      const legacy = legacyWordCache();
-      for (const [key, hit] of Object.entries(legacy)) {
-        if (hit?.data) wordCache.set(normalizeWord(key), { ...hit, key: normalizeWord(key) });
-      }
-    }
-  }
-
-  async function removeWordRecord(key) {
-    wordCache.delete(key);
-    if (wordDb) {
-      try { await wordDb.delete(WORD_DB_STORE, key); } catch (_) { /* no-op */ }
-    } else if (wordStoreFallback) {
-      persistFallbackWordCache();
-    }
-  }
-
-  async function deleteWordCacheFor(word) {
-    const target = normalizeWord(word);
-    if (!target) return 0;
-    const keys = [...wordCache.entries()]
-      .filter(([key, record]) => key === target || normalizeWord(record?.data?.word) === target)
-      .map(([key]) => key);
-    for (const key of keys) await removeWordRecord(key);
-    refreshCacheBorders();
-    if ($("#cache-dashboard")) void renderCacheContent();
-    return keys.length;
-  }
-
-  async function pruneWordCache() {
-    const now = Date.now();
-    const entries = [...wordCache.entries()].sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
-    for (const [key, entry] of entries) {
-      if (now - Number(entry.at || 0) > cacheTtlMs()) await removeWordRecord(key);
-    }
-    for (const [key] of entries.slice(cacheMax())) {
-      if (wordCache.has(key)) await removeWordRecord(key);
-    }
-  }
-
-  async function sentenceKey(text, level, detail) {
-    const raw = `${String(text).trim()}|${level}|${detail}|${uiLang()}`;
-    try {
-      const buffer = await crypto.subtle.digest("SHA-1", new TextEncoder().encode(raw));
-      return Array.from(new Uint8Array(buffer)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
-    } catch (_) {
-      return `k-${raw.length}-${raw.slice(0, 40).replace(/\s+/g, "_")}`;
-    }
-  }
-
-  function cacheGetSentence(key) {
-    const record = sentenceCache.get(key);
-    if (!record || !(record.schema >= 1)) return null;
-    if (Date.now() - Number(record.savedAt || 0) > cacheTtlMs()) {
-      removeSentenceRecord(key);
-      return null;
-    }
-    return record.data || null;
-  }
-
-  function cachePutSentence(key, data, level, detail) {
-    const record = { key, schema: SENTENCE_CACHE_SCHEMA, savedAt: Date.now(), level, detail, data };
-    sentenceCache.set(key, record);
-    if (wordDb) {
-      wordDb.put(SENTENCE_DB_STORE, record).catch(() => {});
-    }
-    if (sentenceCache.size > SENTENCE_LIMIT) {
-      const ordered = [...sentenceCache.values()].sort((a, b) => (a.savedAt || 0) - (b.savedAt || 0));
-      ordered.slice(0, sentenceCache.size - SENTENCE_LIMIT).forEach((entry) => {
-        sentenceCache.delete(entry.key);
-        if (wordDb) wordDb.delete(SENTENCE_DB_STORE, entry.key).catch(() => {});
-      });
-    }
-  }
-
-  function removeSentenceRecord(key) {
-    if (!key) return;
-    sentenceCache.delete(key);
-    if (wordDb) wordDb.delete(SENTENCE_DB_STORE, key).catch(() => {});
-  }
-
-  function clearSentenceCache() {
-    sentenceCache.clear();
-    if (wordDb) wordDb.clear(SENTENCE_DB_STORE).catch(() => {});
-  }
-
-  function cacheGetWord(word, detail = state.settings?.detailLevel || "standard") {
-    const key = normalizeWord(word) + langSuffix();
-    const hit = wordCache.get(key);
-    if (!hit || !hit.data) return null;
-    if (Number(hit.schema || 0) < WORD_CACHE_MIN_SCHEMA) {
-      void removeWordRecord(key);
-      return null;
-    }
-    // Detail is metadata only. A cached word is reusable across fast/standard/deep;
-    // the user can explicitly regenerate if a different depth is desired.
-    if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
-      void removeWordRecord(key);
-      return null;
-    }
-    if (hit.data?.word && isHallucinatedWord(hit.data.word, word)) {
-      void removeWordRecord(key);
-      return null;
-    }
-    return { ...hit.data, gen: hit.gen || hit.data.gen || null, cached: true };
-  }
-
-  function cacheGetChunk(query) {
-    const key = chunkCacheKey(query);
-    const hit = wordCache.get(key);
-    if (!hit?.data || hit.data.kind !== "chunk") return null;
-    if (Date.now() - Number(hit.at || 0) > cacheTtlMs()) {
-      void removeWordRecord(key);
-      return null;
-    }
-    return { ...ensureChunk(hit.data), cached: true };
-  }
-
-  async function pruneChunkCache() {
-    const chunks = [...wordCache.entries()]
-      .filter(([key]) => key.startsWith(CHUNK_CACHE_PREFIX))
-      .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0));
-    for (const [key] of chunks.slice(CHUNK_CACHE_LIMIT)) {
-      if (wordCache.has(key)) await removeWordRecord(key);
-    }
-  }
-
-  function cachePutChunk(query, data, detail = state.settings?.detailLevel || "standard") {
-    const key = chunkCacheKey(query);
-    if (!chunkCacheKey(query) || !data) return;
-    const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, data: { ...data, kind: "chunk" } };
-    wordCache.set(key, record);
-    if (wordDb) {
-      wordDb.put(WORD_DB_STORE, record).catch((error) => {
-        console.warn("Could not write chunk cache to IndexedDB.", error);
-      });
-    } else if (wordStoreFallback) {
-      persistFallbackWordCache();
-    }
-    void pruneChunkCache();
-  }
-
-  function loadReverseStore() {
-    try {
-      const raw = localStorage.getItem(REVERSE_KEY);
-      const parsed = raw ? JSON.parse(raw) : {};
-      const now = Date.now();
-      const entries = Object.entries(parsed)
-        .filter(([, entry]) => entry?.result && now - Number(entry.at || 0) <= REVERSE_TTL)
-        .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0))
-        .slice(0, REVERSE_LIMIT);
-      return Object.fromEntries(entries);
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function saveReverseStore() {
-    const entries = Object.entries(reverseStore || {})
-      .sort((a, b) => Number(b[1].at || 0) - Number(a[1].at || 0))
-      .slice(0, REVERSE_LIMIT);
-    try {
-      localStorage.setItem(REVERSE_KEY, JSON.stringify(Object.fromEntries(entries)));
-    } catch (_) {
-      /* storage may be full or blocked */
-    }
-  }
-
-  const reverseStore = loadReverseStore();
-
-  function cachePutReverse(id, text, data) {
-    reverseStore[id] = { at: Date.now(), text, result: data };
-    saveReverseStore();
-  }
-
-  function cachePutWord(word, data, detail = state.settings?.detailLevel || "standard", gen = null) {
-    const key = normalizeWord(word) + langSuffix();
-    if (!key || !data) return;
-    const { context, ...clean } = data;
-    const record = { key, at: Date.now(), detail, schema: WORD_CACHE_SCHEMA, gen: gen || data.gen || null, data: clean };
-    wordCache.set(key, record);
-    if (wordDb) {
-      wordDb.put(WORD_DB_STORE, record).catch((error) => {
-        console.warn("Could not write word cache to IndexedDB.", error);
-      });
-    } else if (wordStoreFallback) {
-      persistFallbackWordCache();
-    }
-    void pruneWordCache();
-  }
-
-  async function clearWordStore() {
-    wordCache.clear();
-    if (wordDb) {
-      try { await wordDb.clear(WORD_DB_STORE); } catch (_) { /* no-op */ }
-    }
-    try { localStorage.removeItem(WORD_CACHE_KEY); } catch (_) { /* no-op */ }
-  }
-
-  function exportWordCache() {
-    const now = Date.now();
-    const entries = [...wordCache.values()]
-      .filter((entry) => entry?.key && entry?.data && now - Number(entry.at || 0) <= cacheTtlMs())
-      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
-    if (!entries.length) {
-      toast("还没有可导出的词条缓存");
-      return;
-    }
-    const payload = {
-      app: "talk.",
-      format: "talk.word-cache",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      entries
-    };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `talk-word-cache-${new Date().toISOString().slice(0, 10)}.json`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast(`已导出 ${entries.length} 个词条`);
-  }
-
-  async function importWordCache(file) {
-    if (!file) return;
-    if (file.size > 8 * 1024 * 1024) throw new Error("缓存文件超过 8MB");
-    const text = await file.text();
-    const parsed = JSON.parse(text);
-    const entries = Array.isArray(parsed) ? parsed : parsed?.entries;
-    if (!Array.isArray(entries)) throw new Error("不是有效的 Talk 缓存文件");
-    let count = 0;
-    for (const entry of entries) {
-      if (!entry || typeof entry !== "object") continue;
-      const data = entry.data && typeof entry.data === "object" ? entry.data : null;
-      if (!data) continue;
-      const key = normalizeWord(entry.key || data.word || "");
-      if (!key || !data.word) continue;
-      const record = {
-        key,
-        at: Number(entry.at) || Date.now(),
-        detail: entry.detail || "standard",
-        schema: Number(entry.schema) >= WORD_CACHE_MIN_SCHEMA ? Number(entry.schema) : WORD_CACHE_MIN_SCHEMA,
-        data
-      };
-      wordCache.set(key, record);
-      if (wordDb) await wordDb.put(WORD_DB_STORE, record);
-      count += 1;
-    }
-    if (!count) throw new Error("文件里没有可导入的词条");
-    await pruneWordCache();
-    if (wordStoreFallback) persistFallbackWordCache();
-    refreshCacheBorders();
-    return count;
-  }
-
-  function wordCacheStats() {
-    const now = Date.now();
-    const entries = [...wordCache.values()]
-      .filter((entry) => entry?.key && entry?.data && now - Number(entry.at || 0) <= cacheTtlMs())
-      .sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
-    return {
-      count: entries.length,
-      max: cacheMax(),
-      ttlDays: cacheTtlDays(),
-      bytes: entries.reduce((sum, entry) => sum + cacheRecordBytes(entry), 0),
-      backend: wordDb ? "IndexedDB" : "localStorage",
-      fallback: wordStoreFallback,
-      entries: entries.map((entry) => ({
-        key: entry.key,
-        word: entry.data.word || entry.key,
-        detail: entry.detail || "standard",
-        at: Number(entry.at) || 0,
-        bytes: cacheRecordBytes(entry)
-      }))
-    };
-  }
-
-  function wordCacheEstimate() {
-    const stats = wordCacheStats();
-    const average = stats.count ? stats.bytes / stats.count : 2600;
-    const bytes = Math.round(average * stats.max);
-    return { average, bytes, label: formatBytes(bytes) };
-  }
-
-  function lookupWordDeduped(word, options = {}) {
-    const key = normalizeWord(word);
-    const cached = cacheGetWord(key);
-    if (cached) return Promise.resolve({ type: "word", data: cached });
-    if (options.onPreview) {
-      const listeners = wordPreviewListeners.get(key) || new Set();
-      listeners.add(options.onPreview);
-      wordPreviewListeners.set(key, listeners);
-    }
-    if (wordRequests.has(key)) return wordRequests.get(key);
-    const listeners = wordPreviewListeners.get(key) || new Set();
-    const request = modelLookup(key, "word", state.settings, {
-      onPreview: (preview) => listeners.forEach((listener) => {
-        try { listener(preview); } catch (_) { /* preview is best-effort */ }
-      })
-    }).finally(() => {
-      wordRequests.delete(key);
-      wordPreviewListeners.delete(key);
-    });
-    wordRequests.set(key, request);
-    return request;
-  }
-
-  function isWordCached(word) {
-    const key = normalizeWord(word);
-    return Boolean(key) && (Boolean(DATA.words[key]) || Boolean(cacheGetWord(key)));
-  }
-
-  function applyCacheDisplay() {
-    if (!app) return;
-    app.classList.toggle("cache-display-borders", state.settings.cacheDisplay !== "corner");
-    if (state.settings.cacheDisplay === "corner") return;
-    if (cacheCorner) cacheCorner.hidden = true;
-  }
-
-  function refreshCacheBorders(root = document) {
-    $$('[data-cache-word]', root).forEach((element) => {
-      const cached = isWordCached(element.dataset.cacheWord);
-      element.classList.toggle("is-cache-ready", cached);
-      element.classList.toggle("is-cache-pending", !cached);
-      element.dataset.cacheState = cached ? "cached" : "pending";
-    });
-  }
-
-  function prefetchPlan(data) {
-    if (!data) return { all: [], fresh: [] };
-    const all = uniqueWords([
-      ...(data.family || []),
-      ...(data.synonyms || []),
-      ...(data.antonyms || []),
-      ...(data.related || [])
-    ], data.word);
-    const fresh = all.filter((word) => {
-      const key = normalizeWord(word);
-      return Boolean(key) && !DATA.words[key] && !cacheGetWord(key);
-    });
-    return { all, fresh };
-  }
-
-  function updateCacheCorner(filled, label) {
-    if (!cacheCorner) return;
-    if (state.settings.cacheDisplay !== "corner") {
-      cacheCorner.hidden = true;
-      cacheCorner.dataset.label = label;
-      return;
-    }
-    cacheCorner.hidden = false;
-    cacheCorner.dataset.state = filled ? "filled" : "hollow";
-    cacheCorner.dataset.label = label;
-    cacheCorner.classList.toggle("is-filled", filled);
-    cacheCorner.classList.toggle("is-hollow", !filled);
-    cacheCorner.title = label;
-    cacheCorner.setAttribute("aria-label", `缓存状态：${label}`);
-  }
-
-  function hideCacheCorner() {
-    if (!cacheCorner) return;
-    cacheCorner.hidden = true;
-    cacheCorner.dataset.label = "";
-  }
-
-  function cachedRelatedCount(plan) {
-    return plan.all.filter((word) => {
-      const key = normalizeWord(word);
-      return Boolean(key) && (Boolean(DATA.words[key]) || Boolean(cacheGetWord(key)));
-    }).length;
-  }
-
-  function schedulePrefetch(data) {
-    if (!data) {
-      hideCacheCorner();
-      return;
-    }
-    const plan = prefetchPlan(data);
-    const total = plan.all.length;
-    if (!total) {
-      hideCacheCorner();
-      return;
-    }
-    const cached = cachedRelatedCount(plan);
-    const token = ++prefetchToken;
-
-    if (!plan.fresh.length) {
-      updateCacheCorner(true, `本页 ${total} 个相关词已缓存`);
-      return;
-    }
-
-    if (!hasModelConfig() || !state.settings.prefetch) {
-      updateCacheCorner(
-        false,
-        !hasModelConfig()
-          ? "连接模型后可预加载相关词"
-          : `预加载已关闭 · ${cached}/${total} 个相关词已缓存`
-      );
-      return;
-    }
-
-    updateCacheCorner(false, `正在预加载 ${cached}/${total} 个相关词`);
-    window.setTimeout(() => {
-      if (token === prefetchToken) void runPrefetch(plan, token);
-    }, 900);
-  }
-
-  async function runPrefetch(plan, token) {
-    const queue = [...plan.fresh].slice(0, PREFETCH_LIMIT);
-    const worker = async () => {
-      while (queue.length) {
-        if (token !== prefetchToken || !state.settings.prefetch) return;
-        const word = queue.shift();
-        const key = normalizeWord(word);
-        if (!key || DATA.words[key] || cacheGetWord(key)) continue;
-        try {
-          await lookupWordDeduped(key);
-        } catch (_) {
-          // Prefetch is best-effort; never interrupt the reading flow.
-        }
-        refreshCacheBorders();
-        if (token === prefetchToken) {
-          const cached = cachedRelatedCount(plan);
-          const total = plan.all.length;
-          if (cached >= total) {
-            updateCacheCorner(true, `本页 ${total} 个相关词已缓存`);
-          } else {
-            updateCacheCorner(false, `正在预加载 ${cached}/${total} 个相关词`);
-          }
-        }
-      }
-    };
-    await Promise.all([worker(), worker(), worker()]);
-    if (token !== prefetchToken) return;
-    const cached = cachedRelatedCount(plan);
-    const total = plan.all.length;
-    if (cached >= total) {
-      updateCacheCorner(true, `本页 ${total} 个相关词已缓存`);
-    } else {
-      updateCacheCorner(false, `预加载未完成 · ${cached}/${total} 个相关词已缓存`);
-    }
-  }
-
-  function hasModelConfig(cfg = state.settings) {
-    const key = String(cfg.apiKey || "").trim();
-    const base = String(cfg.baseUrl || "").trim();
-    return Boolean(base) && (Boolean(key) || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(base));
-  }
-
   /* ============================================================
      Routing & transitions
      ============================================================ */
@@ -1667,16 +748,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     renderRoute(route, direction, { instant });
   }
 
-  function setOnionOpen(slot, open) {
-    if (!slot) return;
-    slot.classList.toggle("is-open", open);
-    const mark = slot.querySelector(":scope > .onion-mark");
-    if (mark) {
-      mark.textContent = open ? "−" : "+";
-      mark.setAttribute("aria-expanded", open ? "true" : "false");
-    }
-  }
-
   function refreshThemedPage() {
     if (!screen || !state.route || state.route.name === "loading") return;
     const html = pageHtml(state.route);
@@ -1718,62 +789,8 @@ import { createHistorySheet } from "./views/history-sheet.js";
   }
 
   /* ============================================================
-     Theme example backfill
+     Smooth scroll & reveal observer
      ============================================================ */
-
-  const examplesInFlight = new Set();
-  const THEME_EXAMPLE_LIMIT = 8;
-
-  function scheduleThemeExamples(word) {
-    if (!word || !hasModelConfig()) return;
-    const activeTheme = window.TALK_THEME?.current?.();
-    const missing = themesMissingExamples(word).filter((id) => !activeTheme || id === activeTheme.id);
-    if (!missing.length) return;
-    const key = normalizeWord(word.word);
-    if (!key || examplesInFlight.has(key)) return;
-    examplesInFlight.add(key);
-    fillThemeExamples(word, missing)
-      .catch(() => { /* keep the old examples; try again on a later visit */ })
-      .finally(() => examplesInFlight.delete(key));
-  }
-
-  async function fillThemeExamples(word, missing) {
-    const themes = missing.slice(0, THEME_EXAMPLE_LIMIT).map((id) => ({ id, style: exampleStyleFor(id) }));
-    if (!themes.length) return;
-    const payload = {
-      task: "themes",
-      word: word.word,
-      pos: word.pos,
-      short: word.short,
-      senses: (word.senses || []).slice(0, 3).map((sense) => sense.zh || sense.en).filter(Boolean),
-      existing: (word.examples || []).map((item) => item.en).filter(Boolean).slice(0, 6),
-      themes
-    };
-    const data = await LLM.requestJson({
-      settings: state.settings,
-      system: window.TALK_PROMPTS.examples,
-      user: payload,
-      maxTokens: 900,
-      timeoutMs: 45_000,
-      label: "主题例句补全",
-      disableThinking: true,
-      temperature: 0.3,
-      retries: 0
-    });
-    const fresh = normalizeExamplesByTheme(data.examplesByTheme || data.examples_by_theme || data);
-    if (!fresh) return;
-    const merged = normalizeExamplesByTheme({ ...(word.examplesByTheme || {}), ...fresh });
-    if (!merged) return;
-    word.examplesByTheme = merged;
-    const cached = cacheGetWord(word.word);
-    if (cached) {
-      cached.examplesByTheme = merged;
-      // Keep the original receipt: refilling examples must not erase when,
-      // by which model, or for how many tokens the entry was written.
-      cachePutWord(normalizeWord(word.word), cached, state.settings.detailLevel || "standard", cached.gen || null);
-    }
-    updateExamplesBlock(word);
-  }
 
   let revealObserver = null;
   let lenis = null;
@@ -1812,8 +829,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     if (!lenis) return;
     window.requestAnimationFrame(() => lenis?.resize());
   }
-
-
 
   function revealAllRemaining() {
     const pending = $$(".reveal:not(.is-in), .reveal-item:not(.is-in)");
@@ -1956,8 +971,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
           scheduleThemeExamples(word);
         }
       } else {
-        prefetchToken += 1;
-        hideCacheCorner();
+        cancelPrefetch();
       }
       scrollScreenTo(0, true);
       resizeSmoothScroll();
@@ -2128,16 +1142,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     return cacheGetChunk(route?.query || "");
   }
 
-  function getReverse(route) {
-    if (route?.result) return route.result;
-    const entry = reverseStore[idSafe(route?.id)];
-    return entry?.result || null;
-  }
-
-  function idSafe(value) {
-    return String(value || "").replace(/[^a-z0-9]/gi, "").slice(0, 24);
-  }
-
   function getSentence(route) {
     if (route?.result) return ensureSentence(route.result);
     const id = String(route?.id || "");
@@ -2149,7 +1153,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
   }
 
   /* ============================================================
-     Top bar
+     Top bar & module indicator
      ============================================================ */
 
   function contentValue(path) {
@@ -2222,8 +1226,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
       </header>`;
   }
 
-
-  function backTopbar({ label, title, bookmark = null, share = false, actions = "" }) {
+  function backTopbar({ label, title, bookmark = null, share = false, actions: extraActions = "" }) {
     const saved = bookmark ? isSavedKey(bookmark) : false;
     return `
       <header class="topbar">
@@ -2235,13 +1238,13 @@ import { createHistorySheet } from "./views/history-sheet.js";
         <div class="top-actions">
           ${bookmark ? `<button class="icon-btn ${saved ? "is-saved" : ""}" type="button" data-action="save" aria-label="${saved ? "取消收藏" : "收藏"}" aria-pressed="${saved}" title="${saved ? "已收藏" : "收藏"}">${icon("bookmark")}</button>` : ""}
           ${share ? `<button class="icon-btn" type="button" data-action="share-page" aria-label="分享这一页" title="分享这一页">${icon("share")}</button>` : ""}
-          ${actions}
+          ${extraActions}
           <button class="icon-btn" type="button" data-action="settings" aria-label="连接模型" title="连接模型">${icon("settings")}</button>
         </div>
       </header>`;
   }
 
-  function layerTopbar({ label, title, bookmark = null, origin = "", relation = "", depth = 1 }) {
+  function layerTopbar({ title, bookmark = null, origin = "", relation = "", depth = 1 }) {
     const saved = bookmark ? isSavedKey(bookmark) : false;
     return `
       <header class="topbar">
@@ -2259,196 +1262,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
   }
 
   /* ============================================================
-     Home
-     ============================================================ */
-
-  function dayNumber(date = new Date()) {
-    const start = new Date(date.getFullYear(), 0, 0);
-    return Math.floor((date - start) / 86400000);
-  }
-
-  function dailyEntry() {
-    const keys = Array.isArray(DATA.dailyWords) && DATA.dailyWords.length
-      ? DATA.dailyWords
-      : Object.keys(DATA.words);
-    const key = keys[dayNumber() % keys.length];
-    return DATA.words[key] || DATA.words[keys[0]] || null;
-  }
-
-  function visibleMoods() {
-    const pool = Array.isArray(DATA.moods) ? DATA.moods : [];
-    if (!pool.length) return [];
-    const count = Math.min(3, pool.length);
-    const start = (dayNumber() + state.moodOffset) % pool.length;
-    return Array.from({ length: count }, (_, index) => pool[(start + index) % pool.length]);
-  }
-
-  function moodCardsMarkup(moods) {
-    return moods.map((mood) => `
-      <button class="mood-card ${mood.tone}" type="button" data-action="word" data-word="${attr(mood.target)}" aria-label="探索${attr(mood.title)}">
-        <span class="mood-kicker"><span>${esc(mood.kicker)}</span><span>↗</span></span>
-        <strong class="mood-title">${esc(mood.title)}</strong>
-        <span class="mood-words">${esc(mood.words)}</span>
-      </button>`).join("");
-  }
-
-  function renderMoods() {
-    const container = $("#mood-scroll");
-    if (!container) return;
-    const moods = visibleMoods();
-    container.innerHTML = moodCardsMarkup(moods);
-    const count = $("#mood-count");
-    if (count) count.textContent = `${String(moods.length).padStart(2, "0")} 组词单`;
-    container.classList.remove("is-swapping");
-    void container.offsetWidth;
-    container.classList.add("is-swapping");
-  }
-
-  /* Phones pick a keyboard from inputmode. A word search wants a Latin
-     keyboard; translating from Chinese wants the Chinese one. Keep this in one
-     place so a future language pair only needs a mapping entry. */
-  function inputModeFor(lang) {
-    if (lang === "zh") return { inputmode: "text", lang: "zh-CN", autocapitalize: "off" };
-    return { inputmode: "latin", lang: "en", autocapitalize: "none" };
-  }
-
-  function applyInputMode(target, lang) {
-    if (!target) return;
-    const mode = inputModeFor(lang);
-    target.setAttribute("inputmode", mode.inputmode);
-    target.setAttribute("lang", mode.lang);
-    target.setAttribute("autocapitalize", mode.autocapitalize);
-  }
-
-  function homePage() {
-    const dictionaryHistory = state.history.filter((item) => item.type !== "translation");
-    const recent = dictionaryHistory.length ? dictionaryHistory.slice(0, 3) : sanitizeHistory(DATA.recent);
-    const daily = dailyEntry();
-    const moods = visibleMoods();
-    const copy = copyFor("home");
-    const registerLabels = { common: "日常", formal: "正式", literary: "文学", informal: "口语", technical: "技术" };
-    const dailyKicker = daily ? `${String(dayNumber()).padStart(3, "0")} · ${registerLabels[daily.register] || "每日"}` : "每日";
-    return `
-      ${homeTopbar()}
-      <section class="home-hero">
-        <div class="eyebrow reveal" style="--d:0"><span class="spark"></span>${esc(copy.eyebrow)}</div>
-        <h1 class="home-title reveal" style="--d:0.5">${esc(copy.titleLead)}<em>${esc(copy.titleAccent)}</em></h1>
-        <p class="home-lede reveal" style="--d:1">${copy.lede}</p>
-      </section>
-      ${copy.manifesto ? `<div class="theme-manifesto reveal" style="--d:1.2"><span class="manifesto-ru">${esc(copy.manifesto.ru)}</span><span class="manifesto-zh">${esc(copy.manifesto.zh)}</span></div>` : ""}
-
-      <div class="search-wrap reveal" style="--d:1.5">
-        <form class="search-card" id="search-form" novalidate>
-          <div class="search-top">
-            <span class="mono">${esc(copy.searchKicker)}</span>
-            <div class="mode-switch" role="group" aria-label="查询模式">
-              <button class="mode-btn ${state.mode === "auto" ? "active" : ""}" type="button" data-action="mode" data-mode="auto" aria-pressed="${state.mode === "auto"}">${esc(copy.modes.auto)}</button>
-              <button class="mode-btn ${state.mode === "word" ? "active" : ""}" type="button" data-action="mode" data-mode="word" aria-pressed="${state.mode === "word"}">${esc(copy.modes.word)}</button>
-              <button class="mode-btn ${state.mode === "chunk" ? "active" : ""}" type="button" data-action="mode" data-mode="chunk" aria-pressed="${state.mode === "chunk"}">${esc(copy.modes.chunk || "意群")}</button>
-              <button class="mode-btn ${state.mode === "sentence" ? "active" : ""}" type="button" data-action="mode" data-mode="sentence" aria-pressed="${state.mode === "sentence"}">${esc(copy.modes.sentence)}</button>
-            </div>
-          </div>
-          <div class="search-row">
-            <textarea class="search-input" id="search-input" rows="1" placeholder="${attr(copy.searchPlaceholder)}" aria-label="单词或句子" spellcheck="false"></textarea>
-            <button class="search-submit" type="submit" aria-label="查询">${icon("arrowUpRight")}</button>
-          </div>
-          <div class="search-bottom">
-            <span class="detected"><i></i><span id="detect-label">自动 · 单词</span></span>
-            <span class="search-kbd"><span>↵</span> to search</span>
-          </div>
-        </form>
-        <div class="recent-row" aria-label="最近查询">
-          <span class="recent-label">${esc(copy.recentLabel)}</span>
-          ${recent.map((item) => `
-            <button class="chip" type="button" data-action="lookup" data-query="${attr(item.query)}" data-type="${attr(item.type)}">
-              ${item.type === "sentence" ? `<span class="quote-dot"></span>` : ""}
-              ${esc(shorten(item.query, 34))}
-            </button>`).join("")}
-        </div>
-      </div>
-
-      <section class="section daily-section reveal" style="--d:2">
-        <div class="section-head">
-          <div>
-            <span class="section-kicker">${esc(copy.dailySectionKicker)}</span>
-            <h2>${esc(copy.dailySectionTitle)}</h2>
-          </div>
-          <span class="side-note">N° ${String(dayNumber()).padStart(3, "0")}</span>
-        </div>
-        ${daily ? `<button class="daily" type="button" data-action="word" data-word="${attr(daily.word)}" aria-label="打开 ${attr(daily.word)}">
-          <div class="daily-top">
-            <span class="mono">${esc(dailyKicker)}</span>
-            <span class="daily-badge"><i></i>今日词条</span>
-          </div>
-          <div class="daily-main">
-            <p class="daily-word">${esc(daily.word)}</p>
-            <div class="daily-phonetic">${esc(daily.phonetic || "")} · ${esc(posLabel(daily.pos))}</div>
-          </div>
-          <div class="daily-bottom">
-            <p class="daily-meaning">${esc(daily.translation || daily.short || "")}</p>
-            <span class="daily-arrow">${icon("arrowUpRight")}</span>
-          </div>
-        </button>` : ""}
-      </section>
-
-      <section class="section theme-salon reveal" id="theme-salon" style="--d:2.5">
-        ${themeSalonMarkup(currentThemeDeck())}
-      </section>
-
-      <footer class="home-footer">
-        <span>${esc(copy.footerLeft)}</span><i></i><span>${esc(copy.footerRight)}</span>
-      </footer>`;
-  }
-
-  /* ============================================================
-     Theme-aware examples
-     ============================================================ */
-
-  function themeIds() {
-    const list = window.TALK_THEME?.list?.() || [];
-    return list.map((theme) => theme.id);
-  }
-
-  function exampleStyleOverrides() {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(EXAMPLE_STYLE_KEY) || "{}");
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (_) {
-      return {};
-    }
-  }
-
-  function exampleStyleFor(themeId) {
-    const overrides = exampleStyleOverrides();
-    const own = String(overrides[themeId] || "").trim();
-    if (own) return own;
-    const meta = window.TALK_THEME?.metaOf?.(themeId);
-    const registered = String(meta?.exampleStyle || "").trim();
-    return registered || "自然、日常的英语，句子短，适合记忆";
-  }
-
-  function saveExampleStyles(next) {
-    try { localStorage.setItem(EXAMPLE_STYLE_KEY, JSON.stringify(next || {})); } catch (_) { /* no-op */ }
-  }
-
-  function exampleForTheme(word, themeId = window.TALK_THEME?.current?.().id) {
-    if (!word) return [];
-    const themed = word.examplesByTheme?.[themeId];
-    if (Array.isArray(themed) && themed.length) return themed;
-    return word.examples || [];
-  }
-
-  function themesMissingExamples(word) {
-    if (!word) return [];
-    return themeIds().filter((id) => !(word.examplesByTheme?.[id] || []).length);
-  }
-
-  function sentenceLevelOf(value) {
-    return SENTENCE_LEVELS.find((level) => level.id === value) || SENTENCE_LEVELS.find((level) => level.id === SENTENCE_LEVEL_DEFAULT);
-  }
-
-  /* ============================================================
-     Search & API
+     Search & offline demo fallback
      ============================================================ */
 
   class DemoMiss extends Error {
@@ -2484,6 +1298,31 @@ import { createHistorySheet } from "./views/history-sheet.js";
     throw new DemoMiss("sentence", query, DATA.sentences.slice(0, 2).map((item) => item.text));
   }
 
+  function startLoadingStatus(type) {
+    clearLoadingTimer();
+    const messages = type === "sentence"
+      ? ["正在读这句话", "找出真正重要的词", "整理语气与含义"]
+      : type === "chunk"
+        ? ["正在辨认这个意群", "拆开它的槽位", "找出关键的那个词"]
+        : type === "reverse"
+          ? ["正在读你描述的场景", "翻找贴切的表达", "把候选写进手记"]
+          : ["正在理解词义", "收集同根词", "寻找自然例句"];
+    let index = 0;
+    const timer = window.setInterval(() => {
+      index = (index + 1) % messages.length;
+      const target = $("#loading-status-text");
+      if (target) target.textContent = messages[index];
+    }, 1200);
+    state.loadingTimer = timer;
+  }
+
+  function clearLoadingTimer() {
+    if (state.loadingTimer) {
+      window.clearInterval(state.loadingTimer);
+      state.loadingTimer = null;
+    }
+  }
+
   async function runSearch(rawQuery, requestedMode = "auto", options = {}) {
     const query = sanitizeQuery(rawQuery);
     const input = $("#search-input");
@@ -2512,11 +1351,9 @@ import { createHistorySheet } from "./views/history-sheet.js";
       void startReverse(query);
       return;
     }
-    {
-      navigate({ name: "loading", query, type }, { instant: true });
-      startLoadingStatus(type);
-      loadingTimerId = state.loadingTimer;
-    }
+    navigate({ name: "loading", query, type }, { instant: true });
+    startLoadingStatus(type);
+    loadingTimerId = state.loadingTimer;
 
     try {
       let result;
@@ -2581,484 +1418,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
         : String(error?.message || "模型返回了未知错误。");
       navigate({ name: "error", query, type, message }, { replace: true });
     }
-  }
-
-  function startLoadingStatus(type) {
-    clearLoadingTimer();
-    const messages = type === "sentence"
-      ? ["正在读这句话", "找出真正重要的词", "整理语气与含义"]
-      : type === "chunk"
-        ? ["正在辨认这个意群", "拆开它的槽位", "找出关键的那个词"]
-        : type === "reverse"
-          ? ["正在读你描述的场景", "翻找贴切的表达", "把候选写进手记"]
-          : ["正在理解词义", "收集同根词", "寻找自然例句"];
-    let index = 0;
-    const timer = window.setInterval(() => {
-      index = (index + 1) % messages.length;
-      const target = $("#loading-status-text");
-      if (target) target.textContent = messages[index];
-    }, 1200);
-    state.loadingTimer = timer;
-  }
-
-  function clearLoadingTimer() {
-    if (state.loadingTimer) {
-      window.clearInterval(state.loadingTimer);
-      state.loadingTimer = null;
-    }
-
-  }
-
-  /* ============================================================
-     Model API
-     ============================================================ */
-
-  const WORD_SYSTEM_PROMPT = window.TALK_PROMPTS.word;
-  const SENTENCE_SYSTEM_PROMPT = window.TALK_PROMPTS.sentence;
-  // Long paragraphs are fine: the request only has to fit the model context.
-  const TRANSLATOR_MAX_CHARS = 4000;
-  // A sentence to analyse can be a paragraph; the word lookup path stays short.
-  const SEARCH_MAX_CHARS = 800;
-  const CHUNK_SYSTEM_PROMPT = window.TALK_PROMPTS.chunk;
-  const REVERSE_SYSTEM_PROMPT = window.TALK_PROMPTS.reverse;
-  const CHUNK_CACHE_PREFIX = "chunk:";
-  const CHUNK_CACHE_LIMIT = 60;
-  const REVERSE_MAX_SENTENCE_WORDS = 20;
-
-  function reverseBudget() {
-    return Math.max(600, Math.min(3000, Number(state.settings?.reverseMaxTokens) || 1500));
-  }
-
-  function reverseZoneName(budget = reverseBudget()) {
-    if (budget < 1000) return "只给结论";
-    if (budget < 2000) return "分块讲解";
-    return "成句拆解";
-  }
-
-  function reverseStyleName(budget = reverseBudget()) {
-    if (window.TALK_PROMPTS.reverseFor) return window.TALK_PROMPTS.reverseFor(budget);
-    return "editor";
-  }
-
-  function uiLang() {
-    return window.TALK_I18N?.lang === "en" ? "en" : "zh";
-  }
-
-  function langSuffix() {
-    return uiLang() === "en" ? "::en" : "";
-  }
-
-  function englishDirective() {
-    if (uiLang() !== "en") return "";
-    return "\n\nIMPORTANT: The interface language is English. Write every human-readable string in English — translation, note, memory, zh, gloss, why, tag, summary, verdict, tone, structure, examples[].zh. Never contain Chinese characters. Keep JSON keys, English words, phonetics and pos abbreviations unchanged.";
-  }
-
-  function systemPrompt(type, reverseStyle = "") {
-    let base = WORD_SYSTEM_PROMPT;
-    if (type === "sentence") base = SENTENCE_SYSTEM_PROMPT;
-    else if (type === "chunk") base = CHUNK_SYSTEM_PROMPT;
-    else if (type === "reverse") {
-      const prompts = window.TALK_PROMPTS.reversePrompts;
-      base = (reverseStyle && prompts?.[reverseStyle]) || REVERSE_SYSTEM_PROMPT;
-    }
-    return base + englishDirective();
-  }
-
-  function themeBriefs() {
-    return (window.TALK_THEME?.list?.() || []).map((theme) => ({
-      id: theme.id,
-      style: exampleStyleFor(theme.id)
-    }));
-  }
-
-  function wordPrompt(query, detail = "standard") {
-    // Dynamic query is deliberately last so the static system prefix and the
-    // task/detail prefix can be reused by provider prompt caches.
-    return JSON.stringify({
-      task: "word",
-      query: String(query),
-      themes: themeBriefs().filter((theme) => {
-        const active = window.TALK_THEME?.current?.();
-        return !active || theme.id === active.id;
-      })
-    });
-  }
-
-  function chunkPrompt(query, detail = "standard") {
-    return JSON.stringify({ task: "chunk", detail, query: String(query) });
-  }
-
-  function reversePrompt(text) {
-    return String(text || "").trim();
-  }
-
-  function sentencePrompt(query, detail = "standard", pieces = []) {
-    const level = sentenceLevelOf(state.settings?.sentenceLevel);
-    const sentences = pieces.length ? pieces.map((text, index) => ({ index, text })) : undefined;
-    return JSON.stringify({
-      task: "sentence",
-      detail,
-      level: level.id,
-      maxKeyWords: level.maxKeyWords,
-      levelHint: level.hint,
-      length: SENTENCE_DEPTH_BRIEF[detail] || SENTENCE_DEPTH_BRIEF.standard,
-      text: String(query),
-      ...(sentences ? { sentences } : {})
-    });
-  }
-
-  async function modelLookup(query, type, cfg, options = {}) {
-    const resolvedCfg = LLM.resolveConfig(cfg);
-    const detail = resolvedCfg.detailLevel || "standard";
-    if (type === "word") {
-      const cached = cacheGetWord(query, detail);
-      if (cached) return { type: "word", data: cached };
-    }
-    if (type === "chunk" && !options.skipCache) {
-      const cached = cacheGetChunk(query);
-      if (cached) return { type: "chunk", data: cached };
-    }
-    if (type === "reverse" && !options.skipCache && !(options.history || []).length) {
-      const cached = cacheGetReverseFirst(query);
-      if (cached?.content) {
-        return { type: "reverse", data: { id: reverseIdFor(query), text: query, narrative: cached.content, reasoning: cached.reasoning || "" } };
-      }
-    }
-    const pieces = type === "sentence" ? splitSentences(query) : [];
-    const sentenceCacheKey = type === "sentence"
-      ? await sentenceKey(query, sentenceLevelOf(resolvedCfg.sentenceLevel).id, detail)
-      : "";
-    if (type === "sentence" && !options.skipCache) {
-      const cached = cacheGetSentence(sentenceCacheKey);
-      if (cached) {
-        diagLog("info", "sentence.cache", "hit", { chars: String(query).length });
-        return { type: "sentence", data: cached };
-      }
-    }
-    // Validate base URL / key upfront before arming timers.
-    LLM.endpointFor(resolvedCfg.baseUrl, resolvedCfg);
-    const prompt = type === "sentence"
-      ? sentencePrompt(query, detail, pieces)
-      : type === "chunk"
-        ? chunkPrompt(query, detail)
-        : type === "reverse"
-          ? reversePrompt(query, detail)
-          : wordPrompt(query, detail);
-    const history = Array.isArray(options?.history)
-      ? options.history
-        .filter((turn) => turn && turn.content)
-        .map((turn) => ({ role: turn.role === "assistant" ? "assistant" : "user", content: String(turn.content) }))
-      : [];
-    const messages = [
-      { role: "system", content: systemPrompt(type, options.reverseStyle) },
-      ...history,
-      { role: "user", content: prompt }
-    ];
-    let controller = new AbortController();
-    let timedOut = false;
-    let timer = 0;
-    const armDeadline = () => {
-      window.clearTimeout(timer);
-      controller = new AbortController();
-      timedOut = false;
-      timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, MODEL_TIMEOUT_MS);
-    };
-    armDeadline();
-    const detailTokens = (DETAIL_LEVELS[detail] || DETAIL_LEVELS.standard).maxTokens;
-    const wanted = type === "sentence"
-      ? Math.max(detailTokens, SENTENCE_MAX_TOKENS[detail] || SENTENCE_MAX_TOKENS.standard)
-      : type === "chunk"
-        ? Math.max(detailTokens, 2400)
-        : type === "reverse"
-          ? (Number(options.reverseBudget) || reverseBudget())
-          : detailTokens;
-    const maxTokens = Math.min(wanted, LLM.outputCeiling(resolvedCfg));
-    const temperature = type === "reverse" ? 0.7 : 0.3;
-    const isJsonTask = type !== "reverse";
-    let content = "";
-    let usage = null;
-    const addUsage = (u) => {
-      if (!u || typeof u !== "object") return;
-      const next = {
-        prompt: Number(u.prompt_tokens ?? u.promptTokenCount ?? 0) || 0,
-        completion: Number(u.completion_tokens ?? u.candidatesTokenCount ?? 0) || 0,
-        total: Number(u.total_tokens ?? u.totalTokenCount ?? 0) || 0
-      };
-      if (!next.total) next.total = next.prompt + next.completion;
-      if (!next.total) return;
-      usage = usage
-        ? { prompt: usage.prompt + next.prompt, completion: usage.completion + next.completion, total: usage.total + next.total }
-        : next;
-    };
-    const startedAt = Date.now();
-    state.lastReasoning = "";
-    diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
-    const onBuffered = ({ host, contentType }) => {
-      diagLog("info", "stream.buffered", "网关把流式响应缓冲成了整段 JSON", { host, contentType });
-      if (!window.__talkStreamWarned) {
-        window.__talkStreamWarned = true;
-        console.info("Provider returned a buffered JSON response despite stream=true.");
-      }
-    };
-    const streamOnce = (msgs = messages) => LLM.sendChatStream(resolvedCfg, msgs, {
-      signal: controller.signal,
-      allowJsonMode: false,
-      googleJsonMode: isJsonTask,
-      maxTokens,
-      temperature,
-      onDelta: (partial) => {
-        if (typeof options.onPreview === "function") {
-          try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
-        }
-      },
-      onReasoning: (chunk) => {
-        state.lastReasoning = String(state.lastReasoning || "") + chunk;
-      },
-      onUsage: addUsage,
-      onBuffered
-    });
-    try {
-      // Do not combine streaming with response_format by default: some
-      // OpenAI-compatible gateways silently return one buffered JSON response
-      // when both are present. The static prompt already requires JSON.
-      content = await streamOnce();
-    } catch (error) {
-      diagLog("error", "model.fail", timedOut ? `请求超时（${MODEL_TIMEOUT_MS / 1000} 秒）` : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
-      // Mobile networks drop long streams and gateways sometimes cut our
-      // deadline. Both are worth one silent retry with a fresh signal.
-      const retriable = timedOut || error?.name !== "AbortError" || /不是 JSON|空响应|Failed to fetch|network error/i.test(String(error?.message || ""));
-      if (!content && retriable) {
-        await wait(timedOut ? 300 : 900);
-        armDeadline();
-        try {
-          content = await streamOnce();
-        } catch (retryError) {
-          diagLog("error", "model.fail", retryError?.message || String(retryError), { type, detail, ms: Date.now() - startedAt, chars: String(query).length, attempt: 2 });
-        }
-      }
-      // Older/limited gateways may reject streaming. Retry once non-streaming
-      // only when no content has been received.
-      if (!content && retriable) {
-        armDeadline();
-        const response = await LLM.sendChat(resolvedCfg, messages, {
-          signal: controller.signal,
-          allowJsonMode: isJsonTask,
-          maxTokens,
-          temperature
-        });
-        if (!response.ok) {
-          throw new Error(await LLM.readHttpError(response, 260));
-        }
-        const json = await LLM.readJsonResponse(response);
-        addUsage(json?.usage || json?.usageMetadata);
-        content = LLM.extractContent(json, resolvedCfg);
-      }
-      if (!content) throw timedOut ? new Error(`请求超时（${MODEL_TIMEOUT_MS / 1000} 秒），网关没有返回内容，可以重试或换一个模型。`) : error;
-    } finally {
-      window.clearTimeout(timer);
-    }
-    if (!content) {
-      diagLog("error", "model.empty", "网关返回了空内容", { type, detail, chars: 0 });
-      armDeadline();
-      try {
-        content = await streamOnce();
-      } catch (emptyRetryError) {
-        diagLog("error", "model.fail", emptyRetryError?.message || String(emptyRetryError), { type, detail, attempt: 2 });
-      } finally {
-        window.clearTimeout(timer);
-      }
-    }
-    if (!content) throw new Error("模型返回了空消息。");
-    diagLog("info", "model.content", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt });
-    state.lastModelRaw = {
-      type,
-      detail,
-      chars: content.length,
-      cut: content.length > 2400,
-      text: String(content).slice(0, 2400)
-    };
-
-    if (type === "reverse") {
-      return { type: "reverse", data: { id: reverseIdFor(query), text: query, narrative: String(content).trim(), reasoning: String(state.lastReasoning || "") } };
-    }
-    let parsed;
-    let retryLength = null;
-    const emptyish = content.trim().length < 12;
-    try {
-      if (emptyish) throw new Error("模型返回的内容过短，可能被网关截断了。");
-      parsed = LLM.parseJsonObject(content);
-    } catch (parseError) {
-      diagLog("error", emptyish ? "model.empty" : "model.parse", parseError?.message || String(parseError), { type, detail, chars: content.length });
-      // A truncated answer is the most common cause here: retry once with a
-      // larger ceiling instead of showing a raw JSON error to the reader.
-      if (!emptyish && !/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
-      armDeadline();
-      const retryTokens = Math.min(LLM.outputCeiling(resolvedCfg), Math.round(maxTokens * 1.5));
-      const retryMessages = messages.concat([{
-        role: "user",
-        content: '上一次输出不是合法 JSON（常见原因：字符串里出现未转义的双引号或真实换行，或者中途被截断）。请重写：所有字符串内的双引号必须转义，不要输出换行符；保持同样的详细程度，但务必输出完整闭合的 JSON；如果确实太长，只省略 family/synonyms/antonyms 里的嵌套细节，不要删掉义项、句子分析或重点词。'
-      }]);
-      let retryContent = "";
-      try {
-        const retry = await LLM.sendChat(resolvedCfg, retryMessages, {
-          signal: controller.signal,
-          allowJsonMode: true,
-          maxTokens: retryTokens,
-          temperature
-        });
-        if (!retry.ok) throw parseError;
-        const retryJson = await LLM.readJsonResponse(retry);
-        addUsage(retryJson?.usage || retryJson?.usageMetadata);
-        retryContent = LLM.extractContent(retryJson, resolvedCfg);
-      } finally {
-        window.clearTimeout(timer);
-      }
-      if (!retryContent) throw parseError;
-      try {
-        parsed = LLM.parseJsonObject(retryContent);
-        retryLength = retryContent.length;
-        content = retryContent;
-      } catch (_) {
-        diagLog("error", "model.truncated", "json truncated", { type, detail, chars: retryContent.length, tokens: retryTokens });
-        throw new Error(`模型返回的 JSON 被截断（约 ${retryContent.length} 字符），可以重试或把生成深度调到「深入」。`);
-      }
-    }
-    diagLog("info", "model.ok", `${type} · ${detail}`, { chars: content.length, ms: Date.now() - startedAt, retried: retryLength !== null });
-    if (type === "chunk") {
-      const data = ensureChunk({ ...parsed, chunk: parsed?.chunk || query });
-      data.source = "model";
-      data.model = resolvedCfg.model;
-      cachePutChunk(query, data, detail);
-      return { type: "chunk", data };
-    }
-    if (type === "word") {
-      let data = normalizeModelWord(parsed, query);
-      if (isHallucinatedWord(data.word, query)) {
-        diagLog("warn", "model.wrong-word", `returned "${data.word}" for "${query}", retrying`, { query, got: data.word });
-        if (typeof options.onPreview === "function") {
-          try { options.onPreview({ kind: "discard", wrongWord: data.word, targetWord: String(query) }); } catch (_) { /* best-effort */ }
-        }
-        armDeadline();
-        try {
-          const fixMessages = [
-            { role: "system", content: systemPrompt("word") },
-            { role: "user", content: `请解释英文词 "${String(query)}"（详细度：${detail}）。注意：JSON 的 word 字段必须是 "${String(query)}"，绝不要把 detail 参数值（如 standard）当成要查的词。` }
-          ];
-          let fixText = "";
-          try {
-            fixText = await streamOnce(fixMessages);
-          } catch (_) { /* fall back to non-streaming below */ }
-          if (!fixText) {
-            const fixRes = await LLM.sendChat(resolvedCfg, fixMessages, {
-              signal: controller.signal,
-              allowJsonMode: true,
-              maxTokens,
-              temperature
-            });
-            if (fixRes.ok) {
-              const fixJson = await LLM.readJsonResponse(fixRes, "词头纠偏重试");
-              addUsage(fixJson?.usage || fixJson?.usageMetadata);
-              fixText = LLM.extractContent(fixJson, resolvedCfg);
-            }
-          }
-          if (fixText) {
-            const reparsed = LLM.parseJsonObject(fixText);
-            const retried = normalizeModelWord(reparsed, query);
-            if (!isHallucinatedWord(retried.word, query)) data = retried;
-          }
-        } catch (_) { /* checked below */ }
-        finally { window.clearTimeout(timer); }
-        if (isHallucinatedWord(data.word, query)) {
-          throw new Error(`模型误返回了无关词条「${data.word}」，请重试查「${query}」。`);
-        }
-      }
-      data.source = "model";
-      data.model = resolvedCfg.model;
-      data.gen = { ms: Math.max(0, Date.now() - startedAt), model: resolvedCfg.model || "", tokens: usage?.total ?? null, at: Date.now() };
-      cachePutWord(normalizeWord(data.word), data, detail, data.gen);
-      if (normalizeWord(query) !== normalizeWord(data.word)) cachePutWord(query, data, detail, data.gen);
-      return { type: "word", data };
-    }
-    const data = normalizeModelSentence(parsed, query);
-    if (pieces.length > 1 && data.sentences.length) {
-      data.sentences = alignSentenceParts(data.sentences, pieces);
-    }
-    data.sourceType = "model";
-    data.model = resolvedCfg.model;
-    data.source = "语境分析";
-    if (sentenceCacheKey) {
-      data.id = `model-${sentenceCacheKey}`;
-      cachePutSentence(sentenceCacheKey, data, sentenceLevelOf(resolvedCfg.sentenceLevel).id, detail);
-    }
-    return { type: "sentence", data };
-  }
-
-  function tossWrongPreview(host, wrongWord, targetWord) {
-    if (!host) return;
-    const skeleton = $(".skeleton-stack");
-    const hasCard = !host.hidden && host.innerHTML.trim().length > 0;
-    const finishReset = () => {
-      host.classList.remove("is-tossing", "has-content");
-      host.dataset.signature = "";
-      host.dataset.tossing = "";
-      host.innerHTML = `<span class="live-preview-kicker is-retry"><i></i>${wrongWord ? `已丢弃跑偏词条「${esc(wrongWord)}」，` : ""}正在重查「${esc(targetWord || "")}」…</span>`;
-      host.hidden = false;
-      host.classList.add("is-arriving");
-      window.setTimeout(() => host.classList.remove("is-arriving"), 280);
-      if (skeleton) skeleton.classList.remove("is-streaming");
-    };
-    if (!hasCard) {
-      finishReset();
-      return;
-    }
-    host.dataset.tossing = "1";
-    host.classList.remove("is-arriving");
-    host.classList.add("is-tossing");
-    window.setTimeout(finishReset, 420);
-  }
-
-  function updateStreamPreview(preview, type) {
-    if (!preview) return;
-    if (preview.kind === "reverse") {
-      updateReverseStream(preview.narrative || "");
-      return;
-    }
-    const host = $("#live-preview");
-    if (!host) return;
-    if (preview.kind === "discard") {
-      tossWrongPreview(host, preview.wrongWord || "", preview.targetWord || "");
-      return;
-    }
-    if (host.dataset.tossing === "1") return;
-    const signature = JSON.stringify(preview);
-    if (host.dataset.signature === signature) return;
-    host.dataset.signature = signature;
-    host.hidden = false;
-    host.classList.add("has-content");
-    const skeleton = $(".skeleton-stack");
-    if (skeleton) skeleton.classList.add("is-streaming");
-    if (preview.kind === "reverse") {
-      host.innerHTML = `
-        <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
-        <p class="live-preview-narrative">${esc(preview.narrative)}</p>`;
-      return;
-    }
-    if (type === "sentence") {
-      host.innerHTML = `
-        <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
-        <h2 class="live-preview-word">${esc(shorten(preview.text || "", 80))}</h2>
-        ${preview.tone ? `<span class="live-preview-meta">${esc(preview.tone)}</span>` : ""}
-        ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理译文…</p>`}
-        ${preview.structure ? `<p class="live-preview-note">${esc(preview.structure)}</p>` : ""}`;
-      return;
-    }
-    host.innerHTML = `
-      <span class="live-preview-kicker"><i></i>正在分段返回${preview.received ? ` · 模型已返回 ${preview.received.toLocaleString("en-US")} 字` : ""}</span>
-      <h2 class="live-preview-word">${esc(preview.word || "")}</h2>
-      <div class="live-preview-meta">${esc(preview.phonetic || "")}${preview.pos ? ` · ${esc(posLabel(preview.pos))}` : ""}</div>
-      ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理第一段…</p>`}
-      ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}
-      ${(preview.senses || []).length ? `<ul class="live-preview-senses">${preview.senses.map((sense) => `<li>${esc(shorten(sense, 42))}</li>`).join("")}</ul>` : ""}`;
   }
 
   /* ============================================================
@@ -3262,18 +1621,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     runSearch(word, "word");
   }
 
-  function openFullEntry(word) {
-    closeSheet({ immediate: true });
-    const key = normalizeWord(word);
-    const entry = DATA.words[key];
-    if (entry) {
-      addHistory("word", key);
-      navigate({ name: "word", word: key, result: entry });
-      return;
-    }
-    runSearch(word, "word");
-  }
-
   /**
    * Unified active surface resolver: checks top overlay layer first, then main screen route.
    * All page-level actions (regenerate, delete cache, ask AI, save) read from here.
@@ -3304,51 +1651,9 @@ import { createHistorySheet } from "./views/history-sheet.js";
     return { kind: name, query: "", data: null, isLayer: false, record: null };
   }
 
-  function activeSentenceData() {
-    const surface = getActiveSurface();
-    return surface.kind === "sentence" ? surface.data : null;
-  }
-
   function activeWordData() {
     const surface = getActiveSurface();
     return surface.kind === "word" ? surface.data : null;
-  }
-
-  function parseSavedEntry(raw) {
-    const str = String(raw || "").trim();
-    if (str.startsWith("word:")) {
-      const text = str.slice(5).trim();
-      return { kind: "word", text, label: text };
-    }
-    if (str.startsWith("chunk:")) {
-      const text = str.slice(6).replace(/-/g, " ").trim();
-      return { kind: "chunk", text, label: text };
-    }
-    if (str.startsWith("sentence:")) {
-      const rest = str.slice(9).trim();
-      const hit = DATA.sentences?.find((item) => item.id === rest);
-      const text = hit?.text || rest;
-      return { kind: "sentence", text, label: text };
-    }
-    const kind = str.includes(" ") ? "chunk" : "word";
-    return { kind, text: str, label: str };
-  }
-
-  function normalizeSavedKey(raw) {
-    const entry = parseSavedEntry(raw);
-    if (!entry.text) return "";
-    if (entry.kind === "sentence") return `sentence:${entry.text.toLowerCase()}`;
-    return entry.text.toLowerCase();
-  }
-
-  function findSavedIndex(key) {
-    const target = normalizeSavedKey(key);
-    if (!target) return -1;
-    return state.saved.findIndex((item) => normalizeSavedKey(item) === target);
-  }
-
-  function isSavedKey(key) {
-    return findSavedIndex(key) >= 0;
   }
 
   function bookmarkKey() {
@@ -3481,7 +1786,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
   }
 
   /* ============================================================
-     Init
+     Init & bridges
      ============================================================ */
 
   function registerServiceWorker() {
@@ -3510,7 +1815,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
 
   async function init() {
     await unlockStoredKeys();
-    if (storedKeysPlain) persistSettings(state.settings);
+    if (hadPlainKeys()) persistSettings(state.settings);
     setupInstallPrompt();
     await initThemeStore();
     applyCacheDisplay();
@@ -3650,28 +1955,6 @@ import { createHistorySheet } from "./views/history-sheet.js";
     };
   }
 
-
-  async function callWordbookAi(task, payload) {
-    const sys = task === "classify"
-      ? window.TALK_PROMPTS.wordbookClassify
-      : task === "extract"
-        ? window.TALK_PROMPTS.wordbookExtract
-        : window.TALK_PROMPTS.wordbookArticle;
-    const label = task === "classify" ? "主题分册" : task === "extract" ? "AI 提取词条" : "生成精读文章";
-    const maxTokens = task === "extract" ? 2400 : 3200;
-    return LLM.requestJson({
-      settings: state.settings,
-      system: sys,
-      user: payload,
-      maxTokens,
-      timeoutMs: Math.max(MODEL_TIMEOUT_MS, 90_000),
-      label,
-      disableThinking: true,
-      temperature: 0.3,
-      retries: 1
-    });
-  }
-
   window.__TALK_BRIDGE__ = {
     isWordCached: (term) => isTermLocallyCached(term),
     callWordbookAi,
@@ -3747,7 +2030,7 @@ import { createHistorySheet } from "./views/history-sheet.js";
     getSentenceLevel: () => state.settings?.sentenceLevel || "cet6",
     getSentenceLevelLabel: () => {
       const lv = state.settings?.sentenceLevel || "cet6";
-      const found = typeof SENTENCE_LEVELS !== "undefined" ? SENTENCE_LEVELS.find((x) => x.id === lv) : null;
+      const found = SENTENCE_LEVELS.find((x) => x.id === lv);
       return found ? found.label : lv.toUpperCase();
     },
     callModelJSON: async (systemPrompt, userPayload, { signal, maxTokens = 4096, temperature = 0.3 } = {}) => {
