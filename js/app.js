@@ -8,6 +8,7 @@
 
   const DATA = window.TALK_DATA;
   const CONTENT = window.TALK_CONTENT;
+  const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
   const APP_BUILD = "295"; // cache-busting build, kept in step with ?v= and sw.js
 
@@ -238,13 +239,7 @@
 
   // A still-sealed key means unsealing failed (e.g. no WebCrypto here).
   // Never send the ciphertext as a credential; ask the user to re-enter it.
-  function usableApiKey(value) {
-    const key = String(value || "").trim();
-    if (key.startsWith(SEAL_PREFIX)) {
-      throw new Error("当前环境无法解密已保存的密钥，请在模型设置里重新输入密钥。");
-    }
-    return key;
-  }
+  const usableApiKey = (value) => LLM.usableApiKey(value);
 
   const DEFAULT_SETTINGS = {
     provider: "deepseek",
@@ -459,16 +454,8 @@
     return { profiles: kept, activeProfileId: kept.some((item) => item.id === active) ? active : (kept[0]?.id || "") };
   }
 
-  function activeProfile(settings) {
-    if (!settings?.profiles?.length) return null;
-    return settings.profiles.find((profile) => profile.id === settings.activeProfileId) || settings.profiles[0];
-  }
-
-  function profileSupportsThinking(profile) {
-    if (!profile) return false;
-    if (profile.thinkingCapable) return true;
-    return /(?:qwen(?:3\.[5-9]|[4-9]\.\d)|deepseek-v4|glm-5|kimi-k[2-9])/i.test(String(profile.model || ""));
-  }
+  const activeProfile = (settings) => LLM.activeProfile(settings);
+  const profileSupportsThinking = (profile) => LLM.profileSupportsThinking(profile);
 
   function applyProfileToSettings(settings, profile) {
     if (!profile) return settings;
@@ -1732,7 +1719,6 @@
   }
 
   async function fillThemeExamples(word, missing) {
-    const cfg = state.settings;
     const themes = missing.slice(0, THEME_EXAMPLE_LIMIT).map((id) => ({ id, style: exampleStyleFor(id) }));
     if (!themes.length) return;
     const payload = {
@@ -1744,22 +1730,17 @@
       existing: (word.examples || []).map((item) => item.en).filter(Boolean).slice(0, 6),
       themes
     };
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 45_000);
-    let data;
-    try {
-      const response = await postChat(endpointFor(cfg.baseUrl, cfg), cfg, [
-        { role: "system", content: window.TALK_PROMPTS.examples },
-        { role: "user", content: JSON.stringify(payload) }
-      ], controller.signal, true, 900);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const json = await response.json();
-      let content = json?.choices?.[0]?.message?.content;
-      if (Array.isArray(content)) content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-      data = parseJsonObject(content);
-    } finally {
-      window.clearTimeout(timer);
-    }
+    const data = await LLM.requestJson({
+      settings: state.settings,
+      system: window.TALK_PROMPTS.examples,
+      user: payload,
+      maxTokens: 900,
+      timeoutMs: 45_000,
+      label: "主题例句补全",
+      disableThinking: true,
+      temperature: 0.3,
+      retries: 0
+    });
     const fresh = normalizeExamplesByTheme(data.examplesByTheme || data.examples_by_theme || data);
     if (!fresh) return;
     const merged = normalizeExamplesByTheme({ ...(word.examplesByTheme || {}), ...fresh });
@@ -3181,31 +3162,41 @@
   }
 
   async function requestTranslation(text, cfg, sourceLanguage, selectedStyles) {
-    const endpoint = endpointFor(cfg.baseUrl, cfg);
+    const resolvedCfg = LLM.resolveConfig(cfg);
+    LLM.endpointFor(resolvedCfg.baseUrl, resolvedCfg);
     const messages = [
       { role: "system", content: TRANSLATOR_SYSTEM_PROMPT + englishDirective() },
       { role: "user", content: JSON.stringify({ sourceLanguage, styles: selectedStyles, text }) }
     ];
     const controller = new AbortController();
     const timer = window.setTimeout(() => controller.abort(), MODEL_TIMEOUT_MS);
-    const startedAt = Date.now();
     diagLog("info", "model.start", `translation · ${state.settings?.detailLevel || "standard"}`, { chars: text.length });
     try {
       let content = "";
       try {
-        content = await postChatStream(endpoint, cfg, messages, controller.signal, false, 1600);
+        content = await LLM.sendChatStream(resolvedCfg, messages, {
+          signal: controller.signal,
+          allowJsonMode: false,
+          googleJsonMode: true,
+          maxTokens: 1600,
+          temperature: 0.3
+        });
       } catch (error) {
         if (error?.name === "AbortError") throw error;
-        const response = await postChat(endpoint, cfg, messages, controller.signal, false, 1600);
+        const response = await LLM.sendChat(resolvedCfg, messages, {
+          signal: controller.signal,
+          allowJsonMode: false,
+          maxTokens: 1600,
+          temperature: 0.3
+        });
         if (!response.ok) {
-          const raw = await response.text().catch(() => "");
-          throw new Error(`HTTP ${response.status}${raw ? ` · ${raw.slice(0, 220)}` : ""}`);
+          throw new Error(await LLM.readHttpError(response, 220));
         }
-        const json = await response.json();
-        content = json?.choices?.[0]?.message?.content || "";
+        const json = await LLM.readJsonResponse(response, "翻译接口");
+        content = LLM.extractContent(json, resolvedCfg);
       }
       if (!content) throw new Error("模型返回了空内容。");
-      return normalizeTranslation(parseJsonObject(content), text, cfg, sourceLanguage, selectedStyles);
+      return normalizeTranslation(LLM.parseJsonObject(content), text, resolvedCfg, sourceLanguage, selectedStyles);
     } finally {
       window.clearTimeout(timer);
     }
@@ -3556,7 +3547,7 @@
   }
 
   async function requestThemeDeck(seed, exclude = []) {
-    const data = await window.TALK_LLM.requestJson({
+    const data = await LLM.requestJson({
       settings: state.settings,
       system: window.TALK_PROMPTS.theme,
       user: { task: "theme", seed, exclude },
@@ -3564,7 +3555,7 @@
       timeoutMs: 50_000,
       label: "主题沙龙",
       disableThinking: true,
-      temperature: state.pendingTemperature ?? 0.3,
+      temperature: 0.3,
       retries: 1
     });
     return normalizeThemeDeck(data);
@@ -6658,61 +6649,16 @@
     }
   }
 
-  function channelModelsUrl(profile) {
-    const base = String(profile.baseUrl || "").trim().replace(/\/+$/, "");
-    if ((profile.protocol || "openai") === "google") {
-      const root = /\/v1beta$/.test(base) ? base : `${base}/v1beta`;
-      return `${root}/models?key=${encodeURIComponent(usableApiKey(profile.apiKey))}`;
-    }
-    return `${base}/models`;
+  function fetchChannelModels(profile) {
+    return LLM.listModels(profile, { timeoutMs: 15_000 });
   }
 
-  async function fetchChannelModels(profile) {
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 15000);
-    try {
-      const headers = (profile.protocol || "openai") === "google"
-        ? { Accept: "application/json" }
-        : { Accept: "application/json", Authorization: `Bearer ${usableApiKey(profile.apiKey)}` };
-      const response = await fetch(channelModelsUrl(profile), { headers, signal: controller.signal });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const json = await response.json();
-      if ((profile.protocol || "openai") === "google") {
-        return (json.models || [])
-          .filter((item) => !item.supportedGenerationMethods || item.supportedGenerationMethods.includes("generateContent"))
-          .map((item) => String(item.name || "").replace(/^models\//, ""))
-          .filter((id) => id && !/embedding|aqa/i.test(id));
-      }
-      return (json.data || []).map((item) => String(item.id || "")).filter(Boolean);
-    } finally {
-      window.clearTimeout(timer);
-    }
-  }
-
-  async function testChannel(profile) {
-    const started = performance.now();
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => controller.abort(), 20000);
-    try {
-      const response = await postChat(
-        endpointFor(profile.baseUrl, profile),
-        profile,
-        [{ role: "user", content: "Reply with the single word: pong" }],
-        controller.signal,
-        false,
-        16
-      );
-      const json = typeof response.text === "string" ? null : await readJsonResponse(response, "测试请求");
-      const text = json
-        ? (isGoogleProvider(profile) ? googleText(json) : (json.choices?.[0]?.message?.content || ""))
-        : response.text;
-      const reply = String(text || "").trim().slice(0, 40);
-      return { ok: true, ms: Math.round(performance.now() - started), text: reply || "(空回复)" };
-    } catch (error) {
-      return { ok: false, ms: Math.round(performance.now() - started), text: error.message };
-    } finally {
-      window.clearTimeout(timer);
-    }
+  function testChannel(profile) {
+    return LLM.pingModel(profile, {
+      timeoutMs: 20_000,
+      prompt: "Reply with the single word: pong",
+      maxTokens: 16
+    });
   }
 
   function readProviderForm(previous = {}) {
@@ -7409,43 +7355,17 @@
     }
     status.className = "key-status";
     status.innerHTML = `<span>正在测试 ${esc(state.draft.model || "模型")}…</span>`;
-    const started = performance.now();
-    try {
-      const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), 30_000);
-      if (isGoogleProvider(state.draft)) {
-        await googleChat(state.draft, [{ role: "user", content: "Reply with exactly: OK" }], controller.signal, 16, false);
-        window.clearTimeout(timer);
-      } else {
-        const response = await fetch(endpointFor(state.draft.baseUrl, state.draft), {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${usableApiKey(state.draft.apiKey)}`
-          },
-          body: JSON.stringify({
-            model: state.draft.model,
-            messages: [{ role: "user", content: "Reply with exactly: OK" }],
-            temperature: 0,
-            max_tokens: 8,
-            stream: false,
-            ...thinkingParams(state.draft)
-          }),
-          signal: controller.signal
-        });
-        window.clearTimeout(timer);
-        if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 120)}` : ""}`);
-        }
-      }
-      const elapsed = Math.round(performance.now() - started);
+    const result = await LLM.pingModel(state.draft, {
+      timeoutMs: 30_000,
+      prompt: "Reply with exactly: OK",
+      maxTokens: 16
+    });
+    if (result.ok) {
       status.className = "key-status";
-      status.innerHTML = `${icon("check")} <span>已连接 ${esc(state.draft.model || "模型")} · ${elapsed} ms</span>`;
-    } catch (error) {
-      const message = error?.name === "AbortError" ? "请求超时。" : String(error?.message || "无法连接。");
+      status.innerHTML = `${icon("check")} <span>已连接 ${esc(state.draft.model || "模型")} · ${result.ms} ms</span>`;
+    } else {
       status.className = "key-status off";
-      status.innerHTML = `<span>${esc(shorten(message, 140))}</span>`;
+      status.innerHTML = `<span>${esc(shorten(result.text, 140))}</span>`;
     }
   }
 
@@ -7615,70 +7535,6 @@
      Model API
      ============================================================ */
 
-  function outputCeiling(cfg) {
-    const provider = String(cfg?.provider || "").toLowerCase();
-    if (provider === "google") return 32000;
-    if (provider === "openai") return 16000;
-    if (provider === "deepseek") return 8192;
-    return 20000;
-  }
-
-  function isGoogleProvider(cfg) {
-    if (cfg?.protocol) return String(cfg.protocol).toLowerCase() === "google";
-    if (String(cfg?.provider || "").toLowerCase() === "google") return true;
-    return /generativelanguage\.googleapis\.com/i.test(String(cfg?.baseUrl || ""));
-  }
-
-  function googleRoot(baseUrl) {
-    const base = String(baseUrl || "https://generativelanguage.googleapis.com/v1beta").trim().replace(/\/+$/, "");
-    if (!/^https?:\/\//i.test(base)) throw new Error("API 地址需要以 http:// 或 https:// 开头。");
-    return /\/v\d+(?:beta|alpha)?(?:\/|$)/i.test(base) ? base : `${base}/v1beta`;
-  }
-
-  function googleModelUrl(cfg, stream) {
-    const model = String(cfg?.model || "gemini-3.6-flash").trim().replace(/^models\//, "") || "gemini-3.6-flash";
-    const action = stream ? "streamGenerateContent?alt=sse" : "generateContent";
-    const sep = action.includes("?") ? "&" : "?";
-    return `${googleRoot(cfg?.baseUrl)}/models/${encodeURIComponent(model)}:${action}${sep}key=${encodeURIComponent(usableApiKey(cfg?.apiKey))}`;
-  }
-
-  function googlePayload(messages, maxTokens, jsonMode, cfg = {}) {
-    const system = messages.filter((m) => m.role === "system").map((m) => String(m.content || "")).join("\n\n");
-    const turns = messages
-      .filter((m) => m.role !== "system")
-      .map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: String(m.content || "") }] }));
-    const payload = {
-      contents: turns.length ? turns : [{ role: "user", parts: [{ text: "" }] }],
-      generationConfig: {
-        temperature: state.pendingTemperature ?? 0.3,
-        maxOutputTokens: maxTokens
-      }
-    };
-    if (jsonMode) payload.generationConfig.responseMimeType = "application/json";
-    // Gemini 2.5/3 spend output tokens on thinking unless told otherwise; a
-    // long JSON answer then gets cut mid-object even with a generous ceiling.
-    const model = String(cfg.model || "").toLowerCase();
-    if (/gemini-3/.test(model)) payload.generationConfig.thinkingConfig = { thinkingLevel: "LOW" };
-    else if (/gemini-2\.5/.test(model)) payload.generationConfig.thinkingConfig = { thinkingBudget: 0 };
-    if (system) payload.systemInstruction = { parts: [{ text: system }] };
-    return payload;
-  }
-
-  function googleText(json) {
-    const parts = json?.candidates?.[0]?.content?.parts;
-    if (!Array.isArray(parts)) return "";
-    return parts.map((part) => String(part?.text || "")).join("");
-  }
-
-  function endpointFor(baseUrl, cfg) {
-    if (isGoogleProvider(cfg)) return googleModelUrl(cfg, false).replace(/:generateContent\?.*$/, "");
-    let base = String(baseUrl || "").trim().replace(/\/+$/, "");
-    if (!base) throw new Error("请先在模型设置里填写 API 地址。");
-    if (!/^https?:\/\//i.test(base)) throw new Error("API 地址需要以 http:// 或 https:// 开头。");
-    if (!/\/chat\/completions$/i.test(base)) base += "/chat/completions";
-    return base;
-  }
-
   const WORD_SYSTEM_PROMPT = window.TALK_PROMPTS.word;
   const SENTENCE_SYSTEM_PROMPT = window.TALK_PROMPTS.sentence;
   const TRANSLATOR_STYLES = window.TALK_CONTENT.translator.styles;
@@ -7778,7 +7634,8 @@
   }
 
   async function modelLookup(query, type, cfg, options = {}) {
-    const detail = cfg.detailLevel || "standard";
+    const resolvedCfg = LLM.resolveConfig(cfg);
+    const detail = resolvedCfg.detailLevel || "standard";
     if (type === "word") {
       const cached = cacheGetWord(query, detail);
       if (cached) return { type: "word", data: cached };
@@ -7795,7 +7652,7 @@
     }
     const pieces = type === "sentence" ? splitSentences(query) : [];
     const sentenceCacheKey = type === "sentence"
-      ? await sentenceKey(query, sentenceLevelOf(cfg.sentenceLevel).id, detail)
+      ? await sentenceKey(query, sentenceLevelOf(resolvedCfg.sentenceLevel).id, detail)
       : "";
     if (type === "sentence" && !options.skipCache) {
       const cached = cacheGetSentence(sentenceCacheKey);
@@ -7804,7 +7661,8 @@
         return { type: "sentence", data: cached };
       }
     }
-    const endpoint = endpointFor(cfg.baseUrl, cfg);
+    // Validate base URL / key upfront before arming timers.
+    LLM.endpointFor(resolvedCfg.baseUrl, resolvedCfg);
     const prompt = type === "sentence"
       ? sentencePrompt(query, detail, pieces)
       : type === "chunk"
@@ -7840,7 +7698,9 @@
         : type === "reverse"
           ? (Number(options.reverseBudget) || reverseBudget())
           : detailTokens;
-    const maxTokens = Math.min(wanted, outputCeiling(cfg));
+    const maxTokens = Math.min(wanted, LLM.outputCeiling(resolvedCfg));
+    const temperature = type === "reverse" ? 0.7 : 0.3;
+    const isJsonTask = type !== "reverse";
     let content = "";
     let usage = null;
     const addUsage = (u) => {
@@ -7858,13 +7718,31 @@
     };
     const startedAt = Date.now();
     state.lastReasoning = "";
-    state.pendingTemperature = type === "reverse" ? 0.7 : 0.3;
     diagLog("info", "model.start", `${type} · ${detail}`, { chars: String(query).length });
-    const streamOnce = () => postChatStream(endpoint, cfg, messages, controller.signal, false, maxTokens, (partial) => {
-      if (typeof options.onPreview === "function") {
-        try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
+    const onBuffered = ({ host, contentType }) => {
+      diagLog("info", "stream.buffered", "网关把流式响应缓冲成了整段 JSON", { host, contentType });
+      if (!window.__talkStreamWarned) {
+        window.__talkStreamWarned = true;
+        console.info("Provider returned a buffered JSON response despite stream=true.");
       }
-    }, addUsage);
+    };
+    const streamOnce = (msgs = messages) => LLM.sendChatStream(resolvedCfg, msgs, {
+      signal: controller.signal,
+      allowJsonMode: false,
+      googleJsonMode: isJsonTask,
+      maxTokens,
+      temperature,
+      onDelta: (partial) => {
+        if (typeof options.onPreview === "function") {
+          try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
+        }
+      },
+      onReasoning: (chunk) => {
+        state.lastReasoning = String(state.lastReasoning || "") + chunk;
+      },
+      onUsage: addUsage,
+      onBuffered
+    });
     try {
       // Do not combine streaming with response_format by default: some
       // OpenAI-compatible gateways silently return one buffered JSON response
@@ -7888,23 +7766,18 @@
       // only when no content has been received.
       if (!content && retriable) {
         armDeadline();
-        let response;
-        try {
-          response = await postChat(endpoint, cfg, messages, controller.signal, true, maxTokens);
-        } catch (fallbackError) {
-          throw fallbackError;
-        }
+        const response = await LLM.sendChat(resolvedCfg, messages, {
+          signal: controller.signal,
+          allowJsonMode: isJsonTask,
+          maxTokens,
+          temperature
+        });
         if (!response.ok) {
-          const text = await response.text().catch(() => "");
-          throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
+          throw new Error(await LLM.readHttpError(response, 260));
         }
-        const json = await readJsonResponse(response);
+        const json = await LLM.readJsonResponse(response);
         addUsage(json?.usage || json?.usageMetadata);
-        const message = json?.choices?.[0]?.message;
-        content = message?.content;
-        if (Array.isArray(content)) {
-          content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-        }
+        content = LLM.extractContent(json, resolvedCfg);
       }
       if (!content) throw timedOut ? new Error(`请求超时（${MODEL_TIMEOUT_MS / 1000} 秒），网关没有返回内容，可以重试或换一个模型。`) : error;
     } finally {
@@ -7917,6 +7790,8 @@
         content = await streamOnce();
       } catch (emptyRetryError) {
         diagLog("error", "model.fail", emptyRetryError?.message || String(emptyRetryError), { type, detail, attempt: 2 });
+      } finally {
+        window.clearTimeout(timer);
       }
     }
     if (!content) throw new Error("模型返回了空消息。");
@@ -7937,30 +7812,36 @@
     const emptyish = content.trim().length < 12;
     try {
       if (emptyish) throw new Error("模型返回的内容过短，可能被网关截断了。");
-      parsed = parseJsonObject(content);
+      parsed = LLM.parseJsonObject(content);
     } catch (parseError) {
       diagLog("error", emptyish ? "model.empty" : "model.parse", parseError?.message || String(parseError), { type, detail, chars: content.length });
       // A truncated answer is the most common cause here: retry once with a
       // larger ceiling instead of showing a raw JSON error to the reader.
       if (!emptyish && !/JSON|Unexpected|Expected|Unterminated/i.test(String(parseError?.message || ""))) throw parseError;
       armDeadline();
-      const retryTokens = Math.min(outputCeiling(cfg), Math.round(maxTokens * 1.5));
+      const retryTokens = Math.min(LLM.outputCeiling(resolvedCfg), Math.round(maxTokens * 1.5));
       const retryMessages = messages.concat([{
         role: "user",
         content: '上一次输出不是合法 JSON（常见原因：字符串里出现未转义的双引号或真实换行，或者中途被截断）。请重写：所有字符串内的双引号必须转义，不要输出换行符；保持同样的详细程度，但务必输出完整闭合的 JSON；如果确实太长，只省略 family/synonyms/antonyms 里的嵌套细节，不要删掉义项、句子分析或重点词。'
       }]);
-      const retry = await postChat(endpoint, cfg, retryMessages, controller.signal, true, retryTokens);
-      if (!retry.ok) throw parseError;
-      const retryJson = await readJsonResponse(retry);
-      addUsage(retryJson?.usage || retryJson?.usageMetadata);
-      const retryMessage = retryJson?.choices?.[0]?.message;
-      let retryContent = retryMessage?.content;
-      if (Array.isArray(retryContent)) {
-        retryContent = retryContent.map((part) => typeof part === "string" ? part : part?.text || "").join("");
+      let retryContent = "";
+      try {
+        const retry = await LLM.sendChat(resolvedCfg, retryMessages, {
+          signal: controller.signal,
+          allowJsonMode: true,
+          maxTokens: retryTokens,
+          temperature
+        });
+        if (!retry.ok) throw parseError;
+        const retryJson = await LLM.readJsonResponse(retry);
+        addUsage(retryJson?.usage || retryJson?.usageMetadata);
+        retryContent = LLM.extractContent(retryJson, resolvedCfg);
+      } finally {
+        window.clearTimeout(timer);
       }
       if (!retryContent) throw parseError;
       try {
-        parsed = parseJsonObject(retryContent);
+        parsed = LLM.parseJsonObject(retryContent);
         retryLength = retryContent.length;
         content = retryContent;
       } catch (_) {
@@ -7972,7 +7853,7 @@
     if (type === "chunk") {
       const data = ensureChunk({ ...parsed, chunk: parsed?.chunk || query });
       data.source = "model";
-      data.model = cfg.model;
+      data.model = resolvedCfg.model;
       cachePutChunk(query, data, detail);
       return { type: "chunk", data };
     }
@@ -7991,24 +7872,23 @@
           ];
           let fixText = "";
           try {
-            fixText = await postChatStream(endpoint, cfg, fixMessages, controller.signal, false, maxTokens, (partial) => {
-              if (typeof options.onPreview === "function") {
-                try { options.onPreview(streamPreviewFromJson(partial, type, query)); } catch (_) { /* best-effort */ }
-              }
-            }, addUsage);
+            fixText = await streamOnce(fixMessages);
           } catch (_) { /* fall back to non-streaming below */ }
           if (!fixText) {
-            const fixRes = await postChat(endpoint, cfg, fixMessages, controller.signal, true, maxTokens);
+            const fixRes = await LLM.sendChat(resolvedCfg, fixMessages, {
+              signal: controller.signal,
+              allowJsonMode: true,
+              maxTokens,
+              temperature
+            });
             if (fixRes.ok) {
-              const fixJson = await readJsonResponse(fixRes, "词头纠偏重试");
+              const fixJson = await LLM.readJsonResponse(fixRes, "词头纠偏重试");
               addUsage(fixJson?.usage || fixJson?.usageMetadata);
-              fixText = isGoogleProvider(cfg)
-                ? (googleText(fixJson) || fixJson?.choices?.[0]?.message?.content || "")
-                : (typeof fixJson?.choices?.[0]?.message?.content === "string" ? fixJson.choices[0].message.content : "");
+              fixText = LLM.extractContent(fixJson, resolvedCfg);
             }
           }
           if (fixText) {
-            const reparsed = parseJsonObject(fixText);
+            const reparsed = LLM.parseJsonObject(fixText);
             const retried = normalizeModelWord(reparsed, query);
             if (!isHallucinatedWord(retried.word, query)) data = retried;
           }
@@ -8019,8 +7899,8 @@
         }
       }
       data.source = "model";
-      data.model = cfg.model;
-      data.gen = { ms: Math.max(0, Date.now() - startedAt), model: cfg.model || "", tokens: usage?.total ?? null, at: Date.now() };
+      data.model = resolvedCfg.model;
+      data.gen = { ms: Math.max(0, Date.now() - startedAt), model: resolvedCfg.model || "", tokens: usage?.total ?? null, at: Date.now() };
       cachePutWord(normalizeWord(data.word), data, detail, data.gen);
       if (normalizeWord(query) !== normalizeWord(data.word)) cachePutWord(query, data, detail, data.gen);
       return { type: "word", data };
@@ -8030,221 +7910,13 @@
       data.sentences = alignSentenceParts(data.sentences, pieces);
     }
     data.sourceType = "model";
-    data.model = cfg.model;
+    data.model = resolvedCfg.model;
     data.source = "语境分析";
     if (sentenceCacheKey) {
       data.id = `model-${sentenceCacheKey}`;
-      cachePutSentence(sentenceCacheKey, data, sentenceLevelOf(cfg.sentenceLevel).id, detail);
+      cachePutSentence(sentenceCacheKey, data, sentenceLevelOf(resolvedCfg.sentenceLevel).id, detail);
     }
     return { type: "sentence", data };
-  }
-
-  function streamDeltaText(delta) {
-    const value = delta?.content;
-    if (typeof value === "string") return value;
-    if (Array.isArray(value)) {
-      return value.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-    }
-    return "";
-  }
-
-  async function googleChatStream(cfg, messages, signal, maxTokens, onDelta, onUsage) {
-    const url = googleModelUrl(cfg, true);
-    const post = () => fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "text/event-stream" },
-      body: JSON.stringify(googlePayload(messages, maxTokens, true, cfg)),
-      signal
-    });
-    let response = await post();
-    if (response.status === 503 || response.status === 429) {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      response = await post();
-    }
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
-    }
-    if (!response.body) return googleText(await response.json());
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let content = "";
-    const consumeFrame = (frame) => {
-      const line = frame.split("\n").find((row) => row.startsWith("data:"));
-      if (!line) return;
-      const data = line.slice(5).trim();
-      if (!data || data === "[DONE]") return;
-      try {
-        const parsed = JSON.parse(data);
-        if (parsed?.usageMetadata) onUsage?.(parsed.usageMetadata);
-        const text = googleText(parsed);
-        if (text) {
-          content += text;
-          if (typeof onDelta === "function") onDelta(content);
-        }
-      } catch (_) { /* partial frames are skipped */ }
-    };
-    for (;;) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let index = buffer.indexOf("\n\n");
-      while (index >= 0) {
-        const frame = buffer.slice(0, index);
-        buffer = buffer.slice(index + 2);
-        index = buffer.indexOf("\n\n");
-        consumeFrame(frame);
-      }
-    }
-    // The final event often arrives without the trailing blank line; dropping
-    // it cuts the closing braces off the JSON, which looks like model failure.
-    buffer += decoder.decode();
-    if (buffer.trim()) consumeFrame(buffer);
-    return content;
-  }
-
-  async function googleChat(cfg, messages, signal, maxTokens, jsonMode = true) {
-    const url = googleModelUrl(cfg, false);
-    const post = () => fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Accept": "application/json" },
-      body: JSON.stringify(googlePayload(messages, maxTokens, jsonMode, cfg)),
-      signal
-    });
-    let response = await post();
-    if (response.status === 503 || response.status === 429) {
-      await new Promise((resolve) => setTimeout(resolve, 1200));
-      response = await post();
-    }
-    const raw = await response.text().catch(() => "");
-    let json = null;
-    try { json = raw ? JSON.parse(raw) : null; } catch (_) { /* keep raw for the error */ }
-    if (!response.ok) {
-      const message = json?.error?.message || raw.slice(0, 260);
-      throw new Error(`HTTP ${response.status}${message ? ` · ${message}` : ""}`);
-    }
-    const content = googleText(json);
-    return {
-      ok: true,
-      status: response.status,
-      json: async () => ({ choices: [{ message: { content } }] }),
-      text: async () => raw
-    };
-  }
-
-  async function postChatStream(endpoint, cfg, messages, signal, allowJsonMode, maxTokens, onDelta, onUsage) {
-    if (isGoogleProvider(cfg)) {
-      return googleChatStream(cfg, messages, signal, maxTokens, onDelta, onUsage);
-    }
-    const body = {
-      model: cfg.model,
-      messages,
-      temperature: state.pendingTemperature ?? 0.3,
-      max_tokens: maxTokens,
-      stream: true,
-      stream_options: { include_usage: true },
-      ...thinkingParams(cfg)
-    };
-    if (allowJsonMode) body.response_format = { type: "json_object" };
-
-    const send = async (withJsonMode, withUsage = true) => {
-      const payload = { ...body };
-      if (!withJsonMode) delete payload.response_format;
-      if (!withUsage) delete payload.stream_options;
-      return fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "text/event-stream",
-          "Authorization": `Bearer ${usableApiKey(cfg.apiKey)}`
-        },
-        body: JSON.stringify(payload),
-        signal
-      });
-    };
-
-    let response = await send(allowJsonMode);
-    if (!response.ok && allowJsonMode && [400, 422].includes(response.status)) {
-      response = await send(false);
-    }
-    if (!response.ok && [400, 422].includes(response.status)) {
-      // Gateways that do not know stream_options reject the whole request.
-      response = await send(false, false);
-    }
-    if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(`HTTP ${response.status}${text ? ` · ${text.slice(0, 260)}` : ""}`);
-    }
-
-    const type = response.headers.get("content-type") || "";
-    if (type.includes("application/json")) {
-      diagLog("info", "stream.buffered", "网关把流式响应缓冲成了整段 JSON", {
-        host: (() => { try { return new URL(endpoint).host; } catch (_) { return endpoint; } })(),
-        contentType: type
-      });
-      if (!window.__talkStreamWarned) {
-        window.__talkStreamWarned = true;
-        console.info("Provider returned a buffered JSON response despite stream=true.");
-      }
-      const json = await readJsonResponse(response, "流式接口");
-      if (json?.usage) onUsage?.(json.usage);
-      const message = json?.choices?.[0]?.message;
-      let content = message?.content;
-      if (Array.isArray(content)) {
-        content = content.map((part) => typeof part === "string" ? part : part?.text || "").join("");
-      }
-      if (content) onDelta?.(content);
-      return content || "";
-    }
-
-    if (!response.body?.getReader) {
-      return await response.text();
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = "";
-    let content = "";
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      let newline;
-      while ((newline = buffer.indexOf("\n")) >= 0) {
-        const line = buffer.slice(0, newline).trim();
-        buffer = buffer.slice(newline + 1);
-        if (!line.startsWith("data:")) continue;
-        const payload = line.slice(5).trim();
-        if (!payload || payload === "[DONE]") continue;
-        try {
-          const json = JSON.parse(payload);
-          if (json?.usage) onUsage?.(json.usage);
-          const choice = json?.choices?.[0];
-          const reasoning = choice?.delta?.reasoning_content || choice?.delta?.reasoning || choice?.message?.reasoning_content;
-          if (reasoning) state.lastReasoning = String(state.lastReasoning || "") + String(reasoning);
-          const piece = streamDeltaText(choice?.delta) || (typeof choice?.message?.content === "string" ? choice.message.content : "");
-          if (piece) {
-            content += piece;
-            onDelta?.(content);
-          }
-        } catch (_) {
-          // Ignore keep-alive/partial SSE lines.
-        }
-      }
-    }
-    buffer += decoder.decode();
-    if (buffer.trim().startsWith("data:")) {
-      const payload = buffer.trim().slice(5).trim();
-      if (payload && payload !== "[DONE]") {
-        try {
-          const json = JSON.parse(payload);
-          const piece = streamDeltaText(json?.choices?.[0]?.delta);
-          if (piece) content += piece;
-        } catch (_) { /* ignore */ }
-      }
-    }
-    return content;
   }
 
   function partialJsonString(text, key) {
@@ -8350,75 +8022,6 @@
       ${preview.translation ? `<p class="live-preview-translation">${esc(preview.translation)}</p>` : `<p class="live-preview-pending">正在整理第一段…</p>`}
       ${preview.short ? `<p class="live-preview-note">${esc(preview.short)}</p>` : ""}
       ${(preview.senses || []).length ? `<ul class="live-preview-senses">${preview.senses.map((sense) => `<li>${esc(shorten(sense, 42))}</li>`).join("")}</ul>` : ""}`;
-  }
-
-  function thinkingParams(cfg) {
-    const profile = activeProfile(cfg);
-    if (!profileSupportsThinking(profile) && !cfg.enableThinking) return {};
-    const params = { enable_thinking: Boolean(cfg.enableThinking) };
-    const budget = Number(cfg.thinkingBudget) || 0;
-    if (params.enable_thinking && budget > 0) params.thinking_budget = budget;
-    return params;
-  }
-
-  async function postChat(endpoint, cfg, messages, signal, allowJsonMode, maxTokens = 2600) {
-    if (isGoogleProvider(cfg)) {
-      return googleChat(cfg, messages, signal, maxTokens);
-    }
-    const body = {
-      model: cfg.model,
-      messages,
-      temperature: state.pendingTemperature ?? 0.3,
-      max_tokens: maxTokens,
-      stream: false,
-      ...thinkingParams(cfg)
-    };
-    if (allowJsonMode) body.response_format = { type: "json_object" };
-
-    const send = async (withJsonMode) => {
-      const payload = { ...body };
-      if (!withJsonMode) delete payload.response_format;
-      return fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Authorization": `Bearer ${usableApiKey(cfg.apiKey)}`
-        },
-        body: JSON.stringify(payload),
-        signal
-      });
-    };
-
-    let response = await send(allowJsonMode);
-    if (!response.ok && allowJsonMode && [400, 422].includes(response.status)) {
-      response = await send(false);
-    }
-    return response;
-  }
-
-  async function readJsonResponse(response, label = "接口") {
-    const raw = await response.text().catch(() => "");
-    if (!raw) throw new Error(`${label}返回了空响应（HTTP ${response.status}），可能是网关超时，请重试。`);
-    try {
-      return JSON.parse(raw);
-    } catch (_) {
-      throw new Error(`${label}返回的不是 JSON（HTTP ${response.status}）：${raw.slice(0, 160)}`);
-    }
-  }
-
-  function parseJsonObject(content) {
-    let text = String(content).trim();
-    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    const start = text.indexOf("{");
-    const end = text.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) throw new Error("模型没有返回 JSON 对象。");
-    const slice = text.slice(start, end + 1);
-    try {
-      return JSON.parse(slice);
-    } catch (error) {
-      throw new Error(`模型 JSON 解析失败：${error.message}`);
-    }
   }
 
   function unwrapModel(raw) {
@@ -11060,7 +10663,7 @@
         : window.TALK_PROMPTS.wordbookArticle;
     const label = task === "classify" ? "主题分册" : task === "extract" ? "AI 提取词条" : "生成精读文章";
     const maxTokens = task === "extract" ? 2400 : 3200;
-    return window.TALK_LLM.requestJson({
+    return LLM.requestJson({
       settings: state.settings,
       system: sys,
       user: payload,
@@ -11068,7 +10671,7 @@
       timeoutMs: Math.max(MODEL_TIMEOUT_MS, 90_000),
       label,
       disableThinking: true,
-      temperature: state.pendingTemperature ?? 0.3,
+      temperature: 0.3,
       retries: 1
     });
   }
@@ -11151,8 +10754,8 @@
       const found = typeof SENTENCE_LEVELS !== "undefined" ? SENTENCE_LEVELS.find((x) => x.id === lv) : null;
       return found ? found.label : lv.toUpperCase();
     },
-    callModelJSON: async (systemPrompt, userPayload, { signal, maxTokens = 4096 } = {}) => {
-      return window.TALK_LLM.requestJson({
+    callModelJSON: async (systemPrompt, userPayload, { signal, maxTokens = 4096, temperature = 0.3 } = {}) => {
+      return LLM.requestJson({
         settings: state.settings,
         system: systemPrompt,
         user: userPayload,
@@ -11161,7 +10764,7 @@
         signal,
         label: "模型接口",
         disableThinking: true,
-        temperature: state.pendingTemperature ?? 0.3,
+        temperature,
         retries: 1
       });
     }
