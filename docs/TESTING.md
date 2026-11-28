@@ -49,7 +49,7 @@ server.mock.requestsOf("word");   // 抓到的请求，用来断言"没有重复
 
 加一个场景 = 加一个 fixture，或在套件里用 `{ content: "..." }` 直接给字符串。
 
-## 套件（共 15 组 63 例）
+## 套件（共 15 组 65 例）
 
 | 套件 | 类型 | 覆盖 |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ server.mock.requestsOf("word");   // 抓到的请求，用来断言"没有重复
 | `word.spec.mjs` | E2E | 查词、义项与例句渲染、刷新命中缓存、嵌套词层、生成脚注 |
 | `chunk.spec.mjs` | E2E | 多词短语判为意群、全部区块渲染、刷新命中缓存 |
 | `sentence.spec.mjs` | E2E | 三视角切换（原句 / 意群切分 / 信息焦点）、行几何不变、点击意群与旧缓存降级 |
-| `reverse.spec.mjs` | E2E | Markdown + `[[...]]` 行内锚点、多轮追问、刷新完整恢复线程 |
+| `reverse.spec.mjs` | E2E | Markdown + `[[...]]` 行内锚点、多轮追问上下文保真、重生成去重、防截断推荐芯片、失败重试与刷新恢复 |
 | `reader.spec.mjs` | E2E | 内置离线示例精读、AI 导读与分段管线、底部速查 Dock 与 PDF 装订边距 |
 | `cache.spec.mjs` | E2E | 词条缓存 JSON 导出、清空、导入与重新命中校验 |
 | `share.spec.mjs` | E2E | 1080px 宽分享图合成 |

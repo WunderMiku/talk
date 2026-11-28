@@ -83,7 +83,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   const CONTENT = window.TALK_CONTENT;
   const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "303"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "304"; // cache-busting build, kept in step with ?v= and sw.js
   const actions = createActionRegistry();
 
   const app = document.getElementById("app");
@@ -2006,6 +2006,13 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       if (!start || Date.now() - start.at < 450) return;
       if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 14) return;
       if (!$("#reverse-input")) return;
+      const anchor = start.target instanceof Element ? start.target.closest(".rev-anchor") : null;
+      if (anchor?.dataset?.text) {
+        if (appendToComposer(`「${anchor.dataset.text.trim()}」`)) {
+          suppressClickUntil = Date.now() + 700;
+          return;
+        }
+      }
       const selection = window.getSelection();
       const text = englishOnly(selection?.toString() || "");
       if (!text) return;

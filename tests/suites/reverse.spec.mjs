@@ -96,4 +96,69 @@ suite("dictionary · context word search", { timeout: 45_000 }, (s) => {
     await page.waitForPage("reverse");
     t.expect(await page.locator(".rev-anchor").count()).toBeGreaterThanOrEqual(3);
   });
+
+  s.test("follow-up preserves [[...]] in history, never truncates chips mid-word, and regenerate avoids duplicate user turns", async (state, t) => {
+    const LONG_NOTE = `核心表达可以用 [[a surreal reality underpinned by subtle clues]] 整句收束，或者拆分用 [[in the nick of time]] 与 [[faint traces of]]。`;
+    state.env.server.mock.setFallback("*", { content: LONG_NOTE });
+    const page = await state.env.newPage();
+    await page.open("/");
+    await page.fill("#search-input", "想表达千钧一发里的荒诞线索");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-chip");
+
+    // Chips must NOT chop long phrases mid-word (old .slice(0, 16) produced "a surreal realit").
+    const chips = await page.locator('[data-action="reverse-follow"]').allInnerTexts();
+    t.expect(chips.length).toBeGreaterThanOrEqual(1);
+    t.expect(chips.some((c) => c.includes("a surreal realit"))).toBe(false);
+    t.expect(chips.some((c) => c.includes("in the nick of time"))).toBe(true);
+
+    // Send a follow-up and inspect the actual request payload sent to the model.
+    await page.fill("#reverse-input", "换成发给老板的正式邮件怎么改");
+    await page.keyboard.press("Enter");
+    await page.waitForFunction(() => document.querySelectorAll(".reverse-markdown").length === 2, null, { timeout: 10_000 });
+
+    const followReq = state.env.server.mock.requests.at(-1);
+    const followMsgs = followReq?.body?.messages || [];
+    const assistantHistory = followMsgs.find((m) => m.role === "assistant");
+    t.expect(Boolean(assistantHistory?.content?.includes("[[in the nick of time]]"))).toBe(true);
+    t.expect(followMsgs.at(-1)).toEqual({ role: "user", content: "换成发给老板的正式邮件怎么改" });
+
+    // Regenerate the follow-up: must NOT send two identical consecutive user messages!
+    await page.click('[data-action="reverse-regen"]');
+    await page.waitForFunction(() => !document.querySelector(".reverse-turn.is-pending"), null, { timeout: 10_000 });
+
+    const regenReq = state.env.server.mock.requests.at(-1);
+    const regenMsgs = regenReq?.body?.messages || [];
+    const nonSystem = regenMsgs.filter((m) => m.role !== "system");
+    for (let i = 1; i < nonSystem.length; i++) {
+      t.expect(nonSystem[i].role === nonSystem[i - 1].role).toBe(false);
+    }
+    t.expect(nonSystem.at(-1)).toEqual({ role: "user", content: "换成发给老板的正式邮件怎么改" });
+
+    // Restore default fallback for any subsequent tests.
+    state.env.server.mock.setFallback("*", { content: NOTE });
+    t.expect(page.errors).toEqual([]);
+  });
+
+  s.test("errored follow-up exposes a working retry button and recovers cleanly", async (state, t) => {
+    const page = await state.env.newPage();
+    await page.open("/");
+    await page.fill("#search-input", "测试追问失败重试");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-markdown");
+
+    // Make the next follow-up fail (500), then recover on retry.
+    state.env.server.mock.setFallback("*", { status: 500, body: { error: { message: "mock gateway hiccup" } } });
+    await page.fill("#reverse-input", "帮我改短一点");
+    await page.keyboard.press("Enter");
+    await page.waitForSelector('.reverse-turn.is-error [data-action="reverse-regen"]');
+
+    state.env.server.mock.setFallback("*", { content: NOTE });
+    await page.click('.reverse-turn.is-error [data-action="reverse-regen"]');
+    await page.waitForFunction(() => document.querySelectorAll(".reverse-markdown").length === 2, null, { timeout: 10_000 });
+    t.expect(await page.locator(".reverse-turn.is-error").count()).toBe(0);
+    t.expect(page.errors.filter((msg) => !msg.includes("status of 500"))).toEqual([]);
+  });
 });

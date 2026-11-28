@@ -178,12 +178,28 @@ export function createLookupService({
       ...history,
       { role: "user", content: prompt }
     ];
+    const externalSignal = options?.signal || null;
+    const isUserAborted = () => Boolean(externalSignal?.aborted);
     let controller = new AbortController();
     let timedOut = false;
     let timer = 0;
+    const onExternalAbort = () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+    if (externalSignal) {
+      if (externalSignal.aborted) {
+        const abortErr = new Error("已停止生成");
+        abortErr.name = "AbortError";
+        abortErr.userCancelled = true;
+        throw abortErr;
+      }
+      externalSignal.addEventListener("abort", onExternalAbort, { once: true });
+    }
     const armDeadline = () => {
       window.clearTimeout(timer);
       controller = new AbortController();
+      if (externalSignal?.aborted) controller.abort();
       timedOut = false;
       timer = window.setTimeout(() => { timedOut = true; controller.abort(); }, MODEL_TIMEOUT_MS);
     };
@@ -247,22 +263,30 @@ export function createLookupService({
       // when both are present. The static prompt already requires JSON.
       content = await streamOnce();
     } catch (error) {
+      if (isUserAborted()) {
+        const abortErr = new Error("已停止生成");
+        abortErr.name = "AbortError";
+        abortErr.userCancelled = true;
+        throw abortErr;
+      }
       diagLog("error", "model.fail", timedOut ? `请求超时（${MODEL_TIMEOUT_MS / 1000} 秒）` : (error?.message || String(error)), { type, detail, ms: Date.now() - startedAt, chars: String(query).length });
       // Mobile networks drop long streams and gateways sometimes cut our
       // deadline. Both are worth one silent retry with a fresh signal.
       const retriable = timedOut || error?.name !== "AbortError" || /不是 JSON|空响应|Failed to fetch|network error/i.test(String(error?.message || ""));
-      if (!content && retriable) {
+      if (!content && retriable && !isUserAborted()) {
         await wait(timedOut ? 300 : 900);
-        armDeadline();
-        try {
-          content = await streamOnce();
-        } catch (retryError) {
-          diagLog("error", "model.fail", retryError?.message || String(retryError), { type, detail, ms: Date.now() - startedAt, chars: String(query).length, attempt: 2 });
+        if (!isUserAborted()) {
+          armDeadline();
+          try {
+            content = await streamOnce();
+          } catch (retryError) {
+            diagLog("error", "model.fail", retryError?.message || String(retryError), { type, detail, ms: Date.now() - startedAt, chars: String(query).length, attempt: 2 });
+          }
         }
       }
       // Older/limited gateways may reject streaming. Retry once non-streaming
       // only when no content has been received.
-      if (!content && retriable) {
+      if (!content && retriable && !isUserAborted()) {
         armDeadline();
         const response = await LLM.sendChat(resolvedCfg, messages, {
           signal: controller.signal,
@@ -277,11 +301,18 @@ export function createLookupService({
         addUsage(json?.usage || json?.usageMetadata);
         content = LLM.extractContent(json, resolvedCfg);
       }
+      if (isUserAborted()) {
+        const abortErr = new Error("已停止生成");
+        abortErr.name = "AbortError";
+        abortErr.userCancelled = true;
+        throw abortErr;
+      }
       if (!content) throw timedOut ? new Error(`请求超时（${MODEL_TIMEOUT_MS / 1000} 秒），网关没有返回内容，可以重试或换一个模型。`) : error;
     } finally {
       window.clearTimeout(timer);
+      if (externalSignal) externalSignal.removeEventListener("abort", onExternalAbort);
     }
-    if (!content) {
+    if (!content && !isUserAborted()) {
       diagLog("error", "model.empty", "网关返回了空内容", { type, detail, chars: 0 });
       armDeadline();
       try {

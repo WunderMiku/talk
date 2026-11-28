@@ -133,18 +133,45 @@ export function createReverseView({
     kvSet(reverseFirstKey(), map);
   }
 
+  let activeAbort = null;
+
+  function isReverseBusy() {
+    return currentReverseThread().some((turn) => turn && turn.pending);
+  }
+
+  function abortActiveReverse() {
+    if (activeAbort) {
+      try { activeAbort.abort(); } catch (_) { /* no-op */ }
+      activeAbort = null;
+    }
+  }
+
   function reverseSuggestions() {
     const thread = currentReverseThread();
     const sent = new Set(thread.filter((turn) => turn.role === "user").map((turn) => String(turn.content || "").trim()));
-    const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content);
-    const anchors = [...String(last?.content || "").matchAll(REVERSE_ANCHOR_RE)].map((hit) => hit[1].trim()).filter(Boolean);
-    const first = anchors[0] ? anchors[0].slice(0, 16) : "";
-    const second = anchors[1] ? anchors[1].slice(0, 16) : "";
+    const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content && !turn.error);
+    const anchors = [...new Set(
+      [...String(last?.content || "").matchAll(REVERSE_ANCHOR_RE)]
+        .map((hit) => hit[1].replace(/\s+/g, " ").trim())
+        .filter(Boolean)
+    )];
+    // Never chop phrases mid-word: separate clean short terms/idioms from full sentences.
+    const cleanTerms = anchors.filter((text) => {
+      const words = reverseAnchorWords(text);
+      return words >= 1 && words <= 5 && text.length <= 30 && !/[.!?]$/.test(text);
+    });
+    const hasSentence = anchors.some((text) => reverseAnchorWords(text) >= 6 || /[.!?]$/.test(text));
+    const first = cleanTerms[0] || "";
+    const second = cleanTerms[1] || "";
     const pool = [];
+    if (first && second) pool.push(`对比「${first}」和「${second}」的语气差别`);
     if (first) pool.push(`「${first}」更口语怎么说`);
-    if (first && second) pool.push(`「${first}」和「${second}」怎么选`);
-    if (first) pool.push(`把「${first}」放进正式句子`);
-    if (!pool.length) pool.push("再口语一点怎么说", "放进正式写作里怎么改");
+    if (first) pool.push(`用「${first}」造 2 个真实场景例句`);
+    if (hasSentence) {
+      pool.push("把这句改得更自然口语");
+      pool.push("换成书面/邮件语气怎么写");
+    }
+    pool.push("再地道/简短一点怎么说", "换成正式写作语气怎么改");
     return [...new Set(pool)].filter((text) => !sent.has(text)).slice(0, 2);
   }
 
@@ -161,7 +188,12 @@ export function createReverseView({
       </article>`;
     }
     if (turn.error) {
-      return `<article class="reverse-turn is-error" data-surface="stamp"><p class="reverse-error">${esc(turn.error)}</p></article>`;
+      return `<article class="reverse-turn is-error" data-surface="stamp">
+        <p class="reverse-error">${esc(turn.error)}</p>
+        <div class="reverse-actions">
+          <button class="reverse-chip" type="button" data-action="reverse-regen">${icon("refresh")} 重试</button>
+        </div>
+      </article>`;
     }
     return `<article class="reverse-turn" data-surface="elevated">
       <div class="reverse-turn-head"><span class="reverse-turn-dot" aria-hidden="true"></span><span>talk.</span></div>
@@ -182,17 +214,39 @@ export function createReverseView({
             <button class="reverse-chip" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
             <button class="reverse-chip is-icon" type="button" data-action="reverse-copy" aria-label="复制">${icon("copy")}</button>
           </div>
-          <p class="reverse-hint">带下划线或底色的表达可以直接点开看完整档案。</p>` : ""}`;
+          <p class="reverse-hint">点击高亮表达看完整词条，长按可填入下方追问框。</p>` : ""}`;
+  }
+
+  function syncComposerState(root = document) {
+    const sendBtn = $(".reverse-send", root);
+    if (!sendBtn) return;
+    const busy = isReverseBusy();
+    sendBtn.classList.toggle("is-stop", busy);
+    sendBtn.type = busy ? "button" : "submit";
+    if (busy) {
+      sendBtn.dataset.action = "reverse-stop";
+      sendBtn.setAttribute("aria-label", "停止生成");
+      sendBtn.title = "停止生成";
+      sendBtn.innerHTML = `<span class="stop-square" aria-hidden="true"></span>`;
+    } else {
+      delete sendBtn.dataset.action;
+      sendBtn.setAttribute("aria-label", "发送");
+      sendBtn.title = "发送";
+      sendBtn.innerHTML = icon("arrowRight");
+    }
   }
 
   function reverseThreadHtml() {
     const copy = copyFor("reverse");
+    const thread = currentReverseThread();
+    const heading = shorten(state.reverseTitle || reverseThreadTitle(thread) || copy.title || "语境寻词", 26);
+    const busy = isReverseBusy();
     return `
       <header class="reverse-topbar">
         <button class="icon-btn" type="button" data-action="back" aria-label="返回">${icon("arrowLeft")}</button>
         <div class="reverse-topbar-copy">
           <span class="reverse-kicker">${esc(copy.label || "语境寻词")}</span>
-          <strong>${esc(copy.title || "语境寻词")}</strong>
+          <strong>${esc(heading)}</strong>
         </div>
         <div class="reverse-topbar-actions">
           <button class="icon-btn reverse-hist-btn" type="button" data-action="reverse-history" aria-label="历史对话" title="历史对话">${icon("clock")}${(() => { const n = listReverseThreads().length; return n ? `<span class="reverse-hist-badge">${n}</span>` : ""; })()}</button>
@@ -203,8 +257,8 @@ export function createReverseView({
         <div class="reverse-scroll">${reverseScrollInnerHtml()}
         </div>
         <form class="reverse-composer" autocomplete="off">
-          <input id="reverse-input" type="text" name="q" placeholder="输入英文句子，或长按正文选词加入…" />
-          <button class="reverse-send" type="submit" aria-label="发送">${icon("arrowRight")}</button>
+          <input id="reverse-input" type="text" name="q" placeholder="继续追问：换语气、辨析差异、造句，或贴入英文让我润色…" />
+          <button class="reverse-send${busy ? " is-stop" : ""}" type="${busy ? "button" : "submit"}" ${busy ? 'data-action="reverse-stop" aria-label="停止生成" title="停止生成"' : 'aria-label="发送" title="发送"'}>${busy ? '<span class="stop-square" aria-hidden="true"></span>' : icon("arrowRight")}</button>
         </form>
       </main>`;
   }
@@ -233,10 +287,11 @@ export function createReverseView({
           existingBadge.remove();
         }
       }
-      window.TALK_I18N?.apply(scrollBox);
+      syncComposerState(screenEl);
+      if (window.TALK_I18N?.lang === "en") window.TALK_I18N.apply(scrollBox);
     } else {
       screenEl.innerHTML = reverseThreadHtml();
-      window.TALK_I18N?.apply(screenEl);
+      if (window.TALK_I18N?.lang === "en") window.TALK_I18N.apply(screenEl);
     }
     if (scrollToEnd) {
       reverseScrollToEnd();
@@ -252,6 +307,9 @@ export function createReverseView({
       if (stored) {
         state.reverseThreadId = stored.id;
         state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
+        state.reverseTitle = stored.title || reverseThreadTitle(stored.messages);
+        if (stored.budget) state.reverseBudget = Number(stored.budget);
+        if (stored.style) state.reverseStyle = stored.style;
       }
     }
     state.reverse = null;
@@ -273,6 +331,7 @@ export function createReverseView({
   function openReverseForSubject(kind, rawSubject) {
     const subject = String(rawSubject || "").trim();
     if (!subject) return;
+    abortActiveReverse();
     const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     state.reverseBudget = reverseBudget();
     state.reverseStyle = reverseStyleName(state.reverseBudget);
@@ -284,7 +343,7 @@ export function createReverseView({
       : `我想围绕英文${kindLabel}「${subject}」向你提问。`;
     const seedAssistant = kind === "sentence"
       ? `已载入这句英文语境。你可以直接问我它的语气潜台词、长难句逻辑，或让我给出更地道的改写方案。`
-      : `已载入 ${kindLabel} [[${subject}]]。你可以直接追问它的近义词区别、真实外刊造句、搭配限制或常见误用。`;
+      : `已载入${kindLabel} [[${subject}]]。你可以直接追问它的近义词区别、真实外刊造句、搭配限制或常见误用。`;
 
     state.reverseTitle = shorten(subject, 28);
     state.reverseThread = [
@@ -308,6 +367,7 @@ export function createReverseView({
   async function startReverse(query) {
     const text = String(query || "").trim();
     if (!text) return;
+    abortActiveReverse();
     const cached = cacheGetReverseFirst(text);
     const id = `rv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
     state.reverseBudget = reverseBudget();
@@ -326,13 +386,18 @@ export function createReverseView({
     navigate({ name: "reverse", id });
     const owner = state.reverseThread;
     const alive = () => state.reverseThread === owner;
+    const abort = new AbortController();
+    activeAbort = abort;
+    let partialStream = "";
     try {
       const result = await modelLookup(text, "reverse", state.settings, {
+        signal: abort.signal,
         reverseStyle: state.reverseStyle,
         reverseBudget: state.reverseBudget,
         onPreview: (preview) => {
           if (!alive() || !preview?.narrative) return;
-          updateReverseStream(preview.narrative);
+          partialStream = String(preview.narrative);
+          updateReverseStream(partialStream);
         }
       });
       placeholder.pending = false;
@@ -343,39 +408,83 @@ export function createReverseView({
       if (alive()) redrawReverse();
     } catch (error) {
       placeholder.pending = false;
-      placeholder.error = error?.message || "这次没有写完，再试一次。";
+      if (error?.userCancelled && partialStream.trim()) {
+        placeholder.content = partialStream.trim();
+        persistReverseThread();
+      } else {
+        placeholder.error = error?.userCancelled ? "已停止生成，可点击重试继续。" : (error?.message || "这次没有写完，再试一次。");
+      }
       if (alive()) redrawReverse();
+    } finally {
+      if (activeAbort === abort) activeAbort = null;
+      if (alive()) syncComposerState();
     }
   }
 
-  function reverseHistory(excludeIndex = -1) {
-    return currentReverseThread()
-      .filter((turn, index) => index !== excludeIndex && turn.role && turn.content && !turn.pending)
-      .map((turn) => ({
-        role: turn.role,
-        content: turn.role === "assistant" ? stripReverseAnchors(turn.content) : String(turn.content)
-      }));
+  /**
+   * Build clean alternating multi-turn history up to `endIndex` (exclusive).
+   * - Preserves `[[...]]` markers in assistant messages so the model keeps
+   *   emitting clickable inline anchors across follow-up turns!
+   * - Drops pending, errored, and orphaned user turns whose reply failed.
+   * - Caps to the latest 12 turns (6 full rounds) to stay within token budget.
+   */
+  function reverseHistory(endIndex = currentReverseThread().length) {
+    const thread = currentReverseThread();
+    const limit = Math.max(0, Math.min(Number(endIndex), thread.length));
+    const pairs = [];
+    for (let i = 0; i < limit; i++) {
+      const turn = thread[i];
+      if (!turn || turn.pending || turn.error || !turn.content) continue;
+      const role = turn.role === "assistant" ? "assistant" : "user";
+      const content = String(turn.content).trim();
+      if (!content) continue;
+      // Avoid dangling duplicate-role entries (e.g. an earlier user turn whose reply errored).
+      if (pairs.length && pairs[pairs.length - 1].role === role) {
+        pairs[pairs.length - 1] = { role, content };
+      } else {
+        pairs.push({ role, content });
+      }
+    }
+    // Never end history on a dangling `user` message before we append the new `user` prompt.
+    while (pairs.length && pairs[pairs.length - 1].role === "user") {
+      pairs.pop();
+    }
+    return pairs.slice(-12);
   }
 
   async function askReverseFollowUp(text) {
     const query = String(text || "").trim();
     if (!query) return;
-    const history = reverseHistory();
+    if (isReverseBusy()) {
+      toast("上一条还在生成中，点右侧方块可停止");
+      return;
+    }
+    const thread = currentReverseThread();
+    // If the previous turn ended in an error, remove the stale error bubble so the thread stays clean.
+    if (thread.length && thread[thread.length - 1]?.error) {
+      thread.pop();
+    }
+    const history = reverseHistory(thread.length);
     const placeholder = { role: "assistant", content: "", pending: true };
     state.reverseThread.push({ role: "user", content: query }, placeholder);
     persistReverseThread();
     redrawReverse({ scrollToEnd: true });
     const owner = state.reverseThread;
     const alive = () => state.reverseThread === owner;
+    const abort = new AbortController();
+    activeAbort = abort;
+    let partialStream = "";
     try {
       const result = await modelLookup(query, "reverse", state.settings, {
+        signal: abort.signal,
         history,
         skipCache: true,
-        reverseStyle: state.reverseStyle,
-        reverseBudget: state.reverseBudget,
+        reverseStyle: state.reverseStyle || reverseStyleName(),
+        reverseBudget: state.reverseBudget || reverseBudget(),
         onPreview: (preview) => {
           if (!alive() || !preview?.narrative) return;
-          updateReverseStream(preview.narrative);
+          partialStream = String(preview.narrative);
+          updateReverseStream(partialStream);
         }
       });
       placeholder.pending = false;
@@ -385,33 +494,56 @@ export function createReverseView({
       if (alive()) redrawReverse();
     } catch (error) {
       placeholder.pending = false;
-      placeholder.error = error?.message || "这次没有写完，再试一次。";
+      if (error?.userCancelled && partialStream.trim()) {
+        placeholder.content = partialStream.trim();
+        persistReverseThread();
+      } else {
+        placeholder.error = error?.userCancelled ? "已停止生成，可点击重试继续。" : (error?.message || "这次没有写完，再试一次。");
+      }
       if (alive()) redrawReverse();
+    } finally {
+      if (activeAbort === abort) activeAbort = null;
+      if (alive()) syncComposerState();
     }
   }
 
   async function regenerateReverse() {
     const thread = currentReverseThread();
+    if (isReverseBusy()) return;
     const last = thread[thread.length - 1];
     if (!last || last.role !== "assistant" || last.pending) return;
-    const prompt = reverseHistory(thread.length - 1).filter((turn) => turn.role === "user").pop()?.content || "";
+    // Find the user turn directly preceding this assistant reply so we don't duplicate it in history!
+    let lastUserIndex = -1;
+    for (let i = thread.length - 2; i >= 0; i--) {
+      if (thread[i]?.role === "user" && thread[i]?.content) {
+        lastUserIndex = i;
+        break;
+      }
+    }
+    if (lastUserIndex < 0) return;
+    const prompt = String(thread[lastUserIndex].content).trim();
     if (!prompt) return;
+    const history = reverseHistory(lastUserIndex);
     thread.pop();
     const placeholder = { role: "assistant", content: "", pending: true };
     thread.push(placeholder);
     redrawReverse({ scrollToEnd: true });
-    const history = reverseHistory(thread.length - 1);
     const owner = thread;
     const alive = () => state.reverseThread === owner;
+    const abort = new AbortController();
+    activeAbort = abort;
+    let partialStream = "";
     try {
       const result = await modelLookup(prompt, "reverse", state.settings, {
+        signal: abort.signal,
         history,
         skipCache: true,
-        reverseStyle: state.reverseStyle,
-        reverseBudget: state.reverseBudget,
+        reverseStyle: state.reverseStyle || reverseStyleName(),
+        reverseBudget: state.reverseBudget || reverseBudget(),
         onPreview: (preview) => {
           if (!alive() || !preview?.narrative) return;
-          updateReverseStream(preview.narrative);
+          partialStream = String(preview.narrative);
+          updateReverseStream(partialStream);
         }
       });
       placeholder.pending = false;
@@ -421,12 +553,24 @@ export function createReverseView({
       if (alive()) redrawReverse();
     } catch (error) {
       placeholder.pending = false;
-      placeholder.error = error?.message || "这次没有写完，再试一次。";
+      if (error?.userCancelled && partialStream.trim()) {
+        placeholder.content = partialStream.trim();
+        persistReverseThread();
+      } else {
+        placeholder.error = error?.userCancelled ? "已停止生成，可点击重试继续。" : (error?.message || "这次没有写完，再试一次。");
+      }
       if (alive()) redrawReverse();
+    } finally {
+      if (activeAbort === abort) activeAbort = null;
+      if (alive()) syncComposerState();
     }
   }
 
   function submitReverseComposer() {
+    if (isReverseBusy()) {
+      toast("上一条还在生成中，点右侧方块可停止");
+      return;
+    }
     const field = $("#reverse-input");
     const text = String(field?.value || "").trim();
     if (!text) return;
@@ -447,8 +591,10 @@ export function createReverseView({
 
   function startNewReverseSession({ event }) {
     event.preventDefault();
+    abortActiveReverse();
     state.reverseThread = [];
     state.reverseThreadId = "";
+    state.reverseTitle = "";
     navigate({ name: "home" });
     const field = $("#search-input");
     if (field) requestAnimationFrame(() => field.focus());
@@ -461,6 +607,10 @@ export function createReverseView({
     },
     "reverse-again": startNewReverseSession,
     "reverse-new": startNewReverseSession,
+    "reverse-stop"({ event }) {
+      event.preventDefault();
+      abortActiveReverse();
+    },
     "reverse-regen"() {
       void regenerateReverse();
     },
@@ -478,7 +628,7 @@ export function createReverseView({
       const thread = currentReverseThread();
       const last = [...thread].reverse().find((turn) => turn.role === "assistant" && turn.content);
       if (!last) return;
-      void copyText(String(last.content).trim()).then((copied) => {
+      void copyText(stripReverseAnchors(String(last.content)).trim()).then((copied) => {
         toast(copied ? "正文已复制" : "这个浏览器不允许复制");
       });
     },
@@ -492,10 +642,12 @@ export function createReverseView({
       const id = target.dataset.id || "";
       const stored = loadReverseThread(id);
       if (!stored) return;
+      abortActiveReverse();
       tapFeedback();
       closeSheet({ immediate: true });
       state.reverseThreadId = stored.id;
       state.reverseThread = stored.messages.map((turn) => ({ ...turn }));
+      state.reverseTitle = stored.title || reverseThreadTitle(stored.messages);
       state.reverseBudget = Number(stored.budget) || state.reverseBudget;
       state.reverseStyle = stored.style || state.reverseStyle;
       navigate({ name: "reverse", id: stored.id });
@@ -506,17 +658,21 @@ export function createReverseView({
       if (!id) return;
       deleteReverseThread(id);
       if (state.reverseThreadId === id) {
+        abortActiveReverse();
         state.reverseThread = [];
         state.reverseThreadId = "";
+        state.reverseTitle = "";
       }
       renderHistoryContent();
       toast("已删除这条寻词记录");
     },
     "clear-reverse-threads"({ event }) {
       event.preventDefault();
+      abortActiveReverse();
       clearReverseThreads();
       state.reverseThread = [];
       state.reverseThreadId = "";
+      state.reverseTitle = "";
       renderHistoryContent();
       toast("已清空寻词记录");
     }

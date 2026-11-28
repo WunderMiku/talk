@@ -11059,6 +11059,19 @@ html.motion-ready .reveal.reveal-soft.is-in {
 
 .reverse-send svg { width: 16px; height: 16px; }
 
+.reverse-send.is-stop .stop-square {
+  display: block;
+  width: 11px;
+  height: 11px;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.reverse-markdown {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .screen[data-page="reverse"] .reverse-composer {
   position: fixed;
   bottom: 14px;
