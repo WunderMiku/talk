@@ -118,6 +118,30 @@ suite("ui stability · bug & twitch regressions", { timeout: 60_000 }, (s) => {
     t.expect(page.errors).toEqual([]);
   });
 
+  s.test("reverse streaming and completion do not force-scroll the user down on long replies", async (state, t) => {
+    const longNote = Array.from({ length: 30 }, (_, i) =>
+      `- **第 ${i + 1} 层**：可以用 [[absurdity]] 或 [[faint traces of]] 表达细致语境变化，适合书面与口语自然过渡。`
+    ).join("\n\n");
+    state.env.server.mock.setFallback("*", { content: longNote });
+
+    const page = await state.env.newPage();
+    await page.open("/");
+    await page.fill("#search-input", "想表达荒诞里带一点线索的长解释");
+    await page.keyboard.press("Enter");
+    await page.waitForPage("reverse");
+    await page.waitForSelector(".reverse-markdown");
+
+    const scrollState = await page.evaluate(() => {
+      const scroller = document.querySelector(".reverse-page");
+      return {
+        scrollTop: scroller?.scrollTop ?? -1,
+        overflows: (scroller?.scrollHeight || 0) > (scroller?.clientHeight || 0)
+      };
+    });
+    t.expect(scrollState).toEqual({ scrollTop: 0, overflows: true });
+    t.expect(page.errors).toEqual([]);
+  });
+
   s.test("nested layer rapid close/reopen does not get wiped by stale cleanup timer", async (state, t) => {
     state.env.server.mock.on({ task: "word", query: "take" }, { fixture: "word-take" });
     const page = await state.env.newPage();

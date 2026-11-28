@@ -210,9 +210,11 @@ export function createReverseView({
     if (scroller) scroller.scrollTop = scroller.scrollHeight;
   }
 
-  function redrawReverse() {
+  function redrawReverse({ scrollToEnd = false } = {}) {
     const screenEl = document.querySelector('.screen[data-page="reverse"]');
     if (!screenEl) return;
+    const scroller = $(".reverse-page", screenEl);
+    const prevScroll = scroller ? scroller.scrollTop : 0;
     const scrollBox = $(".reverse-scroll", screenEl);
     if (scrollBox) {
       scrollBox.innerHTML = reverseScrollInnerHtml();
@@ -232,7 +234,12 @@ export function createReverseView({
       screenEl.innerHTML = reverseThreadHtml();
       window.TALK_I18N?.apply(screenEl);
     }
-    reverseScrollToEnd();
+    if (scrollToEnd) {
+      reverseScrollToEnd();
+    } else {
+      const nextScroller = $(".reverse-page", screenEl);
+      if (nextScroller) nextScroller.scrollTop = prevScroll;
+    }
   }
 
   function reversePage(result = {}) {
@@ -250,11 +257,13 @@ export function createReverseView({
   function updateReverseStream(text) {
     const body = document.querySelector(".reverse-turn.is-pending .reverse-stream-body");
     if (!body) return;
+    const scroller = document.querySelector(".reverse-page");
+    const prevScroll = scroller ? scroller.scrollTop : 0;
     body.innerHTML = markdownLite(String(text || ""), false);
     body.classList.add("has-text");
     const pending = body.closest(".is-pending");
     if (pending) pending.classList.add("has-text");
-    reverseScrollToEnd();
+    if (scroller && scroller.scrollTop !== prevScroll) scroller.scrollTop = prevScroll;
   }
 
   function openReverseForSubject(kind, rawSubject) {
@@ -351,7 +360,7 @@ export function createReverseView({
     const placeholder = { role: "assistant", content: "", pending: true };
     state.reverseThread.push({ role: "user", content: query }, placeholder);
     persistReverseThread();
-    redrawReverse();
+    redrawReverse({ scrollToEnd: true });
     const owner = state.reverseThread;
     const alive = () => state.reverseThread === owner;
     try {
@@ -386,7 +395,7 @@ export function createReverseView({
     thread.pop();
     const placeholder = { role: "assistant", content: "", pending: true };
     thread.push(placeholder);
-    redrawReverse();
+    redrawReverse({ scrollToEnd: true });
     const history = reverseHistory(thread.length - 1);
     const owner = thread;
     const alive = () => state.reverseThread === owner;
