@@ -270,4 +270,134 @@ suite("llm-client · unified transport & profile resolution (unit)", { timeout: 
     t.expect(badPing.text.includes("HTTP 403")).toBe(true);
     t.expect(badPing.text.includes("Forbidden key")).toBe(true);
   });
+
+  s.test("supports Anthropic Messages API: headers, system/turn normalization, extended thinking, SSE streaming, models & ping", async (_state, t) => {
+    const llmProbe = loadLlmClient();
+    t.expect(llmProbe.isAnthropicProvider({ protocol: "anthropic" })).toBe(true);
+    t.expect(llmProbe.isAnthropicProvider({ provider: "anthropic" })).toBe(true);
+    t.expect(llmProbe.isAnthropicProvider({ baseUrl: "https://api.anthropic.com/v1" })).toBe(true);
+    // Explicit OpenAI protocol (e.g. OpenRouter or OpenAI-compatible Claude proxy) must stay OpenAI.
+    t.expect(llmProbe.isAnthropicProvider({ protocol: "openai", baseUrl: "https://openrouter.ai/api/v1", model: "anthropic/claude-sonnet-4-5" })).toBe(false);
+    t.expect(llmProbe.anthropicRoot("https://api.anthropic.com")).toBe("https://api.anthropic.com/v1");
+    t.expect(llmProbe.anthropicRoot("https://api.anthropic.com/v1/messages")).toBe("https://api.anthropic.com/v1");
+    t.expect(llmProbe.modelsUrlFor({ protocol: "anthropic", baseUrl: "https://api.anthropic.com", apiKey: "sk-ant-1" }))
+      .toBe("https://api.anthropic.com/v1/models");
+
+    // Payload normalization: extracts top-level system, merges consecutive user messages, handles extended thinking
+    const stdPayload = llmProbe.anthropicPayload(
+      [
+        { role: "system", content: "System A" },
+        { role: "system", content: "System B" },
+        { role: "user", content: "Part 1" },
+        { role: "user", content: "Part 2" },
+        { role: "assistant", content: "Ack" },
+        { role: "user", content: "Next" }
+      ],
+      1800,
+      { model: "claude-sonnet-4-5", enableThinking: false },
+      1.4,
+      false
+    );
+    t.expect(stdPayload.system).toBe("System A\n\nSystem B");
+    t.expect(stdPayload.messages.length).toBe(3);
+    t.expect(stdPayload.messages[0]).toEqual({ role: "user", content: "Part 1\n\nPart 2" });
+    t.expect(stdPayload.temperature).toBe(1);
+    t.expect(stdPayload.thinking).toBe(undefined);
+
+    const thinkPayload = llmProbe.anthropicPayload(
+      [{ role: "user", content: "Reason deeply" }],
+      1200,
+      { model: "claude-sonnet-4-5", enableThinking: true, thinkingBudget: 2048 },
+      0.3,
+      true
+    );
+    t.expect(thinkPayload.thinking).toEqual({ type: "enabled", budget_tokens: 2048 });
+    t.expect(thinkPayload.temperature).toBe(undefined);
+    t.expect(thinkPayload.max_tokens).toBe(3072);
+
+    // Non-streaming requestJson + headers + ignoring thinking block in extractContent
+    const captured = [];
+    const llm = loadLlmClient(async (url, init) => {
+      captured.push({ url, headers: init?.headers || {}, body: init?.body ? JSON.parse(init.body) : null });
+      if (url.endsWith("/v1/models")) {
+        return {
+          ok: true,
+          status: 200,
+          text: async () => JSON.stringify({ data: [{ id: "claude-sonnet-4-5" }, { id: "claude-haiku-4-5" }] })
+        };
+      }
+      if (init?.body && JSON.parse(init.body).stream) {
+        return {
+          ok: true,
+          status: 200,
+          headers: new Headers({ "content-type": "text/event-stream" }),
+          body: makeStreamBody([
+            'event: message_start\ndata: {"type":"message_start","message":{"usage":{"input_tokens":30}}}\n\n',
+            'event: content_block_delta\ndata: {"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"weighing nuance"}}\n\n',
+            'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"{\\"word\\":\\""}}\n\n',
+            'event: content_block_delta\ndata: {"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"liminal\\"}"}}\n\n',
+            'event: message_delta\ndata: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":12}}\n\n',
+            'event: message_stop\ndata: {"type":"message_stop"}'
+          ])
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify({
+          content: [
+            { type: "thinking", thinking: "internal reasoning" },
+            { type: "text", text: '{"ok":true,"word":"liminal"}' }
+          ],
+          usage: { input_tokens: 20, output_tokens: 10 }
+        })
+      };
+    });
+
+    const anthropicProfile = {
+      protocol: "anthropic",
+      provider: "anthropic",
+      baseUrl: "https://api.anthropic.com",
+      model: "claude-sonnet-4-5",
+      apiKey: "sk-ant-test"
+    };
+
+    const jsonRes = await llm.requestJson({
+      settings: anthropicProfile,
+      system: "Return JSON",
+      user: "liminal"
+    });
+    t.expect(jsonRes).toEqual({ ok: true, word: "liminal" });
+    t.expect(captured[0].url).toBe("https://api.anthropic.com/v1/messages");
+    t.expect(captured[0].headers["x-api-key"]).toBe("sk-ant-test");
+    t.expect(captured[0].headers["anthropic-version"]).toBe("2023-06-01");
+    t.expect(captured[0].headers["anthropic-dangerous-direct-browser-access"]).toBe("true");
+    t.expect(captured[0].body.response_format).toBe(undefined);
+
+    const deltas = [];
+    let reasoning = "";
+    let usage = null;
+    const streamed = await llm.sendChatStream(
+      { ...anthropicProfile, enableThinking: true, thinkingBudget: 1024 },
+      [{ role: "system", content: "Sys" }, { role: "user", content: "Hi" }],
+      {
+        onDelta: (full) => deltas.push(full),
+        onReasoning: (r) => { reasoning += r; },
+        onUsage: (u) => { usage = u; }
+      }
+    );
+    t.expect(streamed).toBe('{"word":"liminal"}');
+    t.expect(reasoning).toBe("weighing nuance");
+    t.expect(usage).toEqual({ input_tokens: 30, output_tokens: 12, total_tokens: 42 });
+    t.expect(deltas.length).toBe(2);
+
+    const models = await llm.listModels(anthropicProfile);
+    t.expect(models).toEqual(["claude-sonnet-4-5", "claude-haiku-4-5"]);
+    t.expect(captured[2].headers["x-api-key"]).toBe("sk-ant-test");
+    t.expect(captured[2].headers["anthropic-dangerous-direct-browser-access"]).toBe("true");
+
+    const ping = await llm.pingModel(anthropicProfile);
+    t.expect(ping.ok).toBe(true);
+    t.expect(ping.text.includes("liminal")).toBe(true);
+  });
 });

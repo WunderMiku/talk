@@ -204,8 +204,8 @@ export function createLookupService({
     const addUsage = (u) => {
       if (!u || typeof u !== "object") return;
       const next = {
-        prompt: Number(u.prompt_tokens ?? u.promptTokenCount ?? 0) || 0,
-        completion: Number(u.completion_tokens ?? u.candidatesTokenCount ?? 0) || 0,
+        prompt: Number(u.prompt_tokens ?? u.input_tokens ?? u.promptTokenCount ?? 0) || 0,
+        completion: Number(u.completion_tokens ?? u.output_tokens ?? u.candidatesTokenCount ?? 0) || 0,
         total: Number(u.total_tokens ?? u.totalTokenCount ?? 0) || 0
       };
       if (!next.total) next.total = next.prompt + next.completion;

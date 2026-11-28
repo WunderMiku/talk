@@ -9,13 +9,27 @@ import { qwenTtsProfile, qwenTtsEndpoint } from "../features/tts.js";
 
 const PROTOCOL_OPTIONS = [
   { id: "openai", label: "OpenAI 兼容" },
+  { id: "anthropic", label: "Anthropic (Claude)" },
   { id: "google", label: "Google Gemini" }
 ];
 
+const PROTOCOL_DEFAULT_URLS = {
+  google: "https://generativelanguage.googleapis.com/v1beta",
+  anthropic: "https://api.anthropic.com/v1",
+  openai: ""
+};
+
 const CHANNEL_PICKS = {
   google: ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
+  anthropic: ["claude-sonnet-4-5", "claude-haiku-4-5", "claude-opus-4-5", "claude-3-7-sonnet-latest"],
   openai: ["deepseek-chat", "gpt-4o-mini", "qwen3.7-flash", "moonshot-v1-8k"]
 };
+
+function protocolBadge(protocol) {
+  if (protocol === "google") return "Gemini";
+  if (protocol === "anthropic") return "Anthropic";
+  return "OpenAI 兼容";
+}
 
 function profileHost(profile) {
   try {
@@ -29,22 +43,27 @@ function readProviderForm(previous = {}) {
   const read = (name) => $(`[data-provider-field="${name}"]`)?.value;
   const baseUrl = String(read("baseUrl") ?? previous.baseUrl ?? "").trim();
   const name = String(read("name") ?? previous.name ?? "").trim();
+  const protocol = previous.protocol || "openai";
   return {
     id: previous.id || `channel-${Date.now()}`,
     name,
-    protocol: previous.protocol || "openai",
-    provider: previous.provider || ((previous.protocol === "google") ? "google" : "custom"),
+    protocol,
+    provider: previous.provider || (protocol === "google" ? "google" : protocol === "anthropic" ? "anthropic" : "custom"),
     baseUrl,
     model: String(read("model") ?? previous.model ?? "").trim(),
     apiKey: String(read("apiKey") || previous.apiKey || ""),
     models: previous.models || [],
     note: previous.note || "",
+    thinkingCapable: Boolean(previous.thinkingCapable) || protocol === "anthropic",
+    enableThinking: Boolean(previous.enableThinking),
+    thinkingBudget: Number(previous.thinkingBudget) || 0,
     isNew: Boolean(previous.isNew)
   };
 }
 
 function channelPicks(profile, models) {
-  const picks = CHANNEL_PICKS[(profile.protocol || "openai") === "google" ? "google" : "openai"] || [];
+  const proto = profile.protocol || "openai";
+  const picks = CHANNEL_PICKS[proto] || CHANNEL_PICKS.openai || [];
   return picks.filter((id) => models.includes(id));
 }
 
@@ -152,7 +171,7 @@ export function createSettingsSheet({
           <button class="template-row" type="button" data-action="provider-template" data-template="${attr(template.id)}">
             <span class="template-head">
               <strong>${esc(template.name)}</strong>
-              <span class="template-badge">${(template.protocol || "openai") === "google" ? "Gemini" : "OpenAI 兼容"}</span>
+              <span class="template-badge">${esc(protocolBadge(template.protocol || "openai"))}</span>
             </span>
             <span class="template-url mono">${esc(template.baseUrl || "自行填写地址")}</span>
             <span class="template-note">${esc(template.note || "")}</span>
@@ -165,6 +184,12 @@ export function createSettingsSheet({
     const d = state.providerDraft;
     if (!sheet || !d) return;
     const status = state.providerStatus || {};
+    const urlPlaceholder = d.protocol === "google"
+      ? "https://generativelanguage.googleapis.com/v1beta"
+      : d.protocol === "anthropic"
+        ? "https://api.anthropic.com/v1"
+        : "https://api.deepseek.com";
+    const keyPlaceholder = d.protocol === "anthropic" ? "sk-ant-…" : "sk-…";
     sheet.innerHTML = `
       <div class="provider-form">
         <label class="provider-field"><span>名称</span>
@@ -176,10 +201,10 @@ export function createSettingsSheet({
           </div>
         </div>
         <label class="provider-field"><span>Base URL</span>
-          <input data-provider-field="baseUrl" value="${attr(d.baseUrl || "")}" inputmode="url" placeholder="${d.protocol === "google" ? "https://generativelanguage.googleapis.com/v1beta" : "https://api.deepseek.com"}" autocomplete="off" spellcheck="false" />
+          <input data-provider-field="baseUrl" value="${attr(d.baseUrl || "")}" inputmode="url" placeholder="${attr(urlPlaceholder)}" autocomplete="off" spellcheck="false" />
         </label>
         <label class="provider-field"><span>API Key</span>
-          <input data-provider-field="apiKey" type="password" value="${attr(d.apiKey || "")}" placeholder="sk-…" autocomplete="off" />
+          <input data-provider-field="apiKey" type="password" value="${attr(d.apiKey || "")}" placeholder="${attr(keyPlaceholder)}" autocomplete="off" />
         </label>
         <div class="provider-field"><span>模型</span>
           <div class="provider-model-row">
@@ -220,6 +245,9 @@ export function createSettingsSheet({
         apiKey: "",
         models: [],
         note: template?.note || "",
+        thinkingCapable: Boolean(template?.thinkingCapable) || template?.protocol === "anthropic",
+        enableThinking: Boolean(template?.enableThinking),
+        thinkingBudget: Number(template?.thinkingBudget) || 0,
         isNew: true
       };
     state.providerStatus = null;
@@ -582,9 +610,19 @@ export function createSettingsSheet({
     },
     "provider-protocol"({ event, target }) {
       event.preventDefault();
+      const prevProto = state.providerDraft?.protocol || "openai";
       const next = readProviderForm(state.providerDraft);
-      next.protocol = target.dataset.protocol || "openai";
-      next.provider = next.protocol === "google" ? "google" : (next.provider === "google" ? "custom" : next.provider);
+      const nextProto = target.dataset.protocol || "openai";
+      next.protocol = nextProto;
+      if (nextProto === "google") next.provider = "google";
+      else if (nextProto === "anthropic") next.provider = "anthropic";
+      else if (next.provider === "google" || next.provider === "anthropic") next.provider = "custom";
+      const prevDefault = PROTOCOL_DEFAULT_URLS[prevProto] || "";
+      const nextDefault = PROTOCOL_DEFAULT_URLS[nextProto] || "";
+      if (!next.baseUrl || (prevDefault && next.baseUrl === prevDefault)) {
+        next.baseUrl = nextDefault;
+      }
+      next.thinkingCapable = nextProto === "anthropic" || Boolean(next.thinkingCapable);
       next.models = [];
       state.providerDraft = next;
       renderProviderSheet();

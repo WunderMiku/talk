@@ -12,6 +12,8 @@
   // "talk.sealed.v1:" spelling too so a stale value can never be sent as a Bearer token.
   const SEAL_PREFIX = "sealed:v1:";
   const LEGACY_SEAL_PREFIX = "talk.sealed.v1:";
+  const ANTHROPIC_VERSION = "2023-06-01";
+  const DEFAULT_ANTHROPIC_BASE = "https://api.anthropic.com/v1";
 
   function isSealedKey(value) {
     const key = String(value || "");
@@ -34,12 +36,13 @@
   function profileSupportsThinking(profile) {
     if (!profile) return false;
     if (profile.thinkingCapable) return true;
-    return /(?:qwen(?:3\.[5-9]|[4-9]\.\d)|deepseek-v4|glm-5|kimi-k[2-9])/i.test(String(profile.model || ""));
+    return /(?:qwen(?:3\.[5-9]|[4-9]\.\d)|deepseek-v4|glm-5|kimi-k[2-9]|claude-(?:3[-.]7|sonnet-4|opus-4|haiku-4|4))/i.test(String(profile.model || ""));
   }
 
   function outputCeiling(cfg) {
     const provider = String(cfg?.provider || "").toLowerCase();
     if (provider === "google" || isGoogleProvider(cfg)) return 32000;
+    if (isAnthropicProvider(cfg)) return 16384;
     if (provider === "openai") return 16000;
     if (provider === "deepseek") return 8192;
     return 20000;
@@ -76,6 +79,7 @@
     const model = String(cfg.model || "").trim();
     if (!model || isSealedKey(key)) return false;
     if (isGoogleProvider(cfg)) return Boolean(key);
+    if (isAnthropicProvider(cfg)) return Boolean(key);
     const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(base);
     return Boolean(base) && (Boolean(key) || isLocal);
   }
@@ -84,6 +88,16 @@
     if (cfg?.protocol) return String(cfg.protocol).toLowerCase() === "google";
     if (String(cfg?.provider || "").toLowerCase() === "google") return true;
     return /generativelanguage\.googleapis\.com/i.test(String(cfg?.baseUrl || ""));
+  }
+
+  function isAnthropicProvider(cfg) {
+    if (cfg?.protocol) {
+      const proto = String(cfg.protocol).toLowerCase();
+      return proto === "anthropic" || proto === "claude";
+    }
+    const provider = String(cfg?.provider || "").toLowerCase();
+    if (provider === "anthropic" || provider === "claude") return true;
+    return /api\.anthropic\.com/i.test(String(cfg?.baseUrl || ""));
   }
 
   function googleRoot(baseUrl) {
@@ -99,8 +113,30 @@
     return `${googleRoot(cfg?.baseUrl)}/models/${encodeURIComponent(model)}:${action}${sep}key=${encodeURIComponent(usableApiKey(cfg?.apiKey))}`;
   }
 
+  function anthropicRoot(baseUrl) {
+    const raw = String(baseUrl || DEFAULT_ANTHROPIC_BASE).trim().replace(/\/+$/, "");
+    if (!/^https?:\/\//i.test(raw)) throw new Error("API 地址需要以 http:// 或 https:// 开头。");
+    const stripped = raw.replace(/\/messages$/i, "");
+    return /\/v\d+(?:\/|$)/i.test(stripped) ? stripped : `${stripped}/v1`;
+  }
+
+  function anthropicMessagesUrl(cfg) {
+    return `${anthropicRoot(cfg?.baseUrl)}/messages`;
+  }
+
+  function anthropicHeaders(cfg, accept = "application/json") {
+    return {
+      "Content-Type": "application/json",
+      "Accept": accept,
+      "x-api-key": usableApiKey(cfg?.apiKey),
+      "anthropic-version": ANTHROPIC_VERSION,
+      "anthropic-dangerous-direct-browser-access": "true"
+    };
+  }
+
   function endpointFor(baseUrl, cfg) {
     if (isGoogleProvider(cfg)) return googleModelUrl(cfg, false).replace(/:generateContent\?.*$/, "");
+    if (isAnthropicProvider(cfg)) return anthropicMessagesUrl(cfg || { baseUrl });
     let base = String(baseUrl || "").trim().replace(/\/+$/, "");
     if (!base) throw new Error("请先在模型设置里填写 API 地址。");
     if (!/^https?:\/\//i.test(base)) throw new Error("API 地址需要以 http:// 或 https:// 开头。");
@@ -111,6 +147,9 @@
   function modelsUrlFor(profile) {
     if (isGoogleProvider(profile)) {
       return `${googleRoot(profile?.baseUrl)}/models?key=${encodeURIComponent(usableApiKey(profile?.apiKey))}`;
+    }
+    if (isAnthropicProvider(profile)) {
+      return `${anthropicRoot(profile?.baseUrl)}/models`;
     }
     const base = String(profile?.baseUrl || "").trim().replace(/\/+$/, "");
     if (!base) throw new Error("请先在模型设置里填写 API 地址。");
@@ -125,6 +164,47 @@
     const budget = Number(cfg?.thinkingBudget) || 0;
     if (params.enable_thinking && budget > 0) params.thinking_budget = budget;
     return params;
+  }
+
+  function anthropicPayload(messages, maxTokens, cfg = {}, temperature = 0.3, stream = false) {
+    const list = Array.isArray(messages) ? messages : [];
+    const system = list
+      .filter((m) => m?.role === "system")
+      .map((m) => String(m?.content || "").trim())
+      .filter(Boolean)
+      .join("\n\n");
+    const turns = [];
+    for (const m of list) {
+      if (!m || m.role === "system") continue;
+      const role = m.role === "assistant" ? "assistant" : "user";
+      const text = String(m.content || "");
+      const prev = turns[turns.length - 1];
+      if (prev && prev.role === role) {
+        prev.content = prev.content ? `${prev.content}\n\n${text}` : text;
+      } else {
+        turns.push({ role, content: text });
+      }
+    }
+    if (!turns.length) turns.push({ role: "user", content: "" });
+    else if (turns[0].role !== "user") turns.unshift({ role: "user", content: "Continue." });
+
+    const payload = {
+      model: cfg.model,
+      max_tokens: Math.max(1, Number(maxTokens) || 2600),
+      messages: turns,
+      stream: Boolean(stream)
+    };
+    if (system) payload.system = system;
+
+    if (cfg?.enableThinking) {
+      const budget = Math.max(1024, Number(cfg.thinkingBudget) || 2048);
+      payload.thinking = { type: "enabled", budget_tokens: budget };
+      // Anthropic requires max_tokens > budget_tokens and disallows custom temperature when thinking is enabled.
+      payload.max_tokens = Math.max(payload.max_tokens, budget + 1024);
+    } else if (typeof temperature === "number" && Number.isFinite(temperature)) {
+      payload.temperature = Math.min(1, Math.max(0, temperature));
+    }
+    return payload;
   }
 
   function googlePayload(messages, maxTokens, jsonMode, cfg = {}, temperature = 0.3) {
@@ -164,6 +244,16 @@
       if (Array.isArray(parts)) {
         const gText = parts.map((p) => String(p?.text || "")).join("");
         if (gText) return gText;
+      }
+    }
+    if (isAnthropicProvider(cfg) || Array.isArray(json?.content)) {
+      const blocks = json?.content;
+      if (Array.isArray(blocks)) {
+        const aText = blocks
+          .filter((b) => b && (b.type === "text" || (!b.type && typeof b.text === "string")))
+          .map((b) => String(b.text || ""))
+          .join("");
+        if (aText) return aText;
       }
     }
     const content = json?.choices?.[0]?.message?.content;
@@ -234,6 +324,22 @@
       return response;
     }
 
+    if (isAnthropicProvider(cfg)) {
+      const url = anthropicMessagesUrl(cfg);
+      const post = () => fetch(url, {
+        method: "POST",
+        headers: anthropicHeaders(cfg, "application/json"),
+        body: JSON.stringify(anthropicPayload(messages, maxTokens, cfg, temperature, false)),
+        signal
+      });
+      let response = await post();
+      if ((response.status === 529 || response.status === 429) && googleBusyDelayMs > 0) {
+        await new Promise((resolve) => setTimeout(resolve, googleBusyDelayMs));
+        response = await post();
+      }
+      return response;
+    }
+
     const endpoint = endpointFor(cfg.baseUrl, cfg);
     const body = {
       model: cfg.model,
@@ -265,6 +371,110 @@
       response = await send(false);
     }
     return response;
+  }
+
+  async function sendAnthropicChatStream(
+    cfg,
+    messages,
+    { signal, maxTokens = 2600, temperature = 0.3, googleBusyDelayMs = 1200, onDelta, onReasoning, onUsage, onBuffered } = {}
+  ) {
+    const url = anthropicMessagesUrl(cfg);
+    const post = () => fetch(url, {
+      method: "POST",
+      headers: anthropicHeaders(cfg, "text/event-stream"),
+      body: JSON.stringify(anthropicPayload(messages, maxTokens, cfg, temperature, true)),
+      signal
+    });
+    let response = await post();
+    if ((response.status === 529 || response.status === 429) && googleBusyDelayMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, googleBusyDelayMs));
+      response = await post();
+    }
+    if (!response.ok) {
+      throw new Error(await readHttpError(response, 260));
+    }
+
+    const type = response.headers?.get?.("content-type") || "";
+    if (type.includes("application/json")) {
+      const host = (() => { try { return new URL(url).host; } catch (_) { return url; } })();
+      onBuffered?.({ host, contentType: type });
+      const json = await readJsonResponse(response, "Anthropic 流式接口");
+      if (json?.usage) onUsage?.(json.usage);
+      const text = extractContent(json, cfg);
+      if (text) onDelta?.(text);
+      return text || "";
+    }
+    if (!response.body?.getReader) {
+      const json = await readJsonResponse(response, "Anthropic 流式接口");
+      if (json?.usage) onUsage?.(json.usage);
+      const text = extractContent(json, cfg);
+      if (text) onDelta?.(text);
+      return text || "";
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let content = "";
+    let inputTokens = 0;
+    let streamError = null;
+
+    const consumeFrame = (frame) => {
+      const dataLines = frame
+        .split(/\r?\n/)
+        .filter((row) => row.startsWith("data:"))
+        .map((row) => row.slice(5).trim());
+      if (!dataLines.length) return;
+      const data = dataLines.join("\n");
+      if (!data || data === "[DONE]") return;
+      try {
+        const parsed = JSON.parse(data);
+        if (parsed?.type === "error") {
+          streamError = new Error(String(parsed?.error?.message || "Anthropic 流式返回错误"));
+          return;
+        }
+        if (parsed?.type === "message_start" && parsed?.message?.usage) {
+          inputTokens = Number(parsed.message.usage.input_tokens || 0) || 0;
+          return;
+        }
+        if (parsed?.type === "content_block_delta" && parsed?.delta) {
+          if (parsed.delta.type === "thinking_delta" && parsed.delta.thinking) {
+            onReasoning?.(String(parsed.delta.thinking));
+          } else if (parsed.delta.type === "text_delta" && parsed.delta.text) {
+            content += String(parsed.delta.text);
+            onDelta?.(content);
+          }
+          return;
+        }
+        if (parsed?.type === "message_delta" && parsed?.usage) {
+          const out = Number(parsed.usage.output_tokens || 0) || 0;
+          const inp = Number(parsed.usage.input_tokens ?? inputTokens) || inputTokens;
+          onUsage?.({
+            input_tokens: inp,
+            output_tokens: out,
+            total_tokens: inp + out
+          });
+        }
+      } catch (_) { /* ignore partial/ping frames */ }
+    };
+
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+      let index = buffer.indexOf("\n\n");
+      while (index >= 0) {
+        const frame = buffer.slice(0, index);
+        buffer = buffer.slice(index + 2);
+        index = buffer.indexOf("\n\n");
+        consumeFrame(frame);
+        if (streamError) throw streamError;
+      }
+    }
+    buffer += decoder.decode().replace(/\r\n/g, "\n");
+    if (buffer.trim()) consumeFrame(buffer);
+    if (streamError) throw streamError;
+    return content;
   }
 
   async function sendGoogleChatStream(
@@ -359,6 +569,18 @@
         googleBusyDelayMs,
         onDelta,
         onUsage
+      });
+    }
+    if (isAnthropicProvider(cfg)) {
+      return sendAnthropicChatStream(cfg, messages, {
+        signal,
+        maxTokens,
+        temperature,
+        googleBusyDelayMs,
+        onDelta,
+        onReasoning,
+        onUsage,
+        onBuffered
       });
     }
 
@@ -536,9 +758,17 @@
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const isGoogle = isGoogleProvider(cfg);
+      const isAnthropic = isAnthropicProvider(cfg);
       const headers = isGoogle
         ? { Accept: "application/json" }
-        : { Accept: "application/json", Authorization: `Bearer ${usableApiKey(cfg.apiKey)}` };
+        : isAnthropic
+          ? {
+              Accept: "application/json",
+              "x-api-key": usableApiKey(cfg.apiKey),
+              "anthropic-version": ANTHROPIC_VERSION,
+              "anthropic-dangerous-direct-browser-access": "true"
+            }
+          : { Accept: "application/json", Authorization: `Bearer ${usableApiKey(cfg.apiKey)}` };
       const response = await fetch(modelsUrlFor(cfg), { headers, signal: controller.signal });
       if (!response.ok) throw new Error(await readHttpError(response, 160));
       const json = await readJsonResponse(response, "模型列表");
@@ -592,6 +822,7 @@
 
   window.TALK_LLM = {
     SEAL_PREFIX,
+    ANTHROPIC_VERSION,
     isSealedKey,
     usableApiKey,
     activeProfile,
@@ -600,9 +831,14 @@
     resolveConfig,
     hasConfig,
     isGoogleProvider,
+    isAnthropicProvider,
     googleRoot,
     googleModelUrl,
     googlePayload,
+    anthropicRoot,
+    anthropicMessagesUrl,
+    anthropicHeaders,
+    anthropicPayload,
     endpointFor,
     modelsUrlFor,
     thinkingParams,

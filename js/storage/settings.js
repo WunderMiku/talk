@@ -99,6 +99,7 @@ export const PROVIDERS = {
   deepseek: { baseUrl: "https://api.deepseek.com", model: "deepseek-chat" },
   openai: { baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
   google: { baseUrl: "https://generativelanguage.googleapis.com/v1beta", model: "gemini-3.6-flash" },
+  anthropic: { baseUrl: "https://api.anthropic.com/v1", model: "claude-sonnet-4-5" },
   custom: { baseUrl: "", model: "" }
 };
 
@@ -168,10 +169,14 @@ export const MODEL_PRESETS = [
   {
     id: "claude",
     name: "Claude",
-    provider: "custom",
-    baseUrl: "",
+    provider: "anthropic",
+    protocol: "anthropic",
+    baseUrl: "https://api.anthropic.com/v1",
     model: "claude-sonnet-4-5",
-    note: "Anthropic 原生协议不是 OpenAI 格式；请填写兼容代理地址。"
+    note: "Anthropic 原生 Messages API（/v1/messages + 浏览器直连 CORS 头）；也可改为兼容代理地址。",
+    thinkingCapable: true,
+    enableThinking: false,
+    thinkingBudget: 0
   },
   {
     id: "custom",
@@ -195,6 +200,19 @@ export const CUSTOM_TEMPLATE = {
 
 export const PROVIDER_TEMPLATES = [...MODEL_PRESETS, CUSTOM_TEMPLATE];
 
+function inferProtocol(rawProtocol, provider, baseUrl) {
+  const explicit = String(rawProtocol || "").trim().toLowerCase();
+  if (explicit === "google" || explicit === "openai") return explicit;
+  if (explicit === "anthropic" || explicit === "claude") return "anthropic";
+  const prov = String(provider || "").trim().toLowerCase();
+  if (prov === "google") return "google";
+  if (prov === "anthropic" || prov === "claude") return "anthropic";
+  const url = String(baseUrl || "");
+  if (url.includes("generativelanguage")) return "google";
+  if (url.includes("api.anthropic.com")) return "anthropic";
+  return "openai";
+}
+
 export function sentenceLevelOf(value) {
   return SENTENCE_LEVELS.find((level) => level.id === value)
     || SENTENCE_LEVELS.find((level) => level.id === SENTENCE_LEVEL_DEFAULT);
@@ -210,7 +228,7 @@ export function legacyModelProfiles(parsed = {}) {
       id: "legacy-custom",
       name: "我的配置",
       provider: parsed.provider || "custom",
-      protocol: String(baseUrl).includes("generativelanguage") ? "google" : "openai",
+      protocol: inferProtocol(parsed.protocol, parsed.provider, baseUrl),
       baseUrl,
       model,
       apiKey,
@@ -227,17 +245,20 @@ export function normalizeModelProfiles(raw, parsed = {}) {
     const isQwen = id === "qwen";
     const oldQwen = isQwen && String(profile.baseUrl || "").includes("dashscope.aliyuncs.com") && profile.model === "qwen-plus";
     const preset = MODEL_PRESETS.find((item) => item.id === id);
+    const baseUrl = oldQwen ? preset.baseUrl : String(profile.baseUrl || "");
+    const provider = String(profile.provider || "custom");
+    const protocol = inferProtocol(profile.protocol, provider, baseUrl);
     return {
       id,
       name: String(profile.name || `模型 ${index + 1}`),
-      provider: String(profile.provider || "custom"),
-      baseUrl: oldQwen ? preset.baseUrl : String(profile.baseUrl || ""),
+      provider,
+      baseUrl,
       model: oldQwen ? preset.model : String(profile.model || ""),
       apiKey: String(profile.apiKey || ""),
       note: String(profile.note || (oldQwen ? preset.note : "")),
-      protocol: String(profile.protocol || (String(profile.baseUrl || "").includes("generativelanguage") ? "google" : "openai")),
-      templateId: String(profile.templateId || (profile.baseUrl ? "" : "custom")),
-      thinkingCapable: Boolean(profile.thinkingCapable) || isQwen,
+      protocol,
+      templateId: String(profile.templateId || (baseUrl ? "" : "custom")),
+      thinkingCapable: Boolean(profile.thinkingCapable) || isQwen || protocol === "anthropic",
       enableThinking: Boolean(profile.enableThinking),
       thinkingBudget: Math.max(0, Math.min(262144, Number(profile.thinkingBudget) || 0))
     };
@@ -257,6 +278,7 @@ export function applyProfileToSettings(settings, profile) {
   return {
     ...settings,
     provider: profile.provider || "custom",
+    protocol: inferProtocol(profile.protocol, profile.provider, profile.baseUrl),
     baseUrl: profile.baseUrl || "",
     model: profile.model || "",
     apiKey: profile.apiKey || "",
@@ -271,7 +293,7 @@ export function syncDraftProfile(draft, activeProfileFn) {
   const profile = activeProfileFn(draft);
   if (!profile) return;
   profile.provider = draft.provider || profile.provider || "custom";
-  profile.protocol = profile.protocol || (String(profile.provider).toLowerCase() === "google" ? "google" : "openai");
+  profile.protocol = inferProtocol(profile.protocol || draft.protocol, profile.provider, draft.baseUrl || profile.baseUrl);
   profile.baseUrl = String(draft.baseUrl || "");
   profile.model = String(draft.model || "");
   profile.apiKey = String(draft.apiKey || "");
