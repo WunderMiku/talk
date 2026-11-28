@@ -197,11 +197,17 @@ export function createWordView({
     if (!html) {
       section.remove();
     } else {
-      section.outerHTML = html;
+      const holder = document.createElement("div");
+      holder.innerHTML = html;
+      holder.querySelectorAll(".reveal, .reveal-item").forEach((node) => node.classList.add("is-in"));
+      const next = holder.firstElementChild;
+      if (next) section.replaceWith(next);
+      else section.outerHTML = html;
     }
     scrollScreenTo(scroll, true);
     applyCacheDisplay();
     refreshCacheBorders(screen);
+    window.TALK_I18N?.apply(screen);
     return true;
   }
 

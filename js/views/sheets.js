@@ -289,7 +289,7 @@ export function createSheetController({
   function refreshCacheUi() {
     if ($("#cache-dashboard")) {
       void renderCacheContent();
-    } else if (state.sheetOpen && $("#sheet-scroll .settings-intro")) {
+    } else if (state.sheetOpen && $("#sheet-scroll .settings-sheet")) {
       renderSettingsContent();
     }
   }

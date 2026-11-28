@@ -50,12 +50,12 @@ export async function startEnv({ headless = true } = {}) {
    * Opens a fresh page. Pass `config: null` for the offline/no-key scenario,
    * or a settings object to override parts of the default mock config.
    */
-  async function newPage({ config = true, theme = "paper" } = {}) {
+  async function newPage({ config = true, theme = "paper", viewport = VIEWPORT, reducedMotion = "reduce" } = {}) {
     const context = await browser.newContext({
-      viewport: VIEWPORT,
+      viewport,
       deviceScaleFactor: 1,
       serviceWorkers: "block",
-      reducedMotion: "reduce",
+      reducedMotion,
     });
     contexts.add(context);
     if (config) {

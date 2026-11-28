@@ -77,7 +77,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   const CONTENT = window.TALK_CONTENT;
   const LLM = window.TALK_LLM;
   const APP_VERSION = "1.0"; // display version
-  const APP_BUILD = "295"; // cache-busting build, kept in step with ?v= and sw.js
+  const APP_BUILD = "296"; // cache-busting build, kept in step with ?v= and sw.js
   const actions = createActionRegistry();
 
   const app = document.getElementById("app");
@@ -440,6 +440,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     sentenceKey,
     removeSentenceRecord,
     clearSentenceCache,
+    refreshCacheUi: () => sheets.refreshCacheUi(),
     hydrateSentenceLayer: (...args) => layers.hydrateSentenceLayer(...args),
     closeTopWordLayer: () => layers.popWordLayer(),
     toast
@@ -537,7 +538,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     refreshCacheBorders,
     activeWordData,
     schedulePrefetch,
-    hydrateLayerWithModel: (...args) => layers.hydrateLayerWithModel(...args),
+    hydrateLayerWithModel: (...args) => layers.hydrateLayer(...args),
     sentenceLevelOf,
     reverseZoneName,
     exampleStyleFor,
@@ -635,7 +636,9 @@ import { applyInputMode, createHomeView } from "./views/home.js";
         void screen.offsetWidth;
         screen.classList.add("is-module-glide");
       }
-      window.setTimeout(() => {
+      if (state.moduleGlideTimer) window.clearTimeout(state.moduleGlideTimer);
+      state.moduleGlideTimer = window.setTimeout(() => {
+        state.moduleGlideTimer = 0;
         delete document.documentElement.dataset.moduleDir;
         screen.classList.remove("is-module-glide");
       }, 360);
@@ -752,12 +755,21 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     if (!screen || !state.route || state.route.name === "loading") return;
     const html = pageHtml(state.route);
     if (!html) return;
+    const prevScroll = screen.scrollTop;
+    const prevReverseScroll = $(".reverse-page", screen)?.scrollTop || 0;
     screen.innerHTML = html;
+    screen.querySelectorAll(".reveal, .reveal-item").forEach((element) => element.classList.add("is-in"));
     enhanceWordColumns(screen);
     applyCacheDisplay();
     refreshCacheBorders();
     updateModuleBar();
     applyContentCopy();
+    window.TALK_I18N?.apply(document.body);
+    scrollScreenTo(prevScroll, true);
+    if (prevReverseScroll) {
+      const revScroller = $(".reverse-page", screen);
+      if (revScroller) revScroller.scrollTop = prevReverseScroll;
+    }
   }
 
   function enhanceWordColumns(root = screen) {
@@ -820,6 +832,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   function scrollScreenTo(top, immediate = false) {
     if (lenis) {
       lenis.scrollTo(top, { immediate, force: true });
+      if (immediate) screen.scrollTop = top;
       return;
     }
     screen.scrollTop = top;
@@ -835,15 +848,18 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     pending.forEach((element) => element.classList.add("is-in"));
   }
 
-  const STAGGER_MS = 55;
+  const STAGGER_MS = 40;
+  const MAX_STAGGER_MS = 180;
   let revealMode = "normal";
   let revealWatcher = null;
+  let revealRafId = 0;
+  let screenEnterTimer = 0;
 
   function setRevealMode(mode) {
     revealMode = mode;
   }
 
-  function observeReveals(scope) {
+  function observeReveals(scope, { syncAboveFold = false } = {}) {
     if (!revealObserver) return;
     const root = scope || screen;
     if (!root) return;
@@ -851,15 +867,33 @@ import { applyInputMode, createHomeView } from "./views/home.js";
     root.querySelectorAll(".reveal").forEach((element) => {
       if (element.parentElement?.closest(".reveal")) element.classList.add("is-in");
     });
+    const pending = [...root.querySelectorAll(".reveal:not(.is-in)")].filter(
+      (element) => !element.parentElement?.closest(".reveal") && element.dataset.revealQueued !== "1"
+    );
+    const pendingItems = [...root.querySelectorAll(".reveal-item:not(.is-in)")].filter(
+      (element) => element.dataset.revealQueued !== "1"
+    );
+    if (!pending.length && !pendingItems.length) return;
+
     const viewport = window.innerHeight || 800;
+    const mode = revealMode;
+    revealMode = "normal";
     let order = 0;
-    root.querySelectorAll(".reveal:not(.is-in)").forEach((element) => {
-      if (element.parentElement?.closest(".reveal")) return;
+    pending.forEach((element) => {
       const rect = element.getBoundingClientRect();
-      const mode = revealMode;
+      const inView = rect.top < viewport && rect.bottom > 0;
+      // When ViewTransition is handling the crossfade/slide, mark above-the-fold
+      // blocks visible synchronously so the transition snapshot never captures
+      // semi-transparent / scaled-down cards that pop a second time afterward.
+      if (syncAboveFold && inView) {
+        element.dataset.revealQueued = "1";
+        element.classList.add("is-in");
+        return;
+      }
       // A route that lands on top of an existing screen does not need to push
       // in: the top band is simply there.
-      if ((mode === "instant-home" || mode === "instant-top") && rect.top < (mode === "instant-home" ? viewport * 0.92 : 220)) {
+      if ((mode === "instant-home" || mode === "instant-top") && rect.top < (mode === "instant-home" ? viewport : 220)) {
+        element.dataset.revealQueued = "1";
         element.style.transition = "none";
         element.classList.add("is-in");
         window.requestAnimationFrame(() => { element.style.transition = ""; });
@@ -867,9 +901,10 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       }
       // Content that replaces a skeleton fades in without scale, so the grey
       // blocks never appear to morph into text.
-      if (mode === "soft" && rect.top < viewport * 0.92) {
+      if (mode === "soft" && rect.top < viewport) {
+        element.dataset.revealQueued = "1";
         element.classList.add("reveal-soft");
-        const delay = order * 40;
+        const delay = Math.min(order * 35, MAX_STAGGER_MS);
         order += 1;
         window.setTimeout(() => {
           if (element.classList.contains("is-in")) return;
@@ -878,10 +913,11 @@ import { applyInputMode, createHomeView } from "./views/home.js";
         }, delay);
         return;
       }
-      // Anything already on the first screen cascades top-to-bottom, one beat
-      // after another; everything below waits for the observer.
-      if (rect.top < viewport * 0.92) {
-        const delay = order * STAGGER_MS;
+      // Anything already on the first screen cascades top-to-bottom quickly;
+      // everything below waits for the observer.
+      if (rect.top < viewport) {
+        element.dataset.revealQueued = "1";
+        const delay = Math.min(order * STAGGER_MS, MAX_STAGGER_MS);
         order += 1;
         window.setTimeout(() => {
           if (element.classList.contains("is-in")) return;
@@ -889,13 +925,19 @@ import { applyInputMode, createHomeView } from "./views/home.js";
           element.classList.add("is-in");
         }, delay);
       } else {
+        element.dataset.revealQueued = "1";
         revealObserver.observe(element);
       }
     });
-    root.querySelectorAll(".reveal-item:not(.is-in)").forEach((element) => {
-      revealObserver.observe(element);
+    pendingItems.forEach((element) => {
+      element.dataset.revealQueued = "1";
+      const rect = element.getBoundingClientRect();
+      if (syncAboveFold && rect.top < viewport && rect.bottom > 0) {
+        element.classList.add("is-in");
+      } else {
+        revealObserver.observe(element);
+      }
     });
-    revealMode = "normal";
   }
 
   function setupReveal() {
@@ -930,9 +972,17 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       revealWatcher = new MutationObserver((mutations) => {
         const fresh = mutations.some((mutation) =>
           [...mutation.addedNodes].some((node) =>
-            node.nodeType === 1 && (node.matches?.(".reveal, .reveal-item") || node.querySelector?.(".reveal, .reveal-item"))));
+            node.nodeType === 1 && (
+              (node.matches?.(".reveal:not(.is-in), .reveal-item:not(.is-in)") && node.dataset.revealQueued !== "1")
+              || Boolean(node.querySelector?.(".reveal:not(.is-in):not([data-reveal-queued='1']), .reveal-item:not(.is-in):not([data-reveal-queued='1'])"))
+            )));
         if (!fresh) return;
-        window.requestAnimationFrame(() => observeReveals(document));
+        if (!revealRafId) {
+          revealRafId = window.requestAnimationFrame(() => {
+            revealRafId = 0;
+            observeReveals(document);
+          });
+        }
       });
       revealWatcher.observe(document.body, { childList: true, subtree: true });
     }
@@ -941,12 +991,17 @@ import { applyInputMode, createHomeView } from "./views/home.js";
   function queueReveal(scope) {
     if (!revealObserver) return;
     const target = scope || screen;
-    window.requestAnimationFrame(() => observeReveals(target));
+    if (revealRafId) window.cancelAnimationFrame(revealRafId);
+    revealRafId = window.requestAnimationFrame(() => {
+      revealRafId = 0;
+      observeReveals(target);
+    });
   }
 
   function renderRoute(route, direction = "forward", { instant = false } = {}) {
     if (route.name === "home" && revealMode === "normal") setRevealMode("instant-home");
-    const apply = () => {
+    const useViewTransition = Boolean(!instant && !reduceMotion && document.startViewTransition);
+    const apply = (withViewTransition = false) => {
       if (!screen) return;
       state.route = route;
       screen.dataset.page = route.name;
@@ -963,7 +1018,12 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       enhanceWordColumns(screen);
       applyCacheDisplay();
       refreshCacheBorders(screen);
-      queueReveal(screen);
+      scrollScreenTo(0, true);
+      if (withViewTransition) {
+        observeReveals(screen, { syncAboveFold: true });
+      } else {
+        queueReveal(screen);
+      }
       if (route.name === "word") {
         const word = getWord(route);
         if (word) {
@@ -973,18 +1033,26 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       } else {
         cancelPrefetch();
       }
-      scrollScreenTo(0, true);
       resizeSmoothScroll();
       screen.classList.remove("is-leaving", "is-back-leaving", "is-entering");
-      void screen.offsetWidth;
-      screen.classList.add("is-entering");
-      window.setTimeout(() => screen.classList.remove("is-entering"), 1300);
+      if (!withViewTransition) {
+        void screen.offsetWidth;
+        screen.classList.add("is-entering");
+        if (screenEnterTimer) window.clearTimeout(screenEnterTimer);
+        screenEnterTimer = window.setTimeout(() => {
+          screenEnterTimer = 0;
+          screen.classList.remove("is-entering");
+        }, 1300);
+      }
       document.title = pageTitle(route);
       window.TALK_I18N?.apply(document.body);
       if (route.name === "reverse" && Number.isFinite(state.restoreScroll) && state.restoreScroll >= 0) {
         const target = state.restoreScroll;
         state.restoreScroll = -1;
-        window.requestAnimationFrame(() => { screen.scrollTop = target; });
+        window.requestAnimationFrame(() => {
+          const scroller = $(".reverse-page", screen) || screen;
+          scroller.scrollTop = target;
+        });
       }
       if (route.name === "reader") {
         window.TALK_READER?.onMount?.(screen);
@@ -1001,7 +1069,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       }
     };
 
-    if (!instant && !reduceMotion && document.startViewTransition) {
+    if (useViewTransition) {
       if (activeViewTransition) {
         /* The running transition has not painted its own update callback yet.
            Rendering now would let that callback overwrite this page later. */
@@ -1015,7 +1083,7 @@ import { applyInputMode, createHomeView } from "./views/home.js";
         return;
       }
       try {
-        const transition = document.startViewTransition(apply);
+        const transition = document.startViewTransition(() => apply(true));
         activeViewTransition = transition;
         transition.finished.catch(() => {}).finally(() => { activeViewTransition = null; });
         return;
@@ -1026,11 +1094,11 @@ import { applyInputMode, createHomeView } from "./views/home.js";
 
     if (!instant && !reduceMotion && !document.startViewTransition) {
       screen.classList.add(direction === "back" ? "is-back-leaving" : "is-leaving");
-      window.setTimeout(apply, 150);
+      window.setTimeout(() => apply(false), 150);
       return;
     }
 
-    apply();
+    apply(false);
   }
 
   function goBack() {
@@ -1642,7 +1710,8 @@ import { applyInputMode, createHomeView } from "./views/home.js";
       return { kind: "word", query: data?.word || state.route?.word || "", data, isLayer: false, record: null };
     }
     if (name === "chunk") {
-      return { kind: "chunk", query: state.route?.query || "", data: state.route?.data || null, isLayer: false, record: null };
+      const data = getChunk(state.route);
+      return { kind: "chunk", query: data?.chunk || state.route?.query || "", data, isLayer: false, record: null };
     }
     if (name === "sentence") {
       const data = getSentence(state.route);

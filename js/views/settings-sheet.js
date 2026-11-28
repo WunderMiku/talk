@@ -452,9 +452,9 @@ export function createSettingsSheet({
   }
 
   function renderSettingsContent() {
-    window.setTimeout(() => window.TALK_I18N?.apply(document.body), 0);
     const holder = $("#sheet-scroll");
     if (!holder || !state.draft) return;
+    const prevScroll = holder.scrollTop;
     const draft = state.draft;
     const tab = state.settingsTab || "model";
     const settingsCopy = copyFor("settings");
@@ -476,6 +476,8 @@ export function createSettingsSheet({
           <button class="btn btn-primary" type="button" data-action="save-settings">完成</button>
         </div>
       </div>`;
+    holder.scrollTop = prevScroll;
+    window.TALK_I18N?.apply(overlayRoot || document.body);
     if (tab === "tts") requestAnimationFrame(refreshTtsError);
     if (tab === "data") requestAnimationFrame(renderThemeCacheStats);
   }
@@ -639,9 +641,15 @@ export function createSettingsSheet({
       else draft.profiles.push(clean);
       state.draft = applyProfileToSettings(draft, clean);
       commitSettingsDraft();
-      closeSheet();
-      openSettingsSheet();
-      renderSettingsContent();
+      state.settingsOpen = true;
+      state.providerDraft = null;
+      state.providerStatus = null;
+      if (state.sheetOpen && $("#sheet-scroll")) {
+        renderSettingsContent();
+        $("#sheet-scroll")?.scrollTo({ top: 0 });
+      } else {
+        openSettingsSheet();
+      }
       toast("模型已保存");
     },
     "provider-delete"({ event }) {
@@ -654,9 +662,15 @@ export function createSettingsSheet({
         ? applyProfileToSettings(state.draft, state.draft.profiles[0])
         : { ...state.draft, activeProfileId: "", baseUrl: "", model: "", apiKey: "" };
       commitSettingsDraft();
-      closeSheet();
-      openSettingsSheet();
-      renderSettingsContent();
+      state.settingsOpen = true;
+      state.providerDraft = null;
+      state.providerStatus = null;
+      if (state.sheetOpen && $("#sheet-scroll")) {
+        renderSettingsContent();
+        $("#sheet-scroll")?.scrollTo({ top: 0 });
+      } else {
+        openSettingsSheet();
+      }
     },
     "delete-profile"({ event }) {
       event.preventDefault();
@@ -704,7 +718,7 @@ export function createSettingsSheet({
       const level = sentenceLevelOf(target.dataset.level);
       if (state.draft) state.draft.sentenceLevel = level.id;
       scheduleSettingsCommit();
-      $$(".level-chip").forEach((chip) => {
+      $$('[data-action="sentence-level"]').forEach((chip) => {
         const active = chip.dataset.level === level.id;
         chip.classList.toggle("active", active);
         chip.setAttribute("aria-pressed", String(active));

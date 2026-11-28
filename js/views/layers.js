@@ -160,12 +160,29 @@ export function createLayerController({
       </main>`;
   }
 
+  let scrimRemoveTimer = 0;
+  let clearAllLayersTimer = 0;
+
+  function cancelLayerCleanupTimers() {
+    if (scrimRemoveTimer) {
+      window.clearTimeout(scrimRemoveTimer);
+      scrimRemoveTimer = 0;
+    }
+    if (clearAllLayersTimer) {
+      window.clearTimeout(clearAllLayersTimer);
+      clearAllLayersTimer = 0;
+    }
+  }
+
   function ensureLayerScrim() {
+    cancelLayerCleanupTimers();
     let scrim = $(".layer-scrim", layerRoot);
     if (!scrim) {
       scrim = document.createElement("div");
       scrim.className = "layer-scrim";
       layerRoot.appendChild(scrim);
+      requestAnimationFrame(() => scrim.classList.add("show"));
+    } else if (!scrim.classList.contains("show")) {
       requestAnimationFrame(() => scrim.classList.add("show"));
     }
     return scrim;
@@ -236,7 +253,8 @@ export function createLayerController({
     });
   }
 
-  function mountWordLayer({ word, data, origin, relation, depth, content, options = {}, kind = "word" }) {
+  function mountWordLayer({ word, query, data, origin, relation, depth, content, options = {}, kind = "word" }) {
+    cancelLayerCleanupTimers();
     const layerKind = kind || "word";
     const layer = document.createElement("section");
     layer.className = "word-layer";
@@ -264,6 +282,7 @@ export function createLayerController({
       el: layer,
       kind: layerKind,
       word,
+      query: query || word,
       content,
       data: data || null,
       origin,
@@ -539,6 +558,7 @@ export function createLayerController({
       addHistory("sentence", localHit.text || clean);
       mountWordLayer({
         word: titleShort,
+        query: clean,
         kind: "sentence",
         data: localHit,
         origin,
@@ -557,6 +577,7 @@ export function createLayerController({
       addHistory("sentence", cached.text || clean);
       mountWordLayer({
         word: titleShort,
+        query: clean,
         kind: "sentence",
         data: cached,
         origin,
@@ -572,6 +593,7 @@ export function createLayerController({
     if (!hasModelConfig(cfg)) {
       mountWordLayer({
         word: titleShort,
+        query: clean,
         kind: "sentence",
         data: null,
         origin,
@@ -585,6 +607,7 @@ export function createLayerController({
 
     const record = mountWordLayer({
       word: titleShort,
+      query: clean,
       kind: "sentence",
       data: null,
       origin,
@@ -594,6 +617,17 @@ export function createLayerController({
       content: layerLoadingPage(titleShort, origin, relation, depth)
     });
     await hydrateSentenceLayer(record, clean);
+  }
+
+  function hydrateLayer(record) {
+    if (!record) return Promise.resolve();
+    if (record.kind === "chunk") {
+      return hydrateChunkLayer(record, record.query || record.word);
+    }
+    if (record.kind === "sentence") {
+      return hydrateSentenceLayer(record, record.query || record.word);
+    }
+    return hydrateLayerWithModel(record);
   }
 
   function openWordLayerFromButton(button) {
@@ -645,12 +679,16 @@ export function createLayerController({
       restoreLayerContent(previous);
       previous.el.focus({ preventScroll: true });
       refreshCacheBorders(previous.el);
-      if (previous.data) schedulePrefetch(previous.data);
+      if (previous.data && previous.kind === "word") schedulePrefetch(previous.data);
     } else {
       const scrim = $(".layer-scrim", layerRoot);
       if (scrim) {
         scrim.classList.remove("show");
-        window.setTimeout(() => scrim.remove(), 420);
+        if (scrimRemoveTimer) window.clearTimeout(scrimRemoveTimer);
+        scrimRemoveTimer = window.setTimeout(() => {
+          scrimRemoveTimer = 0;
+          if (!state.wordLayers.length && scrim.isConnected) scrim.remove();
+        }, 420);
       }
       if (state.route.name === "word") {
         const mainWord = getWord(state.route);
@@ -664,18 +702,29 @@ export function createLayerController({
   }
 
   function closeAllWordLayers({ immediate = false } = {}) {
+    cancelLayerCleanupTimers();
     if (!state.wordLayers.length && !layerRoot.firstElementChild) return;
     state.wordLayers = [];
     if (immediate) {
       layerRoot.innerHTML = "";
     } else {
-      $$(".word-layer", layerRoot).forEach((layer) => {
+      const closingLayers = $$(".word-layer", layerRoot);
+      closingLayers.forEach((layer) => {
         layer.classList.remove("is-open");
         layer.classList.add("is-closing");
       });
       const scrim = $(".layer-scrim", layerRoot);
       if (scrim) scrim.classList.remove("show");
-      window.setTimeout(() => { layerRoot.innerHTML = ""; }, 540);
+      clearAllLayersTimer = window.setTimeout(() => {
+        clearAllLayersTimer = 0;
+        if (!state.wordLayers.length) {
+          layerRoot.innerHTML = "";
+        } else {
+          closingLayers.forEach((layer) => {
+            if (layer.isConnected && layer.classList.contains("is-closing")) layer.remove();
+          });
+        }
+      }, 540);
     }
     updateScrollLock();
   }
@@ -688,7 +737,7 @@ export function createLayerController({
     "retry-layer"({ event }) {
       event.preventDefault();
       tapFeedback();
-      if (state.wordLayers.length) void hydrateLayerWithModel(state.wordLayers[state.wordLayers.length - 1]);
+      if (state.wordLayers.length) void hydrateLayer(state.wordLayers[state.wordLayers.length - 1]);
     },
     "open-key"({ event, target }) {
       event.preventDefault();
@@ -713,6 +762,7 @@ export function createLayerController({
 
   return {
     mountResultSurface,
+    hydrateLayer,
     hydrateLayerWithModel,
     openWordLayer,
     hydrateChunkLayer,

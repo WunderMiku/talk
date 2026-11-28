@@ -49,7 +49,16 @@
         overlayClose.click();
         return;
       }
-      const layerClose = document.querySelector("#layer-root .word-layer:last-of-type [data-action='close-layer'], #layer-root .word-layer:last-of-type .back-btn");
+      const workspaceClose = document.querySelector("#workspace-root [data-action='close-workspace']");
+      if (workspaceClose) {
+        workspaceClose.click();
+        return;
+      }
+      const layerClose = document.querySelector(
+        "#layer-root .word-layer:not(.is-closing):last-of-type [data-action='layer-back'], "
+        + "#layer-root .word-layer:not(.is-closing):last-of-type [data-action='close-layer'], "
+        + "#layer-root .word-layer:not(.is-closing):last-of-type .back-btn"
+      );
       if (layerClose) {
         layerClose.click();
         return;
@@ -65,18 +74,24 @@
 
   // Force a 1-frame GPU compositor repaint when returning from Android background
   // so WebView never stays visually blank until the first touch event.
+  // Avoid mutating transform on <html> because transform creates a containing block
+  // that shifts position:fixed elements (composer bar, toasts) for one frame.
   let resumeTimer = 0;
   function kickRepaint() {
     window.clearTimeout(resumeTimer);
     resumeTimer = window.setTimeout(() => {
       syncStatusBar();
-      const root = document.documentElement;
-      const prev = root.style.transform;
-      root.style.transform = "translateZ(0)";
-      window.requestAnimationFrame(() => {
-        root.style.transform = prev;
+      const target = document.body;
+      if (target) {
+        const prevOpacity = target.style.opacity;
+        target.style.opacity = "0.9999";
+        window.requestAnimationFrame(() => {
+          target.style.opacity = prevOpacity;
+          window.dispatchEvent(new Event("resize"));
+        });
+      } else {
         window.dispatchEvent(new Event("resize"));
-      });
+      }
     }, 32);
   }
 
@@ -88,8 +103,9 @@
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) kickRepaint();
   });
-  window.addEventListener("pageshow", kickRepaint);
-  window.addEventListener("focus", kickRepaint);
+  window.addEventListener("pageshow", (event) => {
+    if (event.persisted) kickRepaint();
+  });
   window.addEventListener("talk:native-resume", kickRepaint);
 
   window.addEventListener("DOMContentLoaded", () => {

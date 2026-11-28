@@ -189,9 +189,10 @@ export function createHistorySheet({
         <div class="history-empty">「${esc(book.name)}」暂无词条</div>`}`;
   }
 
-  function renderHistoryContent() {
+  function renderHistoryContent({ preserveScroll = true } = {}) {
     const holder = $("#sheet-scroll");
     if (!holder) return;
+    const prevScroll = preserveScroll ? holder.scrollTop : 0;
     const items = historyForCurrentModule();
     const translating = state.module === "translator";
     const revThreads = listReverseThreads();
@@ -258,6 +259,8 @@ export function createHistorySheet({
     }
 
     holder.innerHTML = `<div class="sheet-content">${topTabsHtml}${bodyHtml}</div>`;
+    holder.scrollTop = prevScroll;
+    window.TALK_I18N?.apply(holder);
     const fileInput = $("#wb-import-file", holder);
     if (fileInput) {
       fileInput.addEventListener("change", async () => {
@@ -336,12 +339,12 @@ export function createHistorySheet({
       event.preventDefault();
       historySheetTab = target.dataset.tab === "wordbooks" ? "wordbooks" : "history";
       wordbookAuditNote = "";
-      renderHistoryContent();
+      renderHistoryContent({ preserveScroll: false });
     },
     "history-subtab"({ event, target }) {
       event.preventDefault();
       historySubTab = target.dataset.subtab === "reverse" ? "reverse" : "recent";
-      renderHistoryContent();
+      renderHistoryContent({ preserveScroll: false });
     },
     "wb-toggle-menu"({ event }) {
       event.preventDefault();
@@ -359,7 +362,7 @@ export function createHistorySheet({
       wordbookMenuOpen = false;
       wordbookImportOpen = false;
       wordbookAuditNote = "";
-      renderHistoryContent();
+      renderHistoryContent({ preserveScroll: false });
     },
     "wb-back-shelf"({ event }) {
       event.preventDefault();
@@ -367,7 +370,7 @@ export function createHistorySheet({
       wordbookImportOpen = false;
       wordbookMenuOpen = false;
       wordbookAuditNote = "";
-      renderHistoryContent();
+      renderHistoryContent({ preserveScroll: false });
     },
     "wb-create-book"({ event }) {
       event.preventDefault();

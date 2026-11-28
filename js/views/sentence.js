@@ -78,6 +78,7 @@ export function createSentenceView({
   sentenceKey,
   removeSentenceRecord,
   clearSentenceCache,
+  refreshCacheUi,
   hydrateSentenceLayer,
   closeTopWordLayer,
   toast
@@ -604,12 +605,14 @@ export function createSentenceView({
       const level = sentenceLevelOf(state.settings?.sentenceLevel).id;
       const detail = state.settings?.detailLevel || "standard";
       removeSentenceRecord(await sentenceKey(surface.query, level, detail));
+      refreshCacheUi?.();
       toast("已删除这条句子缓存");
       if (surface.isLayer) closeTopWordLayer();
     },
     "clear-sentence-cache"({ event }) {
       event.preventDefault();
       clearSentenceCache();
+      refreshCacheUi?.();
       toast("句子缓存已清除");
     }
   };

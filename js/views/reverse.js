@@ -166,12 +166,23 @@ export function createReverseView({
     </article>`;
   }
 
-  function reverseThreadHtml() {
-    const copy = copyFor("reverse");
+  function reverseScrollInnerHtml() {
     const thread = currentReverseThread();
     const chips = reverseSuggestions();
     const last = thread[thread.length - 1];
     const showActions = last && last.role === "assistant" && !last.pending && !last.error && last.content;
+    return `
+          ${thread.map(reverseTurnHtml).join("")}
+          ${showActions ? `<div class="reverse-actions">
+            ${chips.map((chip) => `<button class="reverse-chip" type="button" data-action="reverse-follow" data-prompt="${attr(chip)}">${esc(chip)}</button>`).join("")}
+            <button class="reverse-chip" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
+            <button class="reverse-chip is-icon" type="button" data-action="reverse-copy" aria-label="复制">${icon("copy")}</button>
+          </div>
+          <p class="reverse-hint">带下划线或底色的表达可以直接点开看完整档案。</p>` : ""}`;
+  }
+
+  function reverseThreadHtml() {
+    const copy = copyFor("reverse");
     return `
       <header class="reverse-topbar">
         <button class="icon-btn" type="button" data-action="back" aria-label="返回">${icon("arrowLeft")}</button>
@@ -185,14 +196,7 @@ export function createReverseView({
         </div>
       </header>
       <main class="reverse-page reverse-thread">
-        <div class="reverse-scroll">
-          ${thread.map(reverseTurnHtml).join("")}
-          ${showActions ? `<div class="reverse-actions">
-            ${chips.map((chip) => `<button class="reverse-chip" type="button" data-action="reverse-follow" data-prompt="${attr(chip)}">${esc(chip)}</button>`).join("")}
-            <button class="reverse-chip" type="button" data-action="reverse-regen">${icon("refresh")} 重新生成</button>
-            <button class="reverse-chip is-icon" type="button" data-action="reverse-copy" aria-label="复制">${icon("copy")}</button>
-          </div>
-          <p class="reverse-hint">带下划线或底色的表达可以直接点开看完整档案。</p>` : ""}
+        <div class="reverse-scroll">${reverseScrollInnerHtml()}
         </div>
         <form class="reverse-composer" autocomplete="off">
           <input id="reverse-input" type="text" name="q" placeholder="输入英文句子，或长按正文选词加入…" />
@@ -209,7 +213,25 @@ export function createReverseView({
   function redrawReverse() {
     const screenEl = document.querySelector('.screen[data-page="reverse"]');
     if (!screenEl) return;
-    screenEl.innerHTML = reverseThreadHtml();
+    const scrollBox = $(".reverse-scroll", screenEl);
+    if (scrollBox) {
+      scrollBox.innerHTML = reverseScrollInnerHtml();
+      const histBtn = $(".reverse-hist-btn", screenEl);
+      if (histBtn) {
+        const count = listReverseThreads().length;
+        const existingBadge = $(".reverse-hist-badge", histBtn);
+        if (count) {
+          if (existingBadge) existingBadge.textContent = String(count);
+          else histBtn.insertAdjacentHTML("beforeend", `<span class="reverse-hist-badge">${count}</span>`);
+        } else if (existingBadge) {
+          existingBadge.remove();
+        }
+      }
+      window.TALK_I18N?.apply(scrollBox);
+    } else {
+      screenEl.innerHTML = reverseThreadHtml();
+      window.TALK_I18N?.apply(screenEl);
+    }
     reverseScrollToEnd();
   }
 
@@ -403,7 +425,9 @@ export function createReverseView({
     const text = String(expression || "").trim();
     if (!text) return;
     persistReverseThread();
-    state.restoreScroll = document.querySelector(".screen")?.scrollTop || 0;
+    state.restoreScroll = document.querySelector(".reverse-page")?.scrollTop
+      || document.querySelector(".screen")?.scrollTop
+      || 0;
     const type = reverseAnchorWords(text) <= 2 ? "word" : "chunk";
     runSearch(text, type);
   }
