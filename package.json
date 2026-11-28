@@ -7,6 +7,8 @@
   "scripts": {
     "test": "node tests/run.mjs",
     "test:list": "node tests/run.mjs --list",
+    "check:shell": "node tests/run.mjs shell",
+    "bump": "node scripts/bump-build.mjs",
     "screenshots": "node scripts/screenshots.mjs",
     "build:web": "node scripts/build-web.mjs",
     "android:prepare": "npm run build:web && npx cap add android && node scripts/setup-android-native.mjs && npx cap sync android",

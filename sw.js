@@ -18,11 +18,14 @@ const SHELL = [
   "./js/prompts.js?v=295",
   "./js/llm-client.js?v=295",
   "./js/data.js?v=295",
+  "./js/i18n.js?v=295",
   "./js/wordbooks.js?v=295",
   "./js/doc-parser.js?v=295",
   "./js/doc-reader.js?v=295",
   "./js/native-bridge.js?v=295",
   "./js/app.js?v=295",
+  // @shell-esm-start
+  // @shell-esm-end
   "./vendor/idb.js",
   "./vendor/html-to-image.js?v=295",
   "./vendor/lenis.min.js?v=295",
@@ -40,7 +43,7 @@ const SHELL = [
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL))
+      .then((cache) => cache.addAll(SHELL.map((url) => new Request(url, { cache: "reload" }))))
       .then(() => self.skipWaiting())
   );
 });

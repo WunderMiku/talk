@@ -1,6 +1,7 @@
 dist/
 node_modules
 preview/
+test-results/
 .DS_Store
 
 # Local AI/tool configuration — may contain API keys or tokens.
